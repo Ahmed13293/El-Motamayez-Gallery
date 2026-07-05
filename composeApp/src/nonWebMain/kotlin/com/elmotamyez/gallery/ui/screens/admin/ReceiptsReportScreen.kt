@@ -19,6 +19,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.elmotamyez.gallery.data.model.Receipt
+import com.elmotamyez.gallery.ui.screens.admin.ExpenseViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.formatPrice
 import kotlinx.datetime.*
@@ -33,7 +34,9 @@ class ReceiptsReportScreen : Screen {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val receiptVm: ReceiptViewModel = koinInject()
+        val expenseVm: ExpenseViewModel = koinInject()
         val allReceipts by receiptVm.receipts.collectAsState()
+        val allExpenses by expenseVm.expenses.collectAsState()
         val isLoading by receiptVm.isLoading.collectAsState()
 
         var filter by remember { mutableStateOf(ReportFilter.MONTHLY) }
@@ -45,9 +48,7 @@ class ReceiptsReportScreen : Screen {
                 ReportFilter.ALL -> allReceipts
                 ReportFilter.MONTHLY -> {
                     val prefix = "${today.year}-${today.monthNumber.toString().padStart(2, '0')}"
-                    allReceipts.filter { r ->
-                        r.createdAt?.startsWith(prefix) == true
-                    }
+                    allReceipts.filter { r -> r.createdAt?.startsWith(prefix) == true }
                 }
                 ReportFilter.WEEKLY -> {
                     val sevenDaysAgo = today.minus(6, DateTimeUnit.DAY)
@@ -59,10 +60,29 @@ class ReceiptsReportScreen : Screen {
             }
         }
 
-        val totalIncome  = filtered.filter { it.isPaid }.sumOf { it.total }
-        val totalDebited = filtered.filter { !it.isPaid }.sumOf { it.total }
-        val paidCount    = filtered.count { it.isPaid }
-        val debitCount   = filtered.count { !it.isPaid }
+        val filteredExpenses = remember(allExpenses, filter) {
+            when (filter) {
+                ReportFilter.ALL -> allExpenses
+                ReportFilter.MONTHLY -> {
+                    val prefix = "${today.year}-${today.monthNumber.toString().padStart(2, '0')}"
+                    allExpenses.filter { e -> e.createdAt?.startsWith(prefix) == true }
+                }
+                ReportFilter.WEEKLY -> {
+                    val sevenDaysAgo = today.minus(6, DateTimeUnit.DAY)
+                    allExpenses.filter { e ->
+                        val dateStr = e.createdAt?.take(10) ?: return@filter false
+                        dateStr >= sevenDaysAgo.toString() && dateStr <= today.toString()
+                    }
+                }
+            }
+        }
+
+        val totalIncome   = filtered.filter { it.isPaid }.sumOf { it.total }
+        val totalDebited  = filtered.filter { !it.isPaid }.sumOf { it.total }
+        val totalExpenses = filteredExpenses.sumOf { it.amount }
+        val netProfit     = (totalIncome + totalDebited) - totalExpenses
+        val paidCount     = filtered.count { it.isPaid }
+        val debitCount    = filtered.count { !it.isPaid }
 
         Scaffold(
             topBar = {
@@ -141,32 +161,77 @@ class ReceiptsReportScreen : Screen {
                     }
                 }
 
-                // ── Net total ─────────────────────────────────────────────────
+                // ── Expenses card ─────────────────────────────────────────────
+                if (filteredExpenses.isNotEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text("المصاريف", style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.outline)
+                                    Text("${filteredExpenses.size} مصروف",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline)
+                                }
+                                Text(totalExpenses.formatPrice(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
+
+                // ── Net total & profit ────────────────────────────────────────
                 item {
+                    val profitColor = if (netProfit >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                            containerColor = if (netProfit >= 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
                         )
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "إجمالي الفترة",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                (totalIncome + totalDebited).formatPrice(),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("إجمالي المبيعات",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Text((totalIncome + totalDebited).formatPrice(),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
+                            if (filteredExpenses.isNotEmpty()) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text("المصاريف",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    Text("− ${totalExpenses.formatPrice()}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.error)
+                                }
+                                HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("صافي الربح",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Text(netProfit.formatPrice(),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = profitColor)
+                            }
                         }
                     }
                 }

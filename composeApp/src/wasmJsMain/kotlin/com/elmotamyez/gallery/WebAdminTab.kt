@@ -461,56 +461,108 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
 @Composable
 private fun AdminReportSection(isMobile: Boolean = false) {
     val receiptVm: ReceiptViewModel = koinInject()
+    val expenseVm: ExpenseViewModel = koinInject()
     val receipts by receiptVm.receipts.collectAsState()
+    val expenses by expenseVm.expenses.collectAsState()
 
     val grouped = receipts
         .sortedByDescending { it.orderNumber }
         .groupBy { it.dateKey() }
         .entries.sortedByDescending { it.key }
 
-    val grandTotal = receipts.sumOf { it.total }
-    val grandCount = receipts.size
+    val grandRevenue  = receipts.sumOf { it.total }
+    val grandExpenses = expenses.sumOf { it.amount }
+    val grandProfit   = grandRevenue - grandExpenses
+    val grandCount    = receipts.size
 
-    Column(Modifier.fillMaxSize().padding(if (isMobile) 12.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("تقرير المبيعات", style = if (isMobile) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(if (isMobile) 12.dp else 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Text("تقرير المبيعات", style = if (isMobile) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
 
-        // Summary cards — row on desktop, 2-col grid on mobile
-        if (isMobile) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SummaryCard("إجمالي المبيعات", "${grandTotal.formatPrice()} ج", Icons.Default.Payments, Modifier.weight(1f))
-                SummaryCard("الفواتير", "$grandCount فاتورة", Icons.Default.Receipt, Modifier.weight(1f))
-            }
-            SummaryCard("أيام النشاط", "${grouped.size} يوم", Icons.Default.CalendarMonth, Modifier.fillMaxWidth())
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SummaryCard("إجمالي المبيعات", "${grandTotal.formatPrice()} ج", Icons.Default.Payments, Modifier.weight(1f))
-                SummaryCard("عدد الفواتير", "$grandCount فاتورة", Icons.Default.Receipt, Modifier.weight(1f))
-                SummaryCard("أيام النشاط", "${grouped.size} يوم", Icons.Default.CalendarMonth, Modifier.weight(1f))
+        // ── Top summary cards ──────────────────────────────────────────────────
+        item {
+            if (isMobile) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SummaryCard("إجمالي المبيعات", "${grandRevenue.formatPrice()} ج", Icons.Default.Payments, Modifier.weight(1f))
+                        SummaryCard("إجمالي المصاريف", "${grandExpenses.formatPrice()} ج", Icons.Default.MoneyOff, Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SummaryCard("الفواتير", "$grandCount فاتورة", Icons.Default.Receipt, Modifier.weight(1f))
+                        SummaryCard("أيام النشاط", "${grouped.size} يوم", Icons.Default.CalendarMonth, Modifier.weight(1f))
+                    }
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SummaryCard("إجمالي المبيعات", "${grandRevenue.formatPrice()} ج", Icons.Default.Payments, Modifier.weight(1f))
+                    SummaryCard("إجمالي المصاريف", "${grandExpenses.formatPrice()} ج", Icons.Default.MoneyOff, Modifier.weight(1f))
+                    SummaryCard("عدد الفواتير", "$grandCount فاتورة", Icons.Default.Receipt, Modifier.weight(1f))
+                    SummaryCard("أيام النشاط", "${grouped.size} يوم", Icons.Default.CalendarMonth, Modifier.weight(1f))
+                }
             }
         }
 
-        HorizontalDivider()
-        Text("تفصيل يومي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        // ── Net profit card ────────────────────────────────────────────────────
+        item {
+            val profitColor = if (grandProfit >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = if (grandProfit >= 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("صافي الربح", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                            color = if (grandProfit >= 0) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer)
+                        Text("المبيعات − المصاريف", style = MaterialTheme.typography.labelSmall,
+                            color = if (grandProfit >= 0) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f))
+                    }
+                    Text("${grandProfit.formatPrice()} ج", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = profitColor)
+                }
+            }
+        }
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            grouped.forEach { (dateKey, dayReceipts) ->
-                val dayTotal = dayReceipts.sumOf { it.total }
-                val cashTotal = dayReceipts.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
-                val netTotal  = dayReceipts.filter { it.paymentMethod == "شبكة" }.sumOf { it.total }
-                val deferTotal= dayReceipts.filter { it.paymentMethod == "آجل" }.sumOf { it.total }
-                item(key = "rep_$dateKey") {
-                    Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val displayDate = try { val (y,m,d) = dateKey.split("-"); "$d/$m/$y" } catch (_:Exception) { dateKey }
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Text(displayDate, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                Text("${dayTotal.formatPrice()} ج", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        // ── Daily breakdown ────────────────────────────────────────────────────
+        item { HorizontalDivider() }
+        item { Text("تفصيل يومي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+
+        grouped.forEach { (dateKey, dayReceipts) ->
+            val dayRevenue   = dayReceipts.sumOf { it.total }
+            val cashTotal    = dayReceipts.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
+            val networkTotal = dayReceipts.filter { it.paymentMethod == "شبكة" }.sumOf { it.total }
+            val deferTotal   = dayReceipts.filter { it.paymentMethod == "آجل" }.sumOf { it.total }
+            val dayExpenses  = expenses.filter { it.createdAt?.take(10) == dateKey }.sumOf { it.amount }
+            val dayProfit    = dayRevenue - dayExpenses
+
+            item(key = "rep_$dateKey") {
+                Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val displayDate = try { val (y,m,d) = dateKey.split("-"); "$d/$m/$y" } catch (_:Exception) { dateKey }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(displayDate, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("${dayRevenue.formatPrice()} ج", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("${dayReceipts.size} فاتورة", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (cashTotal    > 0) Text("كاش: ${cashTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            if (networkTotal > 0) Text("شبكة: ${networkTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            if (deferTotal   > 0) Text("آجل: ${deferTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        }
+                        if (dayExpenses > 0) {
+                            HorizontalDivider(thickness = 0.5.dp)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("مصاريف اليوم", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("− ${dayExpenses.formatPrice()} ج", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
                             }
-                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                Text("${dayReceipts.size} فاتورة", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (cashTotal  > 0) Text("كاش: ${cashTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                                if (netTotal   > 0) Text("شبكة: ${netTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                                if (deferTotal > 0) Text("آجل: ${deferTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("صافي اليوم", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                Text("${dayProfit.formatPrice()} ج", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold,
+                                    color = if (dayProfit >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
                             }
                         }
                     }
