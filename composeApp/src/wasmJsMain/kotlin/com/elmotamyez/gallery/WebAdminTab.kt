@@ -1,9 +1,11 @@
 package com.elmotamyez.gallery
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,24 +23,34 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import com.elmotamyez.gallery.data.model.Brand
+import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Category
+import com.elmotamyez.gallery.data.model.Expense
 import com.elmotamyez.gallery.data.model.Product
+import com.elmotamyez.gallery.data.model.Receipt
 import com.elmotamyez.gallery.data.model.User
 import com.elmotamyez.gallery.data.model.UserRole
+import com.elmotamyez.gallery.data.repository.ProductRepository
 import com.elmotamyez.gallery.ui.screens.admin.AdminViewModel
+import com.elmotamyez.gallery.ui.screens.admin.ExpenseViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.fmt2f
 import com.elmotamyez.gallery.util.formatPrice
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 private enum class AdminSection(val label: String, val icon: ImageVector) {
-    PROFILE(  "الحساب",    Icons.Default.Person),
-    CATEGORIES("الأقسام",  Icons.Default.Category),
-    BRANDS(   "الفئات",    Icons.Default.SubdirectoryArrowRight),
-    PRODUCTS( "المنتجات",  Icons.Default.Inventory),
-    REPORT(   "التقارير",  Icons.Default.BarChart),
+    PROFILE(   "الحساب",       Icons.Default.Person),
+    CATEGORIES("الأقسام",     Icons.Default.Category),
+    BRANDS(    "الفئات",      Icons.Default.SubdirectoryArrowRight),
+    PRODUCTS(  "المنتجات",    Icons.Default.Inventory),
+    REPORT(    "التقارير",    Icons.Default.BarChart),
+    EXPENSES(  "المصاريف",    Icons.Default.Payments),
+    ANALYSIS(  "تحليل المبيعات", Icons.Default.TrendingUp),
 }
 
 @Composable
@@ -86,6 +98,8 @@ internal fun WebAdminTab(user: User, onLogout: () -> Unit) {
                         AdminSection.BRANDS     -> AdminBrandsSection(state.brands, state.categories, adminVm)
                         AdminSection.PRODUCTS   -> AdminProductsSection(state.products, state.categories, state.brands, adminVm, isMobile = true)
                         AdminSection.REPORT     -> AdminReportSection(isMobile = true)
+                        AdminSection.EXPENSES   -> AdminExpensesSection(isMobile = true)
+                        AdminSection.ANALYSIS   -> AdminSalesAnalysisSection(isMobile = true)
                     }
                 }
             }
@@ -129,6 +143,8 @@ internal fun WebAdminTab(user: User, onLogout: () -> Unit) {
                         AdminSection.BRANDS     -> AdminBrandsSection(state.brands, state.categories, adminVm)
                         AdminSection.PRODUCTS   -> AdminProductsSection(state.products, state.categories, state.brands, adminVm)
                         AdminSection.REPORT     -> AdminReportSection()
+                        AdminSection.EXPENSES   -> AdminExpensesSection()
+                        AdminSection.ANALYSIS   -> AdminSalesAnalysisSection()
                     }
                 }
             }
@@ -665,3 +681,298 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
     )
 }
 
+// ── Expenses Section ──────────────────────────────────────────────────────────
+
+private val EXPENSE_TYPES = listOf("الإيجار", "مرتبات", "النت", "الكهرباء", "مصاريف عامة")
+
+@Composable
+private fun AdminExpensesSection(isMobile: Boolean = false) {
+    val vm: ExpenseViewModel = koinInject()
+    val expenses by vm.expenses.collectAsState()
+    val isSaving by vm.isSaving.collectAsState()
+
+    var showAdd      by remember { mutableStateOf(false) }
+    var editTarget   by remember { mutableStateOf<Expense?>(null) }
+    var deleteTarget by remember { mutableStateOf<Expense?>(null) }
+
+    if (showAdd) {
+        ExpenseDialog(title = "إضافة مصروف", initial = null, isSaving = isSaving,
+            onConfirm = { type, amount, note -> vm.addExpense(type, amount, note) {}; showAdd = false },
+            onDismiss = { showAdd = false })
+    }
+    editTarget?.let { expense ->
+        ExpenseDialog(title = "تعديل: ${expense.type}", initial = expense, isSaving = isSaving,
+            onConfirm = { type, amount, note ->
+                vm.updateExpense(expense.copy(type = type, amount = amount, note = note?.ifBlank { null })) {}
+                editTarget = null
+            },
+            onDismiss = { editTarget = null })
+    }
+    deleteTarget?.let { expense ->
+        ConfirmDeleteDialog(
+            message = "هل تريد حذف \"${expense.type}\" بقيمة ${expense.amount.formatPrice()} ج؟",
+            onConfirm = { vm.deleteExpense(expense.id); deleteTarget = null },
+            onDismiss = { deleteTarget = null })
+    }
+
+    Column(Modifier.fillMaxSize().padding(if (isMobile) 12.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("المصاريف", style = if (isMobile) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Button(onClick = { showAdd = true }, shape = RoundedCornerShape(10.dp)) {
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("إضافة مصروف")
+            }
+        }
+
+        if (expenses.isNotEmpty()) {
+            val total = expenses.sumOf { it.amount }
+            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("إجمالي المصاريف", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text("${total.formatPrice()} ج", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
+        if (expenses.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("لا توجد مصاريف مسجّلة", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(expenses, key = { it.id }) { expense ->
+                    val dateText = expense.createdAt?.let { raw ->
+                        try { "${raw.substring(8,10)}/${raw.substring(5,7)}/${raw.substring(0,4)}" } catch (_: Exception) { null }
+                    }
+                    Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp), modifier = Modifier.fillMaxWidth()) {
+                        Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(expense.type, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                                if (!expense.note.isNullOrBlank()) Text(expense.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (dateText != null) Text(dateText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                            }
+                            Text("${expense.amount.formatPrice()} ج", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(4.dp))
+                            IconButton(onClick = { editTarget = expense }, modifier = Modifier.size(36.dp)) {
+                                Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            }
+                            IconButton(onClick = { deleteTarget = expense }, modifier = Modifier.size(36.dp)) {
+                                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpenseDialog(title: String, initial: Expense?, isSaving: Boolean, onConfirm: (String, Double, String?) -> Unit, onDismiss: () -> Unit) {
+    var selectedType by remember { mutableStateOf(initial?.type) }
+    var amountInput  by remember { mutableStateOf(initial?.amount?.let { if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString() } ?: "") }
+    var noteInput    by remember { mutableStateOf(initial?.note ?: "") }
+    val isEdit = initial != null
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (!isEdit && selectedType == null) {
+                    Text("اختر نوع المصروف", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    EXPENSE_TYPES.forEach { type ->
+                        Surface(onClick = { selectedType = type }, shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+                            Text(type, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                } else {
+                    if (!isEdit) Text("النوع: ${selectedType!!}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(value = amountInput,
+                        onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) amountInput = it },
+                        label = { Text("القيمة (جنيه)") }, suffix = { Text("ج") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = noteInput, onValueChange = { noteInput = it },
+                        label = { Text("ملاحظة (اختياري)") }, minLines = 2, maxLines = 3,
+                        shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                }
+            }
+        },
+        confirmButton = {
+            if (selectedType != null || isEdit) {
+                Button(onClick = {
+                    val amount = amountInput.toDoubleOrNull() ?: return@Button
+                    onConfirm(selectedType ?: initial!!.type, amount, noteInput.ifBlank { null })
+                }, enabled = amountInput.toDoubleOrNull() != null && !isSaving) {
+                    if (isSaving) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                    else Text(if (isEdit) "حفظ التعديل" else "تأكيد المصروف")
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
+    )
+}
+
+// ── Sales Analysis Section ────────────────────────────────────────────────────
+
+private enum class WebGroupBy { CATEGORY, SUB_CATEGORY, PRODUCT }
+
+private data class WebSalesRow(val label: String, val revenue: Double, val quantity: Int, val orderCount: Int)
+
+private fun webAggregate(
+    receipts: List<Receipt>,
+    groupBy: WebGroupBy,
+    categories: List<Category>,
+    brands: List<Brand>
+): List<WebSalesRow> {
+    data class FlatItem(val item: CartItem, val receiptId: String)
+    val flat     = receipts.flatMap { r -> r.items.map { FlatItem(it, r.id) } }
+    val catMap   = categories.associateBy { it.id }
+    val brandMap = brands.associateBy { it.id }
+    val grouped  = flat.groupBy { fi ->
+        when (groupBy) {
+            WebGroupBy.CATEGORY     -> catMap[fi.item.product.categoryId]?.name ?: fi.item.product.categoryId
+            WebGroupBy.SUB_CATEGORY -> brandMap[fi.item.product.brandId]?.name  ?: fi.item.product.brandId
+            WebGroupBy.PRODUCT      -> fi.item.product.name
+        }
+    }
+    return grouped.map { (label, items) ->
+        WebSalesRow(
+            label      = label,
+            revenue    = items.sumOf { it.item.totalPrice },
+            quantity   = items.sumOf { it.item.quantity },
+            orderCount = items.map { it.receiptId }.toSet().size
+        )
+    }.sortedByDescending { it.revenue }
+}
+
+@Composable
+private fun AdminSalesAnalysisSection(isMobile: Boolean = false) {
+    val receiptVm   = koinInject<ReceiptViewModel>()
+    val productRepo = koinInject<ProductRepository>()
+    val scope       = rememberCoroutineScope()
+
+    val allReceipts by receiptVm.receipts.collectAsState()
+    var groupBy   by remember { mutableStateOf(WebGroupBy.CATEGORY) }
+    var fromDate  by remember { mutableStateOf("") }
+    var toDate    by remember { mutableStateOf("") }
+    var categories by remember { mutableStateOf<List<Category>>(emptyList()) }
+    var brands     by remember { mutableStateOf<List<Brand>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        scope.launch { runCatching { categories = productRepo.getCategories(); brands = productRepo.getBrands() } }
+    }
+
+    val filtered = remember(allReceipts, fromDate, toDate) {
+        allReceipts.filter { r ->
+            val d = r.createdAt?.take(10) ?: return@filter true
+            (fromDate.isBlank() || d >= fromDate) && (toDate.isBlank() || d <= toDate)
+        }
+    }
+    val rows = remember(filtered, groupBy, categories, brands) { webAggregate(filtered, groupBy, categories, brands) }
+    val totalRevenue = rows.sumOf { it.revenue }
+
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(if (isMobile) 12.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item {
+            Text("تحليل المبيعات", style = if (isMobile) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
+
+        // Date filters
+        item {
+            Text("الفترة الزمنية", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = fromDate, onValueChange = { fromDate = it },
+                    label = { Text("من (YYYY-MM-DD)") }, singleLine = true,
+                    shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f))
+                OutlinedTextField(value = toDate, onValueChange = { toDate = it },
+                    label = { Text("إلى (YYYY-MM-DD)") }, singleLine = true,
+                    shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f))
+            }
+            if (fromDate.isNotBlank() || toDate.isNotBlank()) {
+                TextButton(onClick = { fromDate = ""; toDate = "" }) { Text("مسح الفلتر") }
+            }
+        }
+
+        // Group-by toggle
+        item {
+            Text("تجميع حسب", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)).padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                WebGroupBy.entries.forEach { g ->
+                    val label = when (g) { WebGroupBy.CATEGORY -> "القسم"; WebGroupBy.SUB_CATEGORY -> "الفئة الفرعية"; WebGroupBy.PRODUCT -> "المنتج" }
+                    val selected = groupBy == g
+                    Surface(onClick = { groupBy = g }, shape = RoundedCornerShape(10.dp),
+                        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        modifier = Modifier.weight(1f).height(40.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Summary card
+        item {
+            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("إجمالي المبيعات", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text("${filtered.size} فاتورة  •  ${rows.size} ${when (groupBy) { WebGroupBy.CATEGORY -> "قسم"; WebGroupBy.SUB_CATEGORY -> "فئة"; WebGroupBy.PRODUCT -> "منتج" }}",
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                    }
+                    Text("${totalRevenue.formatPrice()} ج", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
+        // Results
+        if (rows.isEmpty()) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) {
+                    Text("لا توجد مبيعات في هذه الفترة", color = MaterialTheme.colorScheme.outline)
+                }
+            }
+        } else {
+            item {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("الاسم", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(1f))
+                    Text("الكمية", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.Center, modifier = Modifier.width(48.dp))
+                    Text("الإيراد", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.End, modifier = Modifier.width(if (isMobile) 80.dp else 96.dp))
+                }
+            }
+            itemsIndexed(rows) { index, row ->
+                val fraction = if (totalRevenue > 0) (row.revenue / totalRevenue).toFloat() else 0f
+                val rankColor = when (index + 1) { 1 -> Color(0xFFFFD700); 2 -> Color(0xFFC0C0C0); 3 -> Color(0xFFCD7F32); else -> MaterialTheme.colorScheme.surfaceVariant }
+                Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Surface(shape = CircleShape, color = rankColor, modifier = Modifier.size(28.dp)) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("${index + 1}", fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                        color = if (index < 3) Color(0xFF3A2A00) else MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Text(row.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                            Text("${row.quantity}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, textAlign = TextAlign.Center, modifier = Modifier.width(48.dp))
+                            Text("${row.revenue.formatPrice()} ج", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.End, modifier = Modifier.width(if (isMobile) 80.dp else 96.dp))
+                        }
+                        Box(modifier = Modifier.fillMaxWidth().height(4.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)) {
+                            Box(modifier = Modifier.fillMaxWidth(fraction).height(4.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+                        }
+                        Text("${row.orderCount} فاتورة", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                    }
+                }
+            }
+        }
+    }
+}
