@@ -146,61 +146,75 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
     val cartItems by cartVm.cartItems.collectAsState()
     val isAdmin = user.role == UserRole.ADMIN
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        // Top bar
-        Surface(tonalElevation = 4.dp) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "مكتبة المتميز",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("مرحباً، ${user.name}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton(onClick = onLogout, shape = RoundedCornerShape(10.dp)) { Text("خروج") }
-                }
-            }
-        }
+    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        val isMobile = maxWidth < 600.dp
 
-        // Tab Row — admin tab shown only for ADMIN role
-        val tabCount = if (isAdmin) 4 else 3
-        TabRow(selectedTabIndex = currentTab.ordinal.coerceAtMost(tabCount - 1), containerColor = MaterialTheme.colorScheme.surface) {
-            Tab(selected = currentTab == WebTab.HOME, onClick = { currentTab = WebTab.HOME }, text = {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Default.Home, null, modifier = Modifier.size(18.dp)); Text("المنتجات")
-                }
-            })
-            Tab(selected = currentTab == WebTab.CART, onClick = { currentTab = WebTab.CART }, text = {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(18.dp)); Text("السلة")
-                    if (cartItems.isNotEmpty()) Badge { Text("${cartItems.size}") }
-                }
-            })
-            Tab(selected = currentTab == WebTab.RECEIPTS, onClick = { currentTab = WebTab.RECEIPTS }, text = {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Default.Receipt, null, modifier = Modifier.size(18.dp)); Text("الفواتير")
-                }
-            })
-            if (isAdmin) {
-                Tab(selected = currentTab == WebTab.ADMIN, onClick = { currentTab = WebTab.ADMIN }, text = {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Default.AdminPanelSettings, null, modifier = Modifier.size(18.dp)); Text("الإدارة")
+        Column(Modifier.fillMaxSize()) {
+            // Top bar — compact on mobile
+            Surface(tonalElevation = 4.dp) {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = if (isMobile) 12.dp else 24.dp, vertical = if (isMobile) 8.dp else 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "مكتبة المتميز",
+                        style = if (isMobile) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!isMobile) {
+                            Text("مرحباً، ${user.name}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        OutlinedButton(
+                            onClick = onLogout,
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = if (isMobile) PaddingValues(horizontal = 10.dp, vertical = 4.dp) else ButtonDefaults.ContentPadding
+                        ) { Text("خروج", fontSize = if (isMobile) 12.sp else 14.sp) }
                     }
-                })
+                }
             }
-        }
 
-        // Content
-        when (currentTab) {
-            WebTab.HOME     -> WebHomeTab(cartVm = cartVm)
-            WebTab.CART     -> WebCartTab(cartVm = cartVm, user = user, onOrderConfirmed = { currentTab = WebTab.RECEIPTS })
-            WebTab.RECEIPTS -> WebReceiptsTab()
-            WebTab.ADMIN    -> if (isAdmin) WebAdminTab(user = user, onLogout = onLogout)
+            // Tab Row — icons only on mobile to avoid overflow
+            val selectedIndex = currentTab.ordinal.coerceAtMost(if (isAdmin) 3 else 2)
+            ScrollableTabRow(
+                selectedTabIndex = selectedIndex,
+                containerColor = MaterialTheme.colorScheme.surface,
+                edgePadding = if (isMobile) 0.dp else 16.dp
+            ) {
+                Tab(selected = currentTab == WebTab.HOME, onClick = { currentTab = WebTab.HOME },
+                    icon = { Icon(Icons.Default.Home, null, modifier = Modifier.size(20.dp)) },
+                    text = if (isMobile) null else ({ Text("المنتجات") })
+                )
+                Tab(selected = currentTab == WebTab.CART, onClick = { currentTab = WebTab.CART },
+                    icon = {
+                        BadgedBox(badge = { if (cartItems.isNotEmpty()) Badge { Text("${cartItems.size}") } }) {
+                            Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(20.dp))
+                        }
+                    },
+                    text = if (isMobile) null else ({ Text("السلة") })
+                )
+                Tab(selected = currentTab == WebTab.RECEIPTS, onClick = { currentTab = WebTab.RECEIPTS },
+                    icon = { Icon(Icons.Default.Receipt, null, modifier = Modifier.size(20.dp)) },
+                    text = if (isMobile) null else ({ Text("الفواتير") })
+                )
+                if (isAdmin) {
+                    Tab(selected = currentTab == WebTab.ADMIN, onClick = { currentTab = WebTab.ADMIN },
+                        icon = { Icon(Icons.Default.AdminPanelSettings, null, modifier = Modifier.size(20.dp)) },
+                        text = if (isMobile) null else ({ Text("الإدارة") })
+                    )
+                }
+            }
+
+            // Content
+            when (currentTab) {
+                WebTab.HOME     -> WebHomeTab(cartVm = cartVm, isMobile = isMobile)
+                WebTab.CART     -> WebCartTab(cartVm = cartVm, user = user, isMobile = isMobile, onOrderConfirmed = { currentTab = WebTab.RECEIPTS })
+                WebTab.RECEIPTS -> WebReceiptsTab()
+                WebTab.ADMIN    -> if (isAdmin) WebAdminTab(user = user, onLogout = onLogout)
+            }
         }
     }
 }
@@ -208,7 +222,7 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
 // ── Home Tab ──────────────────────────────────────────────────────────────────
 
 @Composable
-private fun WebHomeTab(cartVm: CartViewModel) {
+private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
     val productsVm: ProductsViewModel = koinViewModel()
     val state by productsVm.uiState.collectAsState()
     val cartItems by cartVm.cartItems.collectAsState()
@@ -221,39 +235,10 @@ private fun WebHomeTab(cartVm: CartViewModel) {
                 Button(onClick = { productsVm.retry() }) { Text("إعادة المحاولة") }
             }
         }
-        else -> Row(Modifier.fillMaxSize()) {
-            // Categories sidebar
-            Surface(modifier = Modifier.width(210.dp).fillMaxHeight(), tonalElevation = 1.dp) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    item {
-                        Text("الأقسام", style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp))
-                    }
-                    items(state.categories) { cat ->
-                        val selected = state.selectedCategoryId == cat.id
-                        Surface(
-                            onClick = { productsVm.selectCategory(cat.id) },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(cat.name, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-            }
-
-            // Products area
-            Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        else -> if (isMobile) {
+            // ── Mobile: categories as horizontal chips, products below ──────
+            Column(Modifier.fillMaxSize()) {
+                // Search bar
                 OutlinedTextField(
                     value = state.searchQuery,
                     onValueChange = { productsVm.search(it) },
@@ -265,28 +250,90 @@ private fun WebHomeTab(cartVm: CartViewModel) {
                     },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
                 )
-
+                // Category chips row
+                androidx.compose.foundation.lazy.LazyRow(
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(state.categories) { cat ->
+                        val selected = state.selectedCategoryId == cat.id
+                        FilterChip(
+                            selected = selected,
+                            onClick = { productsVm.selectCategory(cat.id) },
+                            label = { Text(cat.name, maxLines = 1) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                // Products grid
                 if (state.products.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("لا توجد منتجات", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 180.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(bottom = 16.dp)
+                        columns = GridCells.Fixed(2),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                     ) {
                         items(state.products) { product ->
                             val qty = cartItems.find { it.product.id == product.id }?.quantity ?: 0
-                            WebProductCard(
-                                product = product, quantity = qty,
-                                onAdd      = { cartVm.addToCart(product) },
+                            WebProductCard(product = product, quantity = qty, isMobile = true,
+                                onAdd = { cartVm.addToCart(product) },
                                 onIncrease = { cartVm.increaseQuantity(product.id) },
-                                onDecrease = { cartVm.decreaseQuantity(product.id) }
-                            )
+                                onDecrease = { cartVm.decreaseQuantity(product.id) })
+                        }
+                    }
+                }
+            }
+        } else {
+            // ── Desktop: sidebar + products ──────────────────────────────────
+            Row(Modifier.fillMaxSize()) {
+                Surface(modifier = Modifier.width(210.dp).fillMaxHeight(), tonalElevation = 1.dp) {
+                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        item {
+                            Text("الأقسام", style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp))
+                        }
+                        items(state.categories) { cat ->
+                            val selected = state.selectedCategoryId == cat.id
+                            Surface(onClick = { productsVm.selectCategory(cat.id) }, shape = RoundedCornerShape(10.dp),
+                                color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.fillMaxWidth()) {
+                                Text(cat.name, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+                Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(value = state.searchQuery, onValueChange = { productsVm.search(it) },
+                        placeholder = { Text("بحث عن منتج...") }, leadingIcon = { Icon(Icons.Default.Search, null) },
+                        trailingIcon = { if (state.searchQuery.isNotEmpty()) IconButton(onClick = { productsVm.search("") }) { Icon(Icons.Default.Clear, null) } },
+                        singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                    if (state.products.isEmpty()) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("لا توجد منتجات", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    } else {
+                        LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 180.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(bottom = 16.dp)) {
+                            items(state.products) { product ->
+                                val qty = cartItems.find { it.product.id == product.id }?.quantity ?: 0
+                                WebProductCard(product = product, quantity = qty, isMobile = false,
+                                    onAdd = { cartVm.addToCart(product) },
+                                    onIncrease = { cartVm.increaseQuantity(product.id) },
+                                    onDecrease = { cartVm.decreaseQuantity(product.id) })
+                            }
                         }
                     }
                 }
@@ -296,13 +343,14 @@ private fun WebHomeTab(cartVm: CartViewModel) {
 }
 
 @Composable
-private fun WebProductCard(product: Product, quantity: Int, onAdd: () -> Unit, onIncrease: () -> Unit, onDecrease: () -> Unit) {
+private fun WebProductCard(product: Product, quantity: Int, isMobile: Boolean = false, onAdd: () -> Unit, onIncrease: () -> Unit, onDecrease: () -> Unit) {
     val outOfStock = product.stock == 0
     val inCart = quantity > 0
     Card(shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(2.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(product.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.height(44.dp))
+        Column(Modifier.padding(if (isMobile) 8.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(if (isMobile) 6.dp else 8.dp)) {
+            Text(product.name, style = if (isMobile) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.height(if (isMobile) 36.dp else 44.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("${product.price.fmt2f()} ج", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Surface(shape = RoundedCornerShape(6.dp),
@@ -341,7 +389,7 @@ private fun WebProductCard(product: Product, quantity: Int, onAdd: () -> Unit, o
 // ── Cart Tab ──────────────────────────────────────────────────────────────────
 
 @Composable
-private fun WebCartTab(cartVm: CartViewModel, user: User, onOrderConfirmed: () -> Unit) {
+private fun WebCartTab(cartVm: CartViewModel, user: User, isMobile: Boolean = false, onOrderConfirmed: () -> Unit) {
     val receiptVm: ReceiptViewModel = koinInject()
     val cartItems by cartVm.cartItems.collectAsState()
     var discount by remember { mutableStateOf("") }
@@ -361,9 +409,9 @@ private fun WebCartTab(cartVm: CartViewModel, user: User, onOrderConfirmed: () -
         return
     }
 
-    Row(Modifier.fillMaxSize().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(bottom = 16.dp)) {
+    if (isMobile) {
+        // Mobile: stacked vertically — items list + summary card in one LazyColumn
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
                 Text("عناصر السلة (${cartItems.size})", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
@@ -374,38 +422,88 @@ private fun WebCartTab(cartVm: CartViewModel, user: User, onOrderConfirmed: () -
                     onDecrease = { cartVm.decreaseQuantity(item.product.id) },
                     onRemove   = { cartVm.removeFromCart(item.product.id) })
             }
-        }
-
-        Card(modifier = Modifier.width(300.dp).fillMaxHeight(), shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(4.dp)) {
-            Column(modifier = Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("ملخص الطلب", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                HorizontalDivider()
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("المجموع", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${cartVm.totalPrice.fmt2f()} ج", fontWeight = FontWeight.SemiBold)
-                }
-                OutlinedTextField(value = discount, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) discount = it },
-                    label = { Text("خصم") }, suffix = { Text("ج") }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
-                HorizontalDivider()
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("الإجمالي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("${total.fmt2f()} ج", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                }
-                HorizontalDivider()
-                Text("طريقة الدفع", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("كاش", "شبكة", "آجل").forEach { method ->
-                        FilterChip(selected = paymentMethod == method, onClick = { paymentMethod = method }, label = { Text(method) })
+            item {
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(4.dp)) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("ملخص الطلب", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        HorizontalDivider()
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("المجموع", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${cartVm.totalPrice.fmt2f()} ج", fontWeight = FontWeight.SemiBold)
+                        }
+                        OutlinedTextField(value = discount, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) discount = it },
+                            label = { Text("خصم") }, suffix = { Text("ج") }, singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                        HorizontalDivider()
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("الإجمالي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("${total.fmt2f()} ج", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                        HorizontalDivider()
+                        Text("طريقة الدفع", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("كاش", "شبكة", "آجل").forEach { method ->
+                                FilterChip(selected = paymentMethod == method, onClick = { paymentMethod = method }, label = { Text(method) })
+                            }
+                        }
+                        Button(onClick = { showConfirmDialog = true }, modifier = Modifier.fillMaxWidth().height(44.dp), shape = RoundedCornerShape(14.dp)) {
+                            Text("تأكيد الطلب", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                        OutlinedButton(onClick = { cartVm.clearCart() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                            Text("مسح السلة")
+                        }
                     }
                 }
-                Spacer(Modifier.weight(1f))
-                Button(onClick = { showConfirmDialog = true }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
-                    Text("تأكيد الطلب", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+    } else {
+        // Desktop: side-by-side
+        Row(Modifier.fillMaxSize().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)) {
+                item {
+                    Text("عناصر السلة (${cartItems.size})", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
                 }
-                OutlinedButton(onClick = { cartVm.clearCart() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
-                    Text("مسح السلة")
+                items(cartItems) { item ->
+                    WebCartItemRow(item = item,
+                        onIncrease = { cartVm.increaseQuantity(item.product.id) },
+                        onDecrease = { cartVm.decreaseQuantity(item.product.id) },
+                        onRemove   = { cartVm.removeFromCart(item.product.id) })
+                }
+            }
+            Card(modifier = Modifier.width(300.dp).fillMaxHeight(), shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(4.dp)) {
+                Column(modifier = Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text("ملخص الطلب", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    HorizontalDivider()
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("المجموع", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${cartVm.totalPrice.fmt2f()} ج", fontWeight = FontWeight.SemiBold)
+                    }
+                    OutlinedTextField(value = discount, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) discount = it },
+                        label = { Text("خصم") }, suffix = { Text("ج") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                    HorizontalDivider()
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("الإجمالي", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("${total.fmt2f()} ج", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                    HorizontalDivider()
+                    Text("طريقة الدفع", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("كاش", "شبكة", "آجل").forEach { method ->
+                            FilterChip(selected = paymentMethod == method, onClick = { paymentMethod = method }, label = { Text(method) })
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Button(onClick = { showConfirmDialog = true }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
+                        Text("تأكيد الطلب", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                    OutlinedButton(onClick = { cartVm.clearCart() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                        Text("مسح السلة")
+                    }
                 }
             }
         }
