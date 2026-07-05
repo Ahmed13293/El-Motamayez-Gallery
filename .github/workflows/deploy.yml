@@ -40,8 +40,6 @@ jobs:
 
       - name: Build wasmJs production bundle
         run: ./gradlew :composeApp:wasmJsBrowserDistribution --no-daemon
-        env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false"
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
