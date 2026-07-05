@@ -2,6 +2,7 @@ package com.elmotamyez.gallery
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,66 +47,90 @@ internal fun WebAdminTab(user: User, onLogout: () -> Unit) {
     val state by adminVm.state.collectAsState()
     var section by remember { mutableStateOf(AdminSection.PROFILE) }
 
-    // Show toast
-    state.toast?.let { msg ->
-        LaunchedEffect(msg) { adminVm.clearToast() }
-    }
+    state.toast?.let { msg -> LaunchedEffect(msg) { adminVm.clearToast() } }
 
-    Row(Modifier.fillMaxSize()) {
-        // ── Sidebar nav ───────────────────────────────────────────────────────
-        Surface(modifier = Modifier.width(190.dp).fillMaxHeight(), tonalElevation = 1.dp) {
-            Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("لوحة الإدارة", style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp))
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val isMobile = maxWidth < 600.dp
 
-                AdminSection.entries.forEach { s ->
-                    val selected = section == s
-                    Surface(
-                        onClick = { section = s },
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        if (isMobile) {
+            // ── Mobile: chips row at top, content below ───────────────────────
+            Column(Modifier.fillMaxSize()) {
+                Surface(tonalElevation = 1.dp) {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(s.icon, null, modifier = Modifier.size(18.dp),
-                                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(s.label,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        items(AdminSection.entries) { s ->
+                            FilterChip(
+                                selected = section == s,
+                                onClick = { section = s },
+                                label = { Text(s.label) },
+                                leadingIcon = { Icon(s.icon, null, modifier = Modifier.size(16.dp)) }
+                            )
                         }
                     }
                 }
-
-                Spacer(Modifier.weight(1f))
-
-                // Toast notification
                 state.toast?.let { msg ->
-                    Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-                        Text(msg, modifier = Modifier.padding(10.dp),
+                    Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+                        Text(msg, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
                 }
+                Box(Modifier.fillMaxSize()) {
+                    if (state.isLoading) CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    when (section) {
+                        AdminSection.PROFILE    -> AdminProfileSection(user, onLogout, isMobile = true)
+                        AdminSection.CATEGORIES -> AdminCategoriesSection(state.categories, adminVm)
+                        AdminSection.BRANDS     -> AdminBrandsSection(state.brands, state.categories, adminVm)
+                        AdminSection.PRODUCTS   -> AdminProductsSection(state.products, state.categories, state.brands, adminVm, isMobile = true)
+                        AdminSection.REPORT     -> AdminReportSection(isMobile = true)
+                    }
+                }
             }
-        }
-
-        // ── Content area ──────────────────────────────────────────────────────
-        Box(Modifier.fillMaxSize()) {
-            if (state.isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            }
-            when (section) {
-                AdminSection.PROFILE    -> AdminProfileSection(user, onLogout)
-                AdminSection.CATEGORIES -> AdminCategoriesSection(state.categories, adminVm)
-                AdminSection.BRANDS     -> AdminBrandsSection(state.brands, state.categories, adminVm)
-                AdminSection.PRODUCTS   -> AdminProductsSection(state.products, state.categories, state.brands, adminVm)
-                AdminSection.REPORT     -> AdminReportSection()
+        } else {
+            // ── Desktop: sidebar + content ─────────────────────────────────────
+            Row(Modifier.fillMaxSize()) {
+                Surface(modifier = Modifier.width(190.dp).fillMaxHeight(), tonalElevation = 1.dp) {
+                    Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("لوحة الإدارة", style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp))
+                        AdminSection.entries.forEach { s ->
+                            val selected = section == s
+                            Surface(onClick = { section = s }, shape = RoundedCornerShape(10.dp),
+                                color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.fillMaxWidth()) {
+                                Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Icon(s.icon, null, modifier = Modifier.size(18.dp),
+                                        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(s.label, style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.weight(1f))
+                        state.toast?.let { msg ->
+                            Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+                                Text(msg, modifier = Modifier.padding(10.dp), style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            }
+                        }
+                    }
+                }
+                Box(Modifier.fillMaxSize()) {
+                    if (state.isLoading) CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    when (section) {
+                        AdminSection.PROFILE    -> AdminProfileSection(user, onLogout)
+                        AdminSection.CATEGORIES -> AdminCategoriesSection(state.categories, adminVm)
+                        AdminSection.BRANDS     -> AdminBrandsSection(state.brands, state.categories, adminVm)
+                        AdminSection.PRODUCTS   -> AdminProductsSection(state.products, state.categories, state.brands, adminVm)
+                        AdminSection.REPORT     -> AdminReportSection()
+                    }
+                }
             }
         }
     }
@@ -114,10 +139,10 @@ internal fun WebAdminTab(user: User, onLogout: () -> Unit) {
 // ── Profile Section ───────────────────────────────────────────────────────────
 
 @Composable
-private fun AdminProfileSection(user: User, onLogout: () -> Unit) {
+private fun AdminProfileSection(user: User, onLogout: () -> Unit, isMobile: Boolean = false) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        modifier = Modifier.fillMaxSize().padding(if (isMobile) 16.dp else 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("معلومات الحساب", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
@@ -154,7 +179,7 @@ private fun AdminProfileSection(user: User, onLogout: () -> Unit) {
             onClick = onLogout,
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.width(240.dp).height(48.dp)
+            modifier = if (isMobile) Modifier.fillMaxWidth().height(48.dp) else Modifier.width(240.dp).height(48.dp)
         ) {
             Icon(Icons.Default.Logout, null, tint = Color.White)
             Spacer(Modifier.width(8.dp))
@@ -319,7 +344,7 @@ private fun AdminBrandsSection(brands: List<Brand>, categories: List<Category>, 
 // ── Products Section ──────────────────────────────────────────────────────────
 
 @Composable
-private fun AdminProductsSection(products: List<Product>, categories: List<Category>, brands: List<Brand>, adminVm: AdminViewModel) {
+private fun AdminProductsSection(products: List<Product>, categories: List<Category>, brands: List<Brand>, adminVm: AdminViewModel, isMobile: Boolean = false) {
     var showAdd by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<Product?>(null) }
     var deleteTarget by remember { mutableStateOf<Product?>(null) }
@@ -327,18 +352,33 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
 
     val filtered = if (searchQuery.isBlank()) products else products.filter { it.name.contains(searchQuery, ignoreCase = true) }
 
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("إدارة المنتجات", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it },
-                    placeholder = { Text("بحث...") }, singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    shape = RoundedCornerShape(10.dp), modifier = Modifier.width(220.dp))
-                Button(onClick = { showAdd = true }, shape = RoundedCornerShape(10.dp)) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("إضافة منتج")
+    Column(Modifier.fillMaxSize().padding(if (isMobile) 12.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (isMobile) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("إدارة المنتجات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Button(onClick = { showAdd = true }, shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("إضافة", fontSize = 13.sp)
+                }
+            }
+            OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it },
+                placeholder = { Text("بحث...") }, singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("إدارة المنتجات", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it },
+                        placeholder = { Text("بحث...") }, singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                        shape = RoundedCornerShape(10.dp), modifier = Modifier.width(220.dp))
+                    Button(onClick = { showAdd = true }, shape = RoundedCornerShape(10.dp)) {
+                        Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("إضافة منتج")
+                    }
                 }
             }
         }
@@ -405,7 +445,7 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
 // ── Report Section ────────────────────────────────────────────────────────────
 
 @Composable
-private fun AdminReportSection() {
+private fun AdminReportSection(isMobile: Boolean = false) {
     val receiptVm: ReceiptViewModel = koinInject()
     val receipts by receiptVm.receipts.collectAsState()
 
@@ -417,14 +457,22 @@ private fun AdminReportSection() {
     val grandTotal = receipts.sumOf { it.total }
     val grandCount = receipts.size
 
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("تقرير المبيعات", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Column(Modifier.fillMaxSize().padding(if (isMobile) 12.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("تقرير المبيعات", style = if (isMobile) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
-        // Summary cards
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SummaryCard("إجمالي المبيعات", "${grandTotal.formatPrice()} ج", Icons.Default.Payments, Modifier.weight(1f))
-            SummaryCard("عدد الفواتير", "$grandCount فاتورة", Icons.Default.Receipt, Modifier.weight(1f))
-            SummaryCard("أيام النشاط", "${grouped.size} يوم", Icons.Default.CalendarMonth, Modifier.weight(1f))
+        // Summary cards — row on desktop, 2-col grid on mobile
+        if (isMobile) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SummaryCard("إجمالي المبيعات", "${grandTotal.formatPrice()} ج", Icons.Default.Payments, Modifier.weight(1f))
+                SummaryCard("الفواتير", "$grandCount فاتورة", Icons.Default.Receipt, Modifier.weight(1f))
+            }
+            SummaryCard("أيام النشاط", "${grouped.size} يوم", Icons.Default.CalendarMonth, Modifier.fillMaxWidth())
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SummaryCard("إجمالي المبيعات", "${grandTotal.formatPrice()} ج", Icons.Default.Payments, Modifier.weight(1f))
+                SummaryCard("عدد الفواتير", "$grandCount فاتورة", Icons.Default.Receipt, Modifier.weight(1f))
+                SummaryCard("أيام النشاط", "${grouped.size} يوم", Icons.Default.CalendarMonth, Modifier.weight(1f))
+            }
         }
 
         HorizontalDivider()

@@ -417,7 +417,7 @@ private fun WebCartTab(cartVm: CartViewModel, user: User, isMobile: Boolean = fa
                     fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
             }
             items(cartItems) { item ->
-                WebCartItemRow(item = item,
+                WebCartItemRow(item = item, isMobile = true,
                     onIncrease = { cartVm.increaseQuantity(item.product.id) },
                     onDecrease = { cartVm.decreaseQuantity(item.product.id) },
                     onRemove   = { cartVm.removeFromCart(item.product.id) })
@@ -536,27 +536,51 @@ private fun WebCartTab(cartVm: CartViewModel, user: User, isMobile: Boolean = fa
 }
 
 @Composable
-private fun WebCartItemRow(item: CartItem, onIncrease: () -> Unit, onDecrease: () -> Unit, onRemove: () -> Unit) {
+private fun WebCartItemRow(item: CartItem, isMobile: Boolean = false, onIncrease: () -> Unit, onDecrease: () -> Unit, onRemove: () -> Unit) {
     Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp)) {
-        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(item.product.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${item.product.price.fmt2f()} ج للقطعة", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.width(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer).clickable { onDecrease() }, contentAlignment = Alignment.Center) {
-                    Text("−", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        if (isMobile) {
+            Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(item.product.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    IconButton(onClick = onRemove, modifier = Modifier.size(30.dp)) {
+                        Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                    }
                 }
-                Text("${item.quantity}", fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.Center)
-                Box(Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer).clickable { onIncrease() }, contentAlignment = Alignment.Center) {
-                    Text("+", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer).clickable { onDecrease() }, contentAlignment = Alignment.Center) {
+                            Text("−", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                        Text("${item.quantity}", fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
+                        Box(Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer).clickable { onIncrease() }, contentAlignment = Alignment.Center) {
+                            Text("+", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Text("${item.totalPrice.fmt2f()} ج", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
             }
-            Spacer(Modifier.width(12.dp))
-            Text("${item.totalPrice.fmt2f()} ج", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(80.dp), textAlign = TextAlign.End)
-            IconButton(onClick = onRemove, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+        } else {
+            Row(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(item.product.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${item.product.price.fmt2f()} ج للقطعة", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.width(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer).clickable { onDecrease() }, contentAlignment = Alignment.Center) {
+                        Text("−", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                    Text("${item.quantity}", fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp), textAlign = TextAlign.Center)
+                    Box(Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer).clickable { onIncrease() }, contentAlignment = Alignment.Center) {
+                        Text("+", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Text("${item.totalPrice.fmt2f()} ج", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(80.dp), textAlign = TextAlign.End)
+                IconButton(onClick = onRemove, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                }
             }
         }
     }
@@ -713,29 +737,27 @@ internal fun WebReceiptCard(receipt: Receipt, dayIndex: Int) {
                             fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.tertiary)
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${receipt.items.size} منتج", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    val time = receipt.timeLabel()
-                    if (time.isNotEmpty()) {
-                        Text("•", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    if (receipt.paymentMethod.isNotEmpty()) {
-                        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-                            Text(receipt.paymentMethod,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                fontWeight = FontWeight.SemiBold)
+                val time = receipt.timeLabel()
+                val metaParts = buildList {
+                    add("${receipt.items.size} منتج")
+                    if (time.isNotEmpty()) add(time)
+                }.joinToString(" • ")
+                Text(metaParts, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (receipt.paymentMethod.isNotEmpty() || !receipt.isPaid) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (receipt.paymentMethod.isNotEmpty()) {
+                            Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+                                Text(receipt.paymentMethod, modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer, fontWeight = FontWeight.SemiBold)
+                            }
                         }
-                    }
-                    if (!receipt.isPaid) {
-                        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.errorContainer) {
-                            Text("آجل", modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                fontWeight = FontWeight.SemiBold)
+                        if (!receipt.isPaid) {
+                            Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.errorContainer) {
+                                Text("آجل", modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }
@@ -763,7 +785,7 @@ private fun WebLoginScreen(isLoading: Boolean, error: String?, onLogin: (String,
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-        Card(modifier = Modifier.width(360.dp), shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(8.dp)) {
+        Card(modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(0.92f), shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(8.dp)) {
             Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("مكتبة المتميز", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Text("تسجيل الدخول", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
