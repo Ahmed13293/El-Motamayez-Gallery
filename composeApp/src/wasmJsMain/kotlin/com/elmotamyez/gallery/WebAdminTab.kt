@@ -23,8 +23,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import com.elmotamyez.gallery.data.model.Brand
 import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Category
