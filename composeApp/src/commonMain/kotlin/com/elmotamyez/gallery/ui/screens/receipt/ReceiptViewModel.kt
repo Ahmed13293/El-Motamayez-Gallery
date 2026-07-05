@@ -1,0 +1,136 @@
+package com.elmotamyez.gallery.ui.screens.receipt
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.elmotamyez.gallery.data.model.CartItem
+import com.elmotamyez.gallery.data.model.Receipt
+import com.elmotamyez.gallery.data.repository.ProductRepository
+import com.elmotamyez.gallery.data.repository.ReceiptRepository
+import com.russhwolf.settings.Settings
+import com.russhwolf.settings.get
+import com.russhwolf.settings.set
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import com.elmotamyez.gallery.util.dateString
+import com.elmotamyez.gallery.util.dateTimeString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+private const val KEY_RECEIPTS_CACHE = "receipts_cache_json"
+
+class ReceiptViewModel(
+    private val repository: ReceiptRepository,
+    private val productRepository: ProductRepository
+) : ViewModel() {
+
+    private val settings = Settings()
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+    // Incremented every time stock is decremented — observers use this to trigger a refresh
+    private val _stockVersion = MutableStateFlow(0)
+    val stockVersion: StateFlow<Int> = _stockVersion.asStateFlow()
+
+    // Currently viewed receipt (shown in ReceiptScreen)
+    private val _currentReceipt = MutableStateFlow<Receipt?>(null)
+    val currentReceipt: StateFlow<Receipt?> = _currentReceipt.asStateFlow()
+
+    // Full history — seeded from local cache instantly, then refreshed from Supabase
+    private val _receipts = MutableStateFlow<List<Receipt>>(emptyList())
+    val receipts: StateFlow<List<Receipt>> = _receipts.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    init {
+        // Show cached receipts immediately so the list isn't empty on launch
+        val cached: String = settings[KEY_RECEIPTS_CACHE, ""]
+        if (cached.isNotEmpty()) {
+            runCatching {
+                _receipts.value = json.decodeFromString<List<Receipt>>(cached)
+            }
+        }
+        // Then sync latest from Supabase in the background
+        loadReceipts()
+    }
+
+    /** Reload all receipts from the cloud (called on init and on pull-to-refresh). */
+    fun loadReceipts() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            runCatching { repository.fetchAll() }
+                .onSuccess { fresh ->
+                    _receipts.value = fresh
+                    persistCache(fresh)
+                }
+            _isLoading.value = false
+        }
+    }
+
+    /** Called when the user confirms an order from CartScreen. */
+    fun confirmOrder(
+        items: List<CartItem>,
+        total: Double,
+        discount: Double = 0.0,
+        paymentMethod: String = "كاش",
+        customerPhone: String? = null,
+        customerInfo: String? = null,
+        username: String? = null
+    ) {
+        val isPaid = paymentMethod != "آجل"
+        viewModelScope.launch {
+            val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+            val todayPrefix = dateString(now.year, now.monthNumber, now.dayOfMonth)
+            val todayMax = _receipts.value
+                .filter { it.createdAt?.startsWith(todayPrefix) == true }
+                .maxOfOrNull { it.orderNumber } ?: 0
+            val nextNumber = todayMax + 1
+            val nowIso = dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second)
+            val receipt = Receipt(
+                id            = "ORD-${nextNumber.toString().padStart(4, '0')}",
+                orderNumber   = nextNumber,
+                items         = items,
+                total         = total,
+                discount      = discount,
+                paymentMethod = paymentMethod,
+                isPaid        = isPaid,
+                createdAt     = nowIso,
+                customerPhone = customerPhone.takeIf { !it.isNullOrBlank() },
+                customerInfo  = customerInfo.takeIf  { !it.isNullOrBlank() },
+                username      = username.takeIf      { !it.isNullOrBlank() }
+            )
+            // Update local state and cache immediately
+            val updated = _receipts.value + receipt
+            _receipts.value = updated
+            _currentReceipt.value = receipt
+            persistCache(updated)
+
+            // Push receipt to Supabase
+            runCatching { repository.insert(receipt) }
+
+            // Decrement stock for each real product (skip printing/other virtual items)
+            items
+                .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
+                .forEach { cartItem ->
+                    runCatching {
+                        productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+                    }
+                }
+            // Signal observers (e.g. CategoriesHomeScreen) to refresh product stock
+            _stockVersion.value += 1
+        }
+    }
+
+    /** Called when tapping a receipt from the history list. */
+    fun viewReceipt(receipt: Receipt) {
+        _currentReceipt.value = receipt
+    }
+
+    private fun persistCache(receipts: List<Receipt>) {
+        settings[KEY_RECEIPTS_CACHE] = json.encodeToString(receipts)
+    }
+}
