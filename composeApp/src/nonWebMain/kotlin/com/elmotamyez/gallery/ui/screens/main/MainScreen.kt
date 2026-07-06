@@ -1,6 +1,7 @@
 package com.elmotamyez.gallery.ui.screens.main
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -112,14 +113,22 @@ class MainScreen : Screen {
             ) { padding ->
                 Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                     CurrentTab()
-                    IconButton(
-                        onClick  = { authVm.logout() },
-                        modifier = Modifier.align(Alignment.TopStart)
+                    Row(
+                        modifier = Modifier.align(Alignment.TopStart),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ExitToApp,
-                            contentDescription = "تسجيل الخروج",
-                            tint = MaterialTheme.colorScheme.error
+                        IconButton(onClick = { authVm.logout() }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = "تسجيل الخروج",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        Text(
+                            text = authState.user?.name ?: authState.user?.username ?: "",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
