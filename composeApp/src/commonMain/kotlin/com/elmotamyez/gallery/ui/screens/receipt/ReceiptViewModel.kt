@@ -117,7 +117,7 @@ class ReceiptViewModel(
             val nextNumber = todayMax + 1
             val nowIso = dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second)
             val receipt = Receipt(
-                id            = "ORD-${nextNumber.toString().padStart(4, '0')}",
+                id            = "${todayPrefix}-${nextNumber.toString().padStart(4, '0')}",
                 orderNumber   = nextNumber,
                 items         = items,
                 total         = total,
