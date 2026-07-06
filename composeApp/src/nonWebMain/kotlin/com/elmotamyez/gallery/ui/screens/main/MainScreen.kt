@@ -121,15 +121,23 @@ class MainScreen : Screen {
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 12.dp)
                     )
-                    IconButton(
-                        onClick  = { authVm.logout() },
-                        modifier = Modifier.align(Alignment.TopEnd)
+                    Row(
+                        modifier = Modifier.align(Alignment.TopEnd).padding(end = 4.dp, top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ExitToApp,
-                            contentDescription = "تسجيل الخروج",
-                            tint = MaterialTheme.colorScheme.error
+                        Text(
+                            text = "تسجيل الخروج",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
                         )
+                        IconButton(onClick = { authVm.logout() }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = "تسجيل الخروج",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
             }
