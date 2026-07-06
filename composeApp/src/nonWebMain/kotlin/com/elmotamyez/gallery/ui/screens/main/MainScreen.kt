@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
@@ -93,6 +94,29 @@ class MainScreen : Screen {
 
         TabNavigator(CategoriesTab) { tabNavigator ->
             Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                authState.user?.name ?: authState.user?.username ?: "",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = { authVm.logout() }) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ExitToApp,
+                                    contentDescription = "تسجيل الخروج",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    )
+                },
                 bottomBar = {
                     NavigationBar {
                         NavItem(CategoriesTab, Icons.Default.Home,       tabNavigator)
