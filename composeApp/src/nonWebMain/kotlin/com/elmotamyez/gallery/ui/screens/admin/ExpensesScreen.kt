@@ -30,8 +30,18 @@ class ExpensesScreen : Screen {
         val navigator = LocalNavigator.currentOrThrow
         val vm: ExpenseViewModel = koinInject()
         val expenses by vm.expenses.collectAsState()
+        val error    by vm.error.collectAsState()
 
         LaunchedEffect(Unit) { vm.load() }
+
+        error?.let {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("خطأ") },
+                text  = { Text(it) },
+                confirmButton = { TextButton(onClick = {}) { Text("حسناً") } }
+            )
+        }
 
         var showAddSheet  by remember { mutableStateOf(false) }
         var editTarget    by remember { mutableStateOf<Expense?>(null) }

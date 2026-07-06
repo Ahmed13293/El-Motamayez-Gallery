@@ -20,9 +20,13 @@ class ExpenseViewModel(private val repo: ExpenseRepository) : ViewModel() {
 
     init { load() }
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error = _error.asStateFlow()
+
     fun load() {
         viewModelScope.launch {
             runCatching { _expenses.value = repo.fetchAll() }
+                .onFailure { _error.value = "fetchAll: ${it.message}" }
         }
     }
 
@@ -31,9 +35,9 @@ class ExpenseViewModel(private val repo: ExpenseRepository) : ViewModel() {
         viewModelScope.launch {
             _isSaving.value = true
             val expense = Expense(id = Uuid.random().toString(), type = type, amount = amount, note = note?.ifBlank { null })
-            // Optimistic update — list refreshes immediately regardless of network
             _expenses.value = listOf(expense) + _expenses.value
             runCatching { repo.insert(expense) }
+                .onFailure { _error.value = "insert: ${it.message}" }
             _isSaving.value = false
             onDone()
         }
@@ -42,9 +46,9 @@ class ExpenseViewModel(private val repo: ExpenseRepository) : ViewModel() {
     fun updateExpense(expense: Expense, onDone: () -> Unit) {
         viewModelScope.launch {
             _isSaving.value = true
-            // Optimistic update
             _expenses.value = _expenses.value.map { if (it.id == expense.id) expense else it }
             runCatching { repo.update(expense) }
+                .onFailure { _error.value = "update: ${it.message}" }
             _isSaving.value = false
             onDone()
         }
@@ -52,9 +56,9 @@ class ExpenseViewModel(private val repo: ExpenseRepository) : ViewModel() {
 
     fun deleteExpense(id: String) {
         viewModelScope.launch {
-            // Optimistic update
             _expenses.value = _expenses.value.filter { it.id != id }
             runCatching { repo.delete(id) }
+                .onFailure { _error.value = "delete: ${it.message}" }
         }
     }
 }
