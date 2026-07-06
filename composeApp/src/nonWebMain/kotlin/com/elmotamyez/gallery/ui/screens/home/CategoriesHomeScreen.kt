@@ -46,6 +46,7 @@ import com.elmotamyez.gallery.ui.screens.cart.CartViewModel
 import com.elmotamyez.gallery.ui.screens.main.CartTab
 import com.elmotamyez.gallery.ui.screens.products.CategoryProductsScreen
 import com.elmotamyez.gallery.ui.screens.products.ProductsViewModel
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.formatPrice
@@ -122,20 +123,43 @@ class CategoriesHomeScreen : Screen {
                             .padding(top = 8.dp, bottom = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            "مكتبة المتميز",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-                        val username = authState.user?.name ?: authState.user?.username
-                        if (!username.isNullOrBlank()) {
-                            Text(
-                                text = username,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.Gray
-                            )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                val username = authState.user?.name ?: authState.user?.username
+                                if (!username.isNullOrBlank()) {
+                                    Text(
+                                        text = username,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black
+                                    )
+                                }
+                                Text(
+                                    "مكتبة المتميز",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.Gray
+                                )
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "تسجيل الخروج",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                IconButton(onClick = { authVm.logout() }) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ExitToApp,
+                                        contentDescription = "تسجيل الخروج",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
                         }
                         OutlinedTextField(
                             value = searchQuery,

@@ -1,12 +1,10 @@
 package com.elmotamyez.gallery.ui.screens.main
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
@@ -114,24 +112,6 @@ class MainScreen : Screen {
             ) { padding ->
                 Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                     CurrentTab()
-                    Row(
-                        modifier = Modifier.align(Alignment.TopEnd).padding(end = 4.dp, top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "تسجيل الخروج",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        IconButton(onClick = { authVm.logout() }) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ExitToApp,
-                                contentDescription = "تسجيل الخروج",
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
                 }
             }
         }
