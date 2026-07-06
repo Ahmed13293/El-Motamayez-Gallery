@@ -114,13 +114,6 @@ class MainScreen : Screen {
             ) { padding ->
                 Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                     CurrentTab()
-                    Text(
-                        text = authState.user?.name ?: authState.user?.username ?: "",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 12.dp)
-                    )
                     Row(
                         modifier = Modifier.align(Alignment.TopEnd).padding(end = 4.dp, top = 4.dp),
                         verticalAlignment = Alignment.CenterVertically

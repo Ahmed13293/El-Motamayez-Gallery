@@ -46,6 +46,7 @@ import com.elmotamyez.gallery.ui.screens.cart.CartViewModel
 import com.elmotamyez.gallery.ui.screens.main.CartTab
 import com.elmotamyez.gallery.ui.screens.products.CategoryProductsScreen
 import com.elmotamyez.gallery.ui.screens.products.ProductsViewModel
+import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.formatPrice
 import org.koin.compose.koinInject
@@ -74,6 +75,8 @@ class CategoriesHomeScreen : Screen {
         val vm: ProductsViewModel = koinViewModel()
         val cartVm: CartViewModel = koinInject()
         val receiptVm: ReceiptViewModel = koinInject()
+        val authVm: AuthViewModel = koinInject()
+        val authState by authVm.uiState.collectAsState()
         val keyboard = LocalSoftwareKeyboardController.current
 
         val state by vm.uiState.collectAsState()
@@ -125,6 +128,15 @@ class CategoriesHomeScreen : Screen {
                             fontWeight = FontWeight.Bold,
                             color = Color.Black
                         )
+                        val username = authState.user?.name ?: authState.user?.username
+                        if (!username.isNullOrBlank()) {
+                            Text(
+                                text = username,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.Gray
+                            )
+                        }
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
