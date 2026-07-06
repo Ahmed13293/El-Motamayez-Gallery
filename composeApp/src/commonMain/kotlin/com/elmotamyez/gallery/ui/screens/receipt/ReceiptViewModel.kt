@@ -43,6 +43,10 @@ class ReceiptViewModel(
     private val _expandedDays = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     val expandedDays: StateFlow<Map<String, Boolean>> = _expandedDays.asStateFlow()
 
+    // Scroll position for ReceiptsListScreen — survives back-navigation
+    var listScrollIndex: Int = 0
+    var listScrollOffset: Int = 0
+
     /** Called once when the grouped list is first built to seed default state (newest day open). */
     fun initExpandedDays(dateKeys: List<String>) {
         if (_expandedDays.value.isEmpty()) {

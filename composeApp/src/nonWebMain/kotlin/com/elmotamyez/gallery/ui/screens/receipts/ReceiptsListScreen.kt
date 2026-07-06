@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -91,6 +92,14 @@ class ReceiptsListScreen : Screen {
             vm.initExpandedDays(grouped.map { it.key })
         }
 
+        // Scroll state — restore position when returning from ReceiptScreen
+        val listState = rememberLazyListState()
+        LaunchedEffect(Unit) {
+            if (vm.listScrollIndex > 0) {
+                listState.scrollToItem(vm.listScrollIndex, vm.listScrollOffset)
+            }
+        }
+
         Scaffold { padding ->
             PullToRefreshBox(
                 isRefreshing = isLoading,
@@ -112,6 +121,7 @@ class ReceiptsListScreen : Screen {
                     }
                 } else {
                     LazyColumn(
+                        state = listState,
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
@@ -144,6 +154,8 @@ class ReceiptsListScreen : Screen {
                                                 receipt      = receipt,
                                                 dayIndex     = index + 1,
                                                 onClick      = {
+                                                    vm.listScrollIndex  = listState.firstVisibleItemIndex
+                                                    vm.listScrollOffset = listState.firstVisibleItemScrollOffset
                                                     vm.viewReceipt(receipt)
                                                     (navigator.parent ?: navigator).push(ReceiptScreen())
                                                 }
