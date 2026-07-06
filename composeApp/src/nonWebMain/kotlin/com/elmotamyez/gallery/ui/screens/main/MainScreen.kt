@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
@@ -113,22 +114,21 @@ class MainScreen : Screen {
             ) { padding ->
                 Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                     CurrentTab()
-                    Row(
-                        modifier = Modifier.align(Alignment.TopStart),
-                        verticalAlignment = Alignment.CenterVertically
+                    Text(
+                        text = authState.user?.name ?: authState.user?.username ?: "",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 12.dp)
+                    )
+                    IconButton(
+                        onClick  = { authVm.logout() },
+                        modifier = Modifier.align(Alignment.TopEnd)
                     ) {
-                        IconButton(onClick = { authVm.logout() }) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ExitToApp,
-                                contentDescription = "تسجيل الخروج",
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                        Text(
-                            text = authState.user?.name ?: authState.user?.username ?: "",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                        Icon(
+                            Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = "تسجيل الخروج",
+                            tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }
