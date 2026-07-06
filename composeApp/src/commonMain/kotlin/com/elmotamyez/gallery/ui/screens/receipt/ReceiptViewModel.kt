@@ -50,7 +50,7 @@ class ReceiptViewModel(
         } else {
             // Merge: keep existing state, add any new date keys as collapsed
             val current = _expandedDays.value.toMutableMap()
-            dateKeys.forEach { key -> current.putIfAbsent(key, false) }
+            dateKeys.forEach { key -> if (!current.containsKey(key)) current[key] = false }
             _expandedDays.value = current
         }
     }

@@ -87,7 +87,7 @@ class ReceiptsListScreen : Screen {
 
         // Expanded state lives in the VM so it survives back-navigation
         val expandedDays by vm.expandedDays.collectAsState()
-        LaunchedEffect(grouped) {
+        LaunchedEffect(receipts) {
             vm.initExpandedDays(grouped.map { it.key })
         }
 
