@@ -141,23 +141,22 @@ class CategoriesHomeScreen : Screen {
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color.Gray
                             )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { authVm.logout() }
+                            ) {
                                 Text(
                                     "تسجيل الخروج",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.error
                                 )
-                                IconButton(
-                                    onClick = { authVm.logout() },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.ExitToApp,
-                                        contentDescription = "تسجيل الخروج",
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                }
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ExitToApp,
+                                    contentDescription = "تسجيل الخروج",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
                         OutlinedTextField(
