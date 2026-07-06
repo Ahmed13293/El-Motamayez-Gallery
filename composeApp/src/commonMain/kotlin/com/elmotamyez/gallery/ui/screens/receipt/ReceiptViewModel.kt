@@ -39,6 +39,28 @@ class ReceiptViewModel(
     private val _currentReceipt = MutableStateFlow<Receipt?>(null)
     val currentReceipt: StateFlow<Receipt?> = _currentReceipt.asStateFlow()
 
+    // Expanded state for each day group in ReceiptsListScreen — survives back-navigation
+    private val _expandedDays = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val expandedDays: StateFlow<Map<String, Boolean>> = _expandedDays.asStateFlow()
+
+    /** Called once when the grouped list is first built to seed default state (newest day open). */
+    fun initExpandedDays(dateKeys: List<String>) {
+        if (_expandedDays.value.isEmpty()) {
+            _expandedDays.value = dateKeys.mapIndexed { i, key -> key to (i == 0) }.toMap()
+        } else {
+            // Merge: keep existing state, add any new date keys as collapsed
+            val current = _expandedDays.value.toMutableMap()
+            dateKeys.forEach { key -> current.putIfAbsent(key, false) }
+            _expandedDays.value = current
+        }
+    }
+
+    fun toggleDay(dateKey: String) {
+        _expandedDays.value = _expandedDays.value.toMutableMap().also {
+            it[dateKey] = !(it[dateKey] ?: false)
+        }
+    }
+
     // Full history — seeded from local cache instantly, then refreshed from Supabase
     private val _receipts = MutableStateFlow<List<Receipt>>(emptyList())
     val receipts: StateFlow<List<Receipt>> = _receipts.asStateFlow()

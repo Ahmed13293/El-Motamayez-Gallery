@@ -85,13 +85,10 @@ class ReceiptsListScreen : Screen {
                 .sortedByDescending { it.key }
         }
 
-        // Expanded state per date key — newest day starts expanded
-        val expanded = remember(grouped) {
-            mutableStateMapOf<String, Boolean>().also { map ->
-                grouped.forEachIndexed { i, entry ->
-                    map[entry.key] = (i == 0)   // only first day open by default
-                }
-            }
+        // Expanded state lives in the VM so it survives back-navigation
+        val expandedDays by vm.expandedDays.collectAsState()
+        LaunchedEffect(grouped) {
+            vm.initExpandedDays(grouped.map { it.key })
         }
 
         Scaffold { padding ->
@@ -119,7 +116,7 @@ class ReceiptsListScreen : Screen {
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         grouped.forEach { (dateKey, dayReceipts) ->
-                            val isOpen = expanded[dateKey] == true
+                            val isOpen = expandedDays[dateKey] == true
                             val dayTotal = dayReceipts.sumOf { it.total }
 
                             // ── Day header ────────────────────────────────────
@@ -129,7 +126,7 @@ class ReceiptsListScreen : Screen {
                                     count       = dayReceipts.size,
                                     dayTotal    = dayTotal,
                                     isExpanded  = isOpen,
-                                    onClick     = { expanded[dateKey] = !isOpen }
+                                    onClick     = { vm.toggleDay(dateKey) }
                                 )
                             }
 
