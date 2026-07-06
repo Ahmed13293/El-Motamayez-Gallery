@@ -2,6 +2,7 @@ package com.elmotamyez.gallery.ui.screens.main
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -10,6 +11,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -94,29 +96,6 @@ class MainScreen : Screen {
 
         TabNavigator(CategoriesTab) { tabNavigator ->
             Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = {
-                            Text(
-                                authState.user?.name ?: authState.user?.username ?: "",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = { authVm.logout() }) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ExitToApp,
-                                    contentDescription = "تسجيل الخروج",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
-                    )
-                },
                 bottomBar = {
                     NavigationBar {
                         NavItem(CategoriesTab, Icons.Default.Home,       tabNavigator)
@@ -131,8 +110,18 @@ class MainScreen : Screen {
                     }
                 }
             ) { padding ->
-                Box(modifier = Modifier.padding(padding)) {
+                Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                     CurrentTab()
+                    IconButton(
+                        onClick  = { authVm.logout() },
+                        modifier = Modifier.align(Alignment.TopStart)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = "تسجيل الخروج",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
         }
