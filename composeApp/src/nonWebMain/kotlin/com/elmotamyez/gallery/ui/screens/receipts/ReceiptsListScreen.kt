@@ -267,7 +267,7 @@ class ReceiptsListScreen : Screen {
                                         dayReceipts.forEachIndexed { index, receipt ->
                                             ReceiptCard(
                                                 receipt      = receipt,
-                                                dayIndex     = index + 1,
+                                                dayIndex     = dayReceipts.size - index,
                                                 onClick      = {
                                                     vm.listScrollIndex  = listState.firstVisibleItemIndex
                                                     vm.listScrollOffset = listState.firstVisibleItemScrollOffset
