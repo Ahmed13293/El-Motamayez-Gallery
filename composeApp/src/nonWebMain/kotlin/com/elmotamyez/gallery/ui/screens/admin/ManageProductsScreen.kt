@@ -72,8 +72,7 @@ class ManageProductsScreen : Screen {
                 .filter {
                     when (stockFilter) {
                         "0"  -> it.stock == 0
-                        "1"  -> it.stock <= 1
-                        "2"  -> it.stock <= 2
+                        "12" -> it.stock == 1 || it.stock == 2
                         else -> true
                     }
                 }
@@ -127,8 +126,7 @@ class ManageProductsScreen : Screen {
                             listOf(
                                 "all" to "الكل",
                                 "0"   to "نفد المخزون",
-                                "1"   to "مخزون ≤ 1",
-                                "2"   to "مخزون ≤ 2"
+                                "12"  to "مخزون 1 و 2"
                             ).forEach { (key, label) ->
                                 FilterChip(
                                     selected = stockFilter == key,
