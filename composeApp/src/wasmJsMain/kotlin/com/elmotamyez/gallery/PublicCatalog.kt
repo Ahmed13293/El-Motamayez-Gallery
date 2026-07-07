@@ -35,7 +35,18 @@ private external fun openWhatsApp(number: String, message: String)
 @JsFun("(url) => { window.open(url, '_blank'); }")
 external fun openUrl(url: String)
 
-@JsFun("(text) => { navigator.clipboard.writeText(text).catch(function(){}); }")
+@JsFun("""(text) => {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).catch(function() { fallback(text); });
+    } else { fallback(text); }
+    function fallback(t) {
+        var ta = document.createElement('textarea');
+        ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        try { document.execCommand('copy'); } catch(e) {}
+        document.body.removeChild(ta);
+    }
+}""")
 private external fun copyToClipboard(text: String)
 
 private fun buildCartWhatsAppMsg(items: Map<Product, Int>): String {
