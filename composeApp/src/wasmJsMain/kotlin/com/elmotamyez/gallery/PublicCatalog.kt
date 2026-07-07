@@ -35,6 +35,9 @@ private external fun openWhatsApp(number: String, message: String)
 @JsFun("(url) => { window.open(url, '_blank'); }")
 external fun openUrl(url: String)
 
+@JsFun("(text) => { navigator.clipboard.writeText(text).catch(function(){}); }")
+private external fun copyToClipboard(text: String)
+
 private fun buildCartWhatsAppMsg(items: Map<Product, Int>): String {
     val lines = items.entries.joinToString("\n") { (p, qty) ->
         "• ${p.name} × $qty = ${(p.price * qty).formatPrice()} ج"
@@ -75,11 +78,13 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
     val cartTotal   = cartProducts.entries.sumOf { (p, q) -> p.price * q }
 
     var showOrderDialog by remember { mutableStateOf(false) }
+    var copiedFor       by remember { mutableStateOf("") } // "fb" | "ig" | ""
 
     // Platform selection dialog
     if (showOrderDialog) {
+        val orderMsg = buildCartWhatsAppMsg(cartProducts)
         AlertDialog(
-            onDismissRequest = { showOrderDialog = false },
+            onDismissRequest = { showOrderDialog = false; copiedFor = "" },
             title = {
                 Text(
                     "اختر طريقة الإرسال",
@@ -95,11 +100,13 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     HorizontalDivider()
-                    // WhatsApp
+
+                    // WhatsApp — pre-filled message
                     Button(
                         onClick = {
-                            openWhatsApp(WA_NUMBER, buildCartWhatsAppMsg(cartProducts))
+                            openWhatsApp(WA_NUMBER, orderMsg)
                             showOrderDialog = false
+                            copiedFor = ""
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
@@ -109,33 +116,65 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                         Spacer(Modifier.width(8.dp))
                         Text("واتساب", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
-                    // Facebook
-                    Button(
-                        onClick = { openUrl(FB_PAGE_URL); showOrderDialog = false },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(Icons.Default.Person, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("فيسبوك", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+
+                    // Facebook — copy then open
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Button(
+                            onClick = {
+                                copyToClipboard(orderMsg)
+                                copiedFor = "fb"
+                                openUrl(FB_PAGE_URL)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Person, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("فيسبوك", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        }
+                        if (copiedFor == "fb") {
+                            Text(
+                                "✓ تم نسخ الطلب — الصقه في الرسالة",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF1877F2),
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                        }
                     }
-                    // Instagram
-                    Button(
-                        onClick = { openUrl(IG_PAGE_URL); showOrderDialog = false },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(Icons.Default.Favorite, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("انستغرام", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+
+                    // Instagram — copy then open
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Button(
+                            onClick = {
+                                copyToClipboard(orderMsg)
+                                copiedFor = "ig"
+                                openUrl(IG_PAGE_URL)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Favorite, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("انستغرام", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        }
+                        if (copiedFor == "ig") {
+                            Text(
+                                "✓ تم نسخ الطلب — الصقه في الرسالة",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFE1306C),
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                        }
                     }
                 }
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { showOrderDialog = false }) { Text("إلغاء") }
+                TextButton(onClick = { showOrderDialog = false; copiedFor = "" }) { Text("إلغاء") }
             },
             shape = RoundedCornerShape(16.dp)
         )
