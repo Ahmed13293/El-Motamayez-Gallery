@@ -20,7 +20,7 @@ import com.elmotamyez.gallery.data.model.Expense
 import com.elmotamyez.gallery.ui.screens.admin.ExpenseViewModel
 import org.koin.compose.koinInject
 
-val EXPENSE_TYPES = listOf("الإيجار", "مرتبات", "النت", "الكهرباء", "مصاريف عامة")
+val EXPENSE_TYPES = listOf("الإيجار", "مرتبات", "النت", "الكهرباء", "بضاعه", "مصاريف عامة")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
