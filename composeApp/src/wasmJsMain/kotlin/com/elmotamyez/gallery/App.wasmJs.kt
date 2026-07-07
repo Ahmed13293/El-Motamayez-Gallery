@@ -22,6 +22,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -61,6 +62,26 @@ import org.jetbrains.compose.resources.Font
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+
+// ── WhatsApp helpers ─────────────────────────────────────────────────────────
+
+@JsFun("(num, msg) => { window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank'); }")
+private external fun openWhatsApp(number: String, message: String)
+
+private fun buildCartWhatsAppMsg(
+    items: List<com.elmotamyez.gallery.data.model.CartItem>,
+    total: Double,
+    paymentMethod: String
+): String = buildString {
+    appendLine("مرحباً، أريد طلب من مكتبة المتميز 🛒")
+    appendLine()
+    items.forEach { item ->
+        appendLine("• ${item.product.name} × ${item.quantity} = ${item.totalPrice.formatPrice()} ج")
+    }
+    appendLine()
+    appendLine("الإجمالي: ${total.formatPrice()} ج")
+    append("طريقة الدفع: $paymentMethod")
+}
 
 // ── Date helpers (same logic as mobile ReceiptsListScreen) ───────────────────
 
@@ -126,14 +147,16 @@ actual fun App() {
                 KoinContext {
                     val authVm: AuthViewModel = koinInject()
                     val authState by authVm.uiState.collectAsState()
-                    if (authState.user == null) {
-                        WebLoginScreen(
+                    var showPublicCatalog by remember { mutableStateOf(false) }
+                    when {
+                        authState.user != null -> WebApp(user = authState.user!!, onLogout = { authVm.logout() })
+                        showPublicCatalog -> PublicCatalogScreen(onLoginClick = { showPublicCatalog = false })
+                        else -> WebLoginScreen(
                             isLoading = authState.isLoading,
                             error = authState.error,
-                            onLogin = { u, p -> authVm.login(u, p) }
+                            onLogin = { u, p -> authVm.login(u, p) },
+                            onBrowseAsGuest = { showPublicCatalog = true }
                         )
-                    } else {
-                        WebApp(user = authState.user!!, onLogout = { authVm.logout() })
                     }
                 }
             }
@@ -454,6 +477,19 @@ private fun WebCartTab(cartVm: CartViewModel, user: User, isMobile: Boolean = fa
                         Button(onClick = { showConfirmDialog = true }, modifier = Modifier.fillMaxWidth().height(44.dp), shape = RoundedCornerShape(14.dp)) {
                             Text("تأكيد الطلب", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
+                        Button(
+                            onClick = {
+                                val msg = buildCartWhatsAppMsg(cartItems, total, paymentMethod)
+                                openWhatsApp("201121064222", msg)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                        ) {
+                            Icon(Icons.Default.Phone, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("اطلب عبر واتساب", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
                         OutlinedButton(onClick = { cartVm.clearCart() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
                             Text("مسح السلة")
                         }
@@ -504,6 +540,19 @@ private fun WebCartTab(cartVm: CartViewModel, user: User, isMobile: Boolean = fa
                     Spacer(Modifier.weight(1f))
                     Button(onClick = { showConfirmDialog = true }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
                         Text("تأكيد الطلب", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                    Button(
+                        onClick = {
+                            val msg = buildCartWhatsAppMsg(cartItems, total, paymentMethod)
+                            openWhatsApp("201121064222", msg)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                    ) {
+                        Icon(Icons.Default.Phone, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("اطلب عبر واتساب", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                     OutlinedButton(onClick = { cartVm.clearCart() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
                         Text("مسح السلة")
@@ -995,7 +1044,7 @@ internal fun formatArabicDate(iso: String): String {
 // ── Login Screen ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun WebLoginScreen(isLoading: Boolean, error: String?, onLogin: (String, String) -> Unit) {
+private fun WebLoginScreen(isLoading: Boolean, error: String?, onLogin: (String, String) -> Unit, onBrowseAsGuest: () -> Unit) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
@@ -1010,6 +1059,12 @@ private fun WebLoginScreen(isLoading: Boolean, error: String?, onLogin: (String,
                 Button(onClick = { onLogin(username, password) }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp), enabled = !isLoading) {
                     if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                     else Text("دخول", fontWeight = FontWeight.Bold)
+                }
+                HorizontalDivider()
+                OutlinedButton(onClick = onBrowseAsGuest, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                    Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("تصفح المنتجات كضيف", fontWeight = FontWeight.SemiBold)
                 }
             }
         }
