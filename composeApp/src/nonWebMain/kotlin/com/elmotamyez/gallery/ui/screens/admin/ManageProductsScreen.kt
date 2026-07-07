@@ -1,8 +1,10 @@
 package com.elmotamyez.gallery.ui.screens.admin
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -51,6 +53,7 @@ class ManageProductsScreen : Screen {
         var brandExpanded by remember { mutableStateOf(false) }
         var deleteTarget  by remember { mutableStateOf<Product?>(null) }
         var searchQuery   by remember { mutableStateOf("") }
+        var stockFilter   by remember { mutableStateOf("all") } // "all" | "0" | "1" | "2"
 
         val snackbarHost = remember { SnackbarHostState() }
         LaunchedEffect(state.toast) {
@@ -63,9 +66,17 @@ class ManageProductsScreen : Screen {
         // Brands filtered by selected category (all levels)
         val brandsForCat = state.brands.filter { it.categoryId == selectedCatId }
 
-        val filteredProducts = remember(searchQuery, state.products) {
-            if (searchQuery.isBlank()) state.products
-            else state.products.filter { it.name.contains(searchQuery, ignoreCase = true) }
+        val filteredProducts = remember(searchQuery, stockFilter, state.products) {
+            state.products
+                .filter { if (searchQuery.isBlank()) true else it.name.contains(searchQuery, ignoreCase = true) }
+                .filter {
+                    when (stockFilter) {
+                        "0"  -> it.stock == 0
+                        "1"  -> it.stock <= 1
+                        "2"  -> it.stock <= 2
+                        else -> true
+                    }
+                }
         }
 
         fun openAdd() {
@@ -106,6 +117,32 @@ class ManageProductsScreen : Screen {
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
                         )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(
+                                "all" to "الكل",
+                                "0"   to "نفد المخزون",
+                                "1"   to "مخزون ≤ 1",
+                                "2"   to "مخزون ≤ 2"
+                            ).forEach { (key, label) ->
+                                FilterChip(
+                                    selected = stockFilter == key,
+                                    onClick  = { stockFilter = key },
+                                    label    = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                                    colors   = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = if (key == "0")
+                                            MaterialTheme.colorScheme.errorContainer
+                                        else
+                                            MaterialTheme.colorScheme.primaryContainer
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
             },
@@ -159,7 +196,12 @@ class ManageProductsScreen : Screen {
                                         }
                                         Text("• مخزون: ${product.stock}",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.outline)
+                                            fontWeight = if (product.stock <= 2) FontWeight.Bold else FontWeight.Normal,
+                                            color = when {
+                                                product.stock == 0 -> MaterialTheme.colorScheme.error
+                                                product.stock <= 2 -> Color(0xFFE65100)
+                                                else -> MaterialTheme.colorScheme.outline
+                                            })
                                     }
                                     Text(path,
                                         style = MaterialTheme.typography.labelSmall,
