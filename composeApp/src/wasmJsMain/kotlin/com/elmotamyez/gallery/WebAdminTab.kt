@@ -363,8 +363,17 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
     var editTarget by remember { mutableStateOf<Product?>(null) }
     var deleteTarget by remember { mutableStateOf<Product?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    var stockFilter by remember { mutableStateOf("all") }
 
-    val filtered = if (searchQuery.isBlank()) products else products.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    val filtered = products
+        .filter { if (searchQuery.isBlank()) true else it.name.contains(searchQuery, ignoreCase = true) }
+        .filter {
+            when (stockFilter) {
+                "0"  -> it.stock == 0
+                "12" -> it.stock == 1 || it.stock == 2
+                else -> true
+            }
+        }
 
     Column(Modifier.fillMaxSize().padding(if (isMobile) 12.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (isMobile) {
@@ -397,6 +406,24 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
             }
         }
 
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                listOf("all" to "الكل", "0" to "نفد المخزون", "12" to "مخزون 1 و 2").forEach { (key, label) ->
+                    FilterChip(
+                        selected = stockFilter == key,
+                        onClick  = { stockFilter = key },
+                        label    = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                        colors   = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = if (key == "0")
+                                MaterialTheme.colorScheme.errorContainer
+                            else MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+        }
+
         Text("${filtered.size} منتج", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         if (filtered.isEmpty()) {
@@ -411,6 +438,11 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
                     CrudItemRow(
                         title = product.name,
                         subtitle = "$catName / $brandName | السعر: ${product.price.fmt2f()} ج | المخزون: ${product.stock}",
+                        subtitleColor = when {
+                            product.stock == 0 -> MaterialTheme.colorScheme.error
+                            product.stock <= 2 -> Color(0xFFE65100)
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                         onEdit = { editTarget = product },
                         onDelete = { deleteTarget = product }
                     )
@@ -586,12 +618,12 @@ private fun SummaryCard(label: String, value: String, icon: ImageVector, modifie
 // ── Shared CRUD Components ────────────────────────────────────────────────────
 
 @Composable
-private fun CrudItemRow(title: String, subtitle: String, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun CrudItemRow(title: String, subtitle: String, onEdit: () -> Unit, onDelete: () -> Unit, subtitleColor: Color? = null) {
     Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp), modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = subtitleColor ?: MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
