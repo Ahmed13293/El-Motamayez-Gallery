@@ -9,17 +9,18 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
         }.getOrElse { raw }
     } ?: ""
 
+    // RTL column order in HTML: المنتج (rightmost) | الكمية | السعر | الإجمالي (leftmost)
     val itemRows = receipt.items.joinToString("") { item ->
         val total = item.totalPrice.formatPrice()
         val price = item.product.price.formatPrice()
-        "<tr><td>$total ج</td><td>$price ج</td><td>${item.quantity}</td><td class=\"name-col\">${item.product.name}</td></tr>"
+        "<tr><td class=\"name-col\">${item.product.name}</td><td>${item.quantity}</td><td>$price ج</td><td>$total ج</td></tr>"
     }
 
     val discountRows = if (receipt.discount > 0.0) {
         val subtotal = (receipt.total + receipt.discount).formatPrice()
         val discount = receipt.discount.formatPrice()
-        "<tr class=\"sub-row\"><td colspan=\"3\" class=\"lbl\">المجموع</td><td>$subtotal ج</td></tr>" +
-        "<tr class=\"sub-row\"><td colspan=\"3\" class=\"lbl\">الخصم</td><td>- $discount ج</td></tr>"
+        "<tr class=\"sub-row\"><td class=\"lbl\">المجموع</td><td colspan=\"3\">$subtotal ج</td></tr>" +
+        "<tr class=\"sub-row\"><td class=\"lbl\">الخصم</td><td colspan=\"3\">- $discount ج</td></tr>"
     } else ""
 
     val customerSection = buildString {
@@ -56,19 +57,19 @@ td{padding:7px 6px;text-align:center;border-bottom:.5px solid #ddd}
   <p>رقم الفاتورة: ${receipt.orderNumber}</p>
 </div>
 <div class="info">
-  <div>$customerSection</div>
-  <div style="text-align:left">
+  <div>
     <p>رقم الفاتورة: ${receipt.orderNumber}</p>
     $dateRow
     <p>طريقة الدفع: ${receipt.paymentMethod}</p>
   </div>
+  <div>$customerSection</div>
 </div>
 <table>
-  <thead><tr><th>الإجمالي</th><th>السعر</th><th>الكمية</th><th class="name-col">المنتج</th></tr></thead>
+  <thead><tr><th class="name-col">المنتج</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
   <tbody>
     $itemRows
     $discountRows
-    <tr class="tot"><td colspan="3" class="lbl">الإجمالي الكلي</td><td>${receipt.total.formatPrice()} ج</td></tr>
+    <tr class="tot"><td class="lbl">الإجمالي الكلي</td><td colspan="3">${receipt.total.formatPrice()} ج</td></tr>
   </tbody>
 </table>
 <div class="ftr">شكراً لتسوقكم معنا!</div>
