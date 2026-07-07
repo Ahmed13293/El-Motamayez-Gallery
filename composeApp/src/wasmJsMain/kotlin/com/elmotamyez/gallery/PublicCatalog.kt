@@ -70,10 +70,8 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
         }
     }
 
-    val cartProducts = remember(cart, allProducts) {
-        allProducts.filter { cart.containsKey(it.id) }
-            .associateWith { cart[it.id] ?: 0 }
-    }
+    val cartProducts = allProducts.filter { cart.containsKey(it.id) }
+        .associateWith { cart[it.id] ?: 0 }
     val cartCount   = cart.values.sum()
     val cartTotal   = cartProducts.entries.sumOf { (p, q) -> p.price * q }
 
