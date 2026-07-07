@@ -1,6 +1,7 @@
 package com.elmotamyez.gallery.ui.screens.receipts
 
 import androidx.compose.animation.AnimatedVisibility
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +56,22 @@ private fun Receipt.dateKey(): String {
     else "unknown"
 }
 
+private fun Receipt.monthKey(): String {
+    val local = createdAt?.parseSupabaseDateTime() ?: return "unknown"
+    return "${local.year}-${twoDigit(local.monthNumber)}"
+}
+
+private fun String.toArabicMonth(): String {
+    val parts = split("-")
+    if (parts.size < 2) return this
+    val year  = parts[0]
+    val month = parts[1].toIntOrNull() ?: return this
+    val name  = listOf("", "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                        "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر")
+        .getOrElse(month) { month.toString() }
+    return "$name $year"
+}
+
 private fun String.toArabicDisplayDate(): String {
     return try {
         val (y, m, d) = split("-")
@@ -77,18 +95,40 @@ class ReceiptsListScreen : Screen {
         val receipts  by vm.receipts.collectAsState()
         val isLoading by vm.isLoading.collectAsState()
 
-        // Group by date, newest day first
-        val grouped = remember(receipts) {
+        // Current month key e.g. "2026-07"
+        val currentMonthKey = remember {
+            val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+            "${now.year}-${twoDigit(now.monthNumber)}"
+        }
+
+        // Distinct months sorted newest first
+        val months = remember(receipts) {
+            receipts.map { it.monthKey() }.filter { it != "unknown" }.distinct().sortedDescending()
+        }
+
+        // Selected month tab index — default to current month, fallback to newest
+        var selectedMonthIndex by remember(months) {
+            val idx = months.indexOf(currentMonthKey).takeIf { it >= 0 } ?: 0
+            mutableIntStateOf(idx)
+        }
+        val selectedMonth = months.getOrNull(selectedMonthIndex) ?: currentMonthKey
+
+        // Group by date, filtered to selected month, newest day first
+        val grouped = remember(receipts, selectedMonth) {
             receipts
+                .filter { it.monthKey() == selectedMonth }
                 .sortedByDescending { it.orderNumber }
                 .groupBy { it.dateKey() }
                 .entries
                 .sortedByDescending { it.key }
         }
 
+        val monthTotal = remember(grouped) { grouped.sumOf { it.value.sumOf { r -> r.total } } }
+        val monthCount = remember(grouped) { grouped.sumOf { it.value.size } }
+
         // Expanded state lives in the VM so it survives back-navigation
         val expandedDays by vm.expandedDays.collectAsState()
-        LaunchedEffect(receipts) {
+        LaunchedEffect(receipts, selectedMonth) {
             vm.initExpandedDays(grouped.map { it.key })
         }
 
@@ -99,8 +139,36 @@ class ReceiptsListScreen : Screen {
                 listState.scrollToItem(vm.listScrollIndex, vm.listScrollOffset)
             }
         }
+        // Reset scroll when month changes
+        LaunchedEffect(selectedMonth) {
+            listState.scrollToItem(0)
+        }
 
-        Scaffold { padding ->
+        Scaffold(
+            topBar = {
+                if (months.isNotEmpty()) {
+                    ScrollableTabRow(
+                        selectedTabIndex = selectedMonthIndex,
+                        edgePadding = 0.dp
+                    ) {
+                        months.forEachIndexed { index, monthKey ->
+                            Tab(
+                                selected = index == selectedMonthIndex,
+                                onClick  = { selectedMonthIndex = index },
+                                text     = {
+                                    Text(
+                                        monthKey.toArabicMonth(),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (index == selectedMonthIndex)
+                                            FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        ) { padding ->
             PullToRefreshBox(
                 isRefreshing = isLoading,
                 onRefresh    = { vm.loadReceipts() },
@@ -125,6 +193,53 @@ class ReceiptsListScreen : Screen {
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        // ── Monthly summary card ──────────────────────────────
+                        item(key = "month_summary") {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            selectedMonth.toArabicMonth(),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                        )
+                                        Text(
+                                            "$monthCount فاتورة",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                    Text(
+                                        "${monthTotal.formatPrice()} ج",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+
+                        if (grouped.isEmpty()) {
+                            item {
+                                Box(
+                                    Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("لا توجد فواتير في هذا الشهر",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+
                         grouped.forEach { (dateKey, dayReceipts) ->
                             val isOpen = expandedDays[dateKey] == true
                             val dayTotal = dayReceipts.sumOf { it.total }
