@@ -48,6 +48,9 @@ import com.elmotamyez.gallery.util.exportReceiptToPdf
 import com.elmotamyez.gallery.util.fmt2f
 import com.elmotamyez.gallery.util.formatPrice
 import com.elmotamyez.gallery.util.twoDigit
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import elmotamyezgallery.composeapp.generated.resources.Cairo_Bold
 import elmotamyezgallery.composeapp.generated.resources.Cairo_Regular
 import elmotamyezgallery.composeapp.generated.resources.Res
@@ -589,44 +592,110 @@ private fun WebCartItemRow(item: CartItem, isMobile: Boolean = false, onIncrease
 
 // ── Receipts Tab — grouped by date, expand/collapse like mobile ───────────────
 
+private fun Receipt.webMonthKey(): String {
+    val local = createdAt?.let { raw ->
+        runCatching {
+            val normalized = raw.replace(" ", "T")
+                .replace(Regex("\\.\\d+"), "")
+                .replace(Regex("[+-]\\d{2}(:\\d{2})?$"), "Z")
+                .let { if (!it.endsWith("Z")) "${it}Z" else it }
+            kotlinx.datetime.Instant.parse(normalized)
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+        }.getOrNull()
+    } ?: return "unknown"
+    return "${local.year}-${twoDigit(local.monthNumber)}"
+}
+
+private fun String.webToArabicMonth(): String {
+    val parts = split("-")
+    if (parts.size < 2) return this
+    val year  = parts[0]
+    val month = parts[1].toIntOrNull() ?: return this
+    val name  = listOf("", "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                        "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر")
+        .getOrElse(month) { month.toString() }
+    return "$name $year"
+}
+
 @Composable
 internal fun WebReceiptsTab() {
     val receiptVm: ReceiptViewModel = koinInject()
     val receipts  by receiptVm.receipts.collectAsState()
     val isLoading by receiptVm.isLoading.collectAsState()
 
-    // Same grouping logic as mobile ReceiptsListScreen
-    val grouped = remember(receipts) {
+    // Current month key e.g. "2026-07"
+    val currentMonthKey = remember {
+        val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        "${now.year}-${twoDigit(now.monthNumber)}"
+    }
+
+    // Distinct months sorted newest first
+    val months = remember(receipts) {
+        receipts.map { it.webMonthKey() }.filter { it != "unknown" }.distinct().sortedDescending()
+    }
+
+    var selectedMonthIndex by remember(months) {
+        val idx = months.indexOf(currentMonthKey).takeIf { it >= 0 } ?: 0
+        mutableIntStateOf(idx)
+    }
+    val selectedMonth = months.getOrNull(selectedMonthIndex) ?: currentMonthKey
+
+    // Group by date filtered to selected month, newest day first
+    val grouped = remember(receipts, selectedMonth) {
         receipts
+            .filter { it.webMonthKey() == selectedMonth }
             .sortedByDescending { it.orderNumber }
             .groupBy { it.dateKey() }
             .entries
             .sortedByDescending { it.key }
     }
 
-    // Newest day starts expanded — same as mobile
+    val monthTotal = remember(grouped) { grouped.sumOf { it.value.sumOf { r -> r.total } } }
+    val monthCount = remember(grouped) { grouped.sumOf { it.value.size } }
+
+    // Newest day starts expanded
     val expandedMap = remember(grouped) {
         mutableStateMapOf<String, Boolean>().also { map ->
             grouped.forEachIndexed { i, entry -> map[entry.key] = (i == 0) }
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Header row with refresh
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        // ── Header row ────────────────────────────────────────────────────────
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text("سجل الفواتير", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             OutlinedButton(
                 onClick = { receiptVm.loadReceipts() },
                 shape = RoundedCornerShape(10.dp),
                 enabled = !isLoading
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
-                }
+                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(if (isLoading) "جاري التحديث..." else "تحديث")
+            }
+        }
+
+        // ── Month tabs ────────────────────────────────────────────────────────
+        if (months.isNotEmpty()) {
+            ScrollableTabRow(selectedTabIndex = selectedMonthIndex, edgePadding = 0.dp) {
+                months.forEachIndexed { index, monthKey ->
+                    Tab(
+                        selected = index == selectedMonthIndex,
+                        onClick  = { selectedMonthIndex = index },
+                        text     = {
+                            Text(
+                                monthKey.webToArabicMonth(),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (index == selectedMonthIndex) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    )
+                }
             }
         }
 
@@ -640,12 +709,58 @@ internal fun WebReceiptsTab() {
                         Text("أكّد طلباً لتظهر هنا", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            else -> LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // ── Monthly summary card ──────────────────────────────────────
+                item(key = "month_summary") {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    selectedMonth.webToArabicMonth(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                )
+                                Text(
+                                    "$monthCount فاتورة",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                )
+                            }
+                            Text(
+                                "${monthTotal.formatPrice()} ج",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                if (grouped.isEmpty()) {
+                    item {
+                        Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+                            Text("لا توجد فواتير في هذا الشهر",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
                 grouped.forEach { (dateKey, dayReceipts) ->
                     val isOpen   = expandedMap[dateKey] == true
                     val dayTotal = dayReceipts.sumOf { it.total }
 
-                    // Collapsible day header
                     item(key = "header_$dateKey") {
                         ReceiptDayHeader(
                             dateKey    = dateKey,
@@ -656,17 +771,12 @@ internal fun WebReceiptsTab() {
                         )
                     }
 
-                    // Animated receipts list — dayIndex matches mobile (#1, #2… within the day)
                     item(key = "body_$dateKey") {
-                        AnimatedVisibility(
-                            visible = isOpen,
-                            enter   = expandVertically(),
-                            exit    = shrinkVertically()
-                        ) {
+                        AnimatedVisibility(visible = isOpen, enter = expandVertically(), exit = shrinkVertically()) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Spacer(Modifier.height(2.dp))
                                 dayReceipts.forEachIndexed { index, receipt ->
-                                    WebReceiptCard(receipt = receipt, dayIndex = index + 1)
+                                    WebReceiptCard(receipt = receipt, dayIndex = dayReceipts.size - index)
                                 }
                                 Spacer(Modifier.height(2.dp))
                             }
