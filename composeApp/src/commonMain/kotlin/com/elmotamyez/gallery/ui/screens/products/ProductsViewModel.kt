@@ -74,10 +74,14 @@ class ProductsViewModel(private val repository: ProductRepository) : ViewModel()
 
     fun search(query: String) {
         val s = _uiState.value
+        // When searching, ignore category/brand filters so results span all categories
+        val catId   = if (query.isBlank()) s.selectedCategoryId else null
+        val brandId = if (query.isBlank()) s.selectedBrandId    else null
+        val subId   = if (query.isBlank()) s.selectedSubBrandId else null
         _uiState.update {
             it.copy(
                 searchQuery = query,
-                products    = filtered(s.selectedCategoryId, s.selectedBrandId, s.selectedSubBrandId, query)
+                products    = filtered(catId, brandId, subId, query)
             )
         }
     }
