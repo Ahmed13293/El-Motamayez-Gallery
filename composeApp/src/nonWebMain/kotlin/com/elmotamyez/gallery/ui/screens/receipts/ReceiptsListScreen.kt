@@ -132,16 +132,20 @@ class ReceiptsListScreen : Screen {
             vm.initExpandedDays(grouped.map { it.key })
         }
 
-        // Scroll state — restore position when returning from ReceiptScreen
+        // Scroll state — restore position when returning from ReceiptScreen.
+        // On first composition: restore saved position instead of resetting.
+        // On subsequent selectedMonth changes: scroll to top.
         val listState = rememberLazyListState()
-        LaunchedEffect(Unit) {
-            if (vm.listScrollIndex > 0) {
-                listState.scrollToItem(vm.listScrollIndex, vm.listScrollOffset)
-            }
-        }
-        // Reset scroll when month changes
+        var scrollRestored by remember { mutableStateOf(false) }
         LaunchedEffect(selectedMonth) {
-            listState.scrollToItem(0)
+            if (!scrollRestored) {
+                scrollRestored = true
+                if (vm.listScrollIndex > 0) {
+                    listState.scrollToItem(vm.listScrollIndex, vm.listScrollOffset)
+                }
+            } else {
+                listState.scrollToItem(0)
+            }
         }
 
         Scaffold(
