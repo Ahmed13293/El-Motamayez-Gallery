@@ -26,7 +26,7 @@ import com.elmotamyez.gallery.util.formatPrice
 import org.koin.compose.koinInject
 
 private const val WA_NUMBER   = "201121064222"
-private const val FB_PAGE_URL = "https://m.me/YOUR_FB_PAGE"   // replace with real page
+private const val FB_PAGE_URL = "https://m.me/almotamiz.bookstore"
 private const val IG_PAGE_URL = "https://ig.me/m/almotamayz.gallery"
 
 @JsFun("(num, msg) => { window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank'); }")
