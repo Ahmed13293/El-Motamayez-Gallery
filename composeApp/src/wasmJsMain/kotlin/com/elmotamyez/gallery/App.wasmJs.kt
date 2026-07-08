@@ -762,7 +762,7 @@ private fun WebCartTab(
                             fontWeight = FontWeight.SemiBold
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("كاش", "شبكة", "آجل").forEach { method ->
+                            listOf("كاش", "تحويل").forEach { method ->
                                 FilterChip(
                                     selected = paymentMethod == method,
                                     onClick = { paymentMethod = method },
@@ -914,7 +914,7 @@ private fun WebCartTab(
                         fontWeight = FontWeight.SemiBold
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("كاش", "شبكة", "آجل").forEach { method ->
+                        listOf("كاش", "تحويل").forEach { method ->
                             FilterChip(
                                 selected = paymentMethod == method,
                                 onClick = { paymentMethod = method },
