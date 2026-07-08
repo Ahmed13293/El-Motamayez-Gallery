@@ -36,6 +36,7 @@ private data class ReceiptInsert(
     val discount: Double,
     val payment_method: String,
     val is_paid: Boolean,
+    val created_at: String?     = null,
     val customer_phone: String? = null,
     val customer_info: String?  = null,
     val username: String?       = null
@@ -90,6 +91,7 @@ class ReceiptRepository {
             discount       = receipt.discount,
             payment_method = receipt.paymentMethod,
             is_paid        = receipt.isPaid,
+            created_at     = receipt.createdAt,
             customer_phone = receipt.customerPhone,
             customer_info  = receipt.customerInfo,
             username       = receipt.username
