@@ -21,13 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.elmotamyez.gallery.data.model.Brand
 import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
@@ -347,12 +345,8 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                                         modifier = Modifier.fillMaxSize()
                                     ) {
                                         items(subcategories, key = { it.id }) { brand ->
-                                            val thumb = allProducts
-                                                .firstOrNull { it.brandId == brand.id && it.imageUrl != null }
-                                                ?.imageUrl
                                             SubcategoryCard(
-                                                name  = brand.name,
-                                                imageUrl = thumb,
+                                                name    = brand.name,
                                                 onClick = {
                                                     selectedBrand = brand
                                                     catalogView   = CatalogView.PRODUCTS
@@ -469,7 +463,7 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
 // ── Subcategory card ──────────────────────────────────────────────────────────
 
 @Composable
-private fun SubcategoryCard(name: String, imageUrl: String?, onClick: () -> Unit) {
+private fun SubcategoryCard(name: String, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
@@ -485,21 +479,12 @@ private fun SubcategoryCard(name: String, imageUrl: String?, onClick: () -> Unit
                 .background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center
         ) {
-            if (imageUrl != null) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().clip(CircleShape)
-                )
-            } else {
-                Text(
-                    text = name.take(1),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+            Text(
+                text = name.take(1),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
         Text(
             text = name,
@@ -533,19 +518,6 @@ private fun PublicProductCard(
     ) {
         Column(modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-
-            // Product image
-            if (product.imageUrl != null) {
-                AsyncImage(
-                    model = product.imageUrl,
-                    contentDescription = product.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                )
-            }
 
             Text(product.name,
                 style = MaterialTheme.typography.bodyMedium,
