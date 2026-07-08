@@ -103,7 +103,8 @@ class ReceiptViewModel(
         }
     }
 
-    /** Called when the user confirms an order from CartScreen. */
+    /** Called when the user confirms an order from CartScreen.
+     *  [overrideDate] allows admins to back-date a receipt: Triple(year, month, day). */
     fun confirmOrder(
         items: List<CartItem>,
         total: Double,
@@ -111,17 +112,22 @@ class ReceiptViewModel(
         paymentMethod: String = "كاش",
         customerPhone: String? = null,
         customerInfo: String? = null,
-        username: String? = null
+        username: String? = null,
+        overrideDate: Triple<Int, Int, Int>? = null
     ) {
         val isPaid = paymentMethod != "آجل"
         viewModelScope.launch {
             val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-            val todayPrefix = dateString(now.year, now.monthNumber, now.dayOfMonth)
+            val (year, month, day) = overrideDate ?: Triple(now.year, now.monthNumber, now.dayOfMonth)
+            val todayPrefix = dateString(year, month, day)
             val todayMax = _receipts.value
                 .filter { it.createdAt?.startsWith(todayPrefix) == true }
                 .maxOfOrNull { it.orderNumber } ?: 0
             val nextNumber = todayMax + 1
-            val nowIso = dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second)
+            val nowIso = if (overrideDate != null)
+                "${todayPrefix}T12:00:00+00:00"
+            else
+                dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second)
             val receipt = Receipt(
                 id            = "${todayPrefix}-${nextNumber.toString().padStart(4, '0')}",
                 orderNumber   = nextNumber,

@@ -2,6 +2,7 @@
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +11,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
@@ -25,10 +27,15 @@ import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.elmotamyez.gallery.data.model.UserRole
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptScreen
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.formatPrice
+import com.elmotamyez.gallery.util.twoDigit
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.koinInject
 import kotlin.math.max
 
@@ -47,10 +54,20 @@ class CartScreen : Screen {
         val authVm      = koinInject<AuthViewModel>()
         val currentUser by authVm.uiState.collectAsState()
         val cartItems   by cartVm.cartItems.collectAsState()
+        val isAdmin     = currentUser.user?.role == UserRole.ADMIN
 
         // ── Customer optional fields ──────────────────────────────────────────
         var customerPhone by remember { mutableStateOf("") }
         var customerInfo  by remember { mutableStateOf("") }
+
+        // ── Back-date (admin only) ────────────────────────────────────────────
+        // null = use today's real timestamp; non-null = override to this date
+        var overrideDate   by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
+        var showDatePicker by remember { mutableStateOf(false) }
+
+        val overrideDateLabel = overrideDate?.let { (y, m, d) ->
+            "${twoDigit(d)}/${twoDigit(m)}/$y"
+        }
 
         // ── Discount state ────────────────────────────────────────────────────
         var discountMode  by remember { mutableStateOf(DiscountMode.AMOUNT) }
@@ -294,6 +311,51 @@ class CartScreen : Screen {
                                 }
                             )
 
+                            // ── Back-date row (admin only) ────────────────────
+                            if (isAdmin) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(
+                                            if (overrideDate != null)
+                                                MaterialTheme.colorScheme.tertiaryContainer
+                                            else MaterialTheme.colorScheme.surfaceVariant,
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { showDatePicker = true }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.CalendarMonth,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = if (overrideDate != null)
+                                                MaterialTheme.colorScheme.tertiary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            "تاريخ الفاتورة:",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Text(
+                                        overrideDateLabel ?: "اليوم",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (overrideDate != null)
+                                            MaterialTheme.colorScheme.tertiary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
                             Button(
                                 onClick = {
                                     receiptVm.confirmOrder(
@@ -303,7 +365,8 @@ class CartScreen : Screen {
                                         paymentMethod = selectedMethod.label,
                                         customerPhone = customerPhone,
                                         customerInfo  = customerInfo,
-                                        username      = currentUser.user?.username
+                                        username      = currentUser.user?.username,
+                                        overrideDate  = overrideDate
                                     )
                                     cartVm.clearCart()
                                     (navigator.parent ?: navigator).push(ReceiptScreen())
@@ -382,5 +445,35 @@ class CartScreen : Screen {
             }
         }
 
+        // ── Date picker dialog (admin only) ───────────────────────────────────
+        if (showDatePicker) {
+            val datePickerState = rememberDatePickerState()
+            DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val millis = datePickerState.selectedDateMillis
+                        if (millis != null) {
+                            val local = Instant.fromEpochMilliseconds(millis)
+                                .toLocalDateTime(TimeZone.UTC)
+                            overrideDate = Triple(local.year, local.monthNumber, local.dayOfMonth)
+                        }
+                        showDatePicker = false
+                    }) { Text("موافق") }
+                },
+                dismissButton = {
+                    Row {
+                        if (overrideDate != null) {
+                            TextButton(onClick = { overrideDate = null; showDatePicker = false }) {
+                                Text("اليوم", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                        TextButton(onClick = { showDatePicker = false }) { Text("إلغاء") }
+                    }
+                }
+            ) {
+                DatePicker(state = datePickerState)
+            }
+        }
     }
 }
