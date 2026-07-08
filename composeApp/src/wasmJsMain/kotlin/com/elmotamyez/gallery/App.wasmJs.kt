@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,6 +26,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,6 +36,7 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -72,6 +76,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -335,7 +340,7 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                     isMobile = isMobile,
                     onOrderConfirmed = { currentTab = WebTab.RECEIPTS })
 
-                WebTab.RECEIPTS -> WebReceiptsTab()
+                WebTab.RECEIPTS -> WebReceiptsTab(isAdmin = isAdmin)
                 WebTab.ADMIN -> if (isAdmin) WebAdminTab(user = user, onLogout = onLogout)
             }
         }
@@ -1234,10 +1239,13 @@ private fun String.webToArabicMonth(): String {
 }
 
 @Composable
-internal fun WebReceiptsTab() {
+internal fun WebReceiptsTab(isAdmin: Boolean = false) {
     val receiptVm: ReceiptViewModel = koinInject()
     val receipts by receiptVm.receipts.collectAsState()
     val isLoading by receiptVm.isLoading.collectAsState()
+    val allProducts by receiptVm.allProducts.collectAsState()
+    val isSaving by receiptVm.isSaving.collectAsState()
+    var editingReceipt by remember { mutableStateOf<Receipt?>(null) }
 
     // Current month key e.g. "2026-07"
     val currentMonthKey = remember {
@@ -1418,7 +1426,13 @@ internal fun WebReceiptsTab() {
                                 dayReceipts.forEachIndexed { index, receipt ->
                                     WebReceiptCard(
                                         receipt = receipt,
-                                        dayIndex = dayReceipts.size - index
+                                        dayIndex = dayReceipts.size - index,
+                                        isAdmin = isAdmin,
+                                        onEdit = {
+                                            receiptVm.loadProductsForEdit()
+                                            receiptVm.viewReceipt(receipt)
+                                            editingReceipt = receipt
+                                        }
                                     )
                                 }
                                 Spacer(Modifier.height(2.dp))
@@ -1428,6 +1442,19 @@ internal fun WebReceiptsTab() {
                 }
             }
         }
+    }
+
+    editingReceipt?.let { receipt ->
+        WebEditReceiptDialog(
+            receipt = receipt,
+            allProducts = allProducts,
+            isSaving = isSaving,
+            onDismiss = { editingReceipt = null },
+            onSave = { newItems, discount, paymentMethod ->
+                receiptVm.updateReceipt(newItems, discount, paymentMethod)
+                editingReceipt = null
+            }
+        )
     }
 }
 
@@ -1489,7 +1516,12 @@ private fun ReceiptDayHeader(
 
 // dayIndex = 1-based position within the day — same display as mobile "فاتورة #$dayIndex"
 @Composable
-internal fun WebReceiptCard(receipt: Receipt, dayIndex: Int) {
+internal fun WebReceiptCard(
+    receipt: Receipt,
+    dayIndex: Int,
+    isAdmin: Boolean = false,
+    onEdit: () -> Unit = {}
+) {
     var expanded by remember { mutableStateOf(false) }
     val discount = receipt.discount
     val subtotal = receipt.total + discount
@@ -1592,6 +1624,16 @@ internal fun WebReceiptCard(receipt: Receipt, dayIndex: Int) {
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    if (isAdmin) {
+                        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "تعديل الفاتورة",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                     Icon(
                         imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                         contentDescription = null,
@@ -1750,6 +1792,239 @@ internal fun WebReceiptCard(receipt: Receipt, dayIndex: Int) {
             }
         }
     }
+}
+
+@Composable
+private fun WebEditReceiptDialog(
+    receipt: Receipt,
+    allProducts: List<Product>,
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (List<CartItem>, Double, String) -> Unit
+) {
+    val editItems = remember(receipt.id) { mutableStateListOf<CartItem>().also { it.addAll(receipt.items) } }
+    var discountText by remember(receipt.id) { mutableStateOf(receipt.discount.fmt2f()) }
+    var paymentMethod by remember(receipt.id) { mutableStateOf(receipt.paymentMethod) }
+    var showAddProduct by remember { mutableStateOf(false) }
+    var showAddOther by remember { mutableStateOf(false) }
+
+    val discount = discountText.toDoubleOrNull() ?: 0.0
+    val newTotal = editItems.sumOf { it.totalPrice } - discount
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = { onSave(editItems.toList(), discount, paymentMethod) },
+                enabled = !isSaving && editItems.isNotEmpty()
+            ) {
+                if (isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                else Text("حفظ")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+        title = { Text("تعديل الفاتورة ${receipt.id}", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // ── Items list ────────────────────────────────────────────────
+                editItems.forEachIndexed { idx, item ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(item.product.name, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        // Qty stepper
+                        IconButton(onClick = {
+                            if (item.quantity > 1) editItems[idx] = item.copy(quantity = item.quantity - 1)
+                        }, modifier = Modifier.size(28.dp)) {
+                            Text("−", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Text("${item.quantity}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        IconButton(onClick = {
+                            editItems[idx] = item.copy(quantity = item.quantity + 1)
+                        }, modifier = Modifier.size(28.dp)) {
+                            Text("+", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Text("${item.totalPrice.formatPrice()} ج", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(56.dp), textAlign = TextAlign.End)
+                        IconButton(onClick = { editItems.removeAt(idx) }, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+
+                // ── Add buttons ───────────────────────────────────────────────
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { showAddProduct = true }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) {
+                        Text("+ إضافة منتج", style = MaterialTheme.typography.labelSmall)
+                    }
+                    OutlinedButton(onClick = { showAddOther = true }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) {
+                        Text("+ خدمة / أخرى", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                HorizontalDivider()
+
+                // ── Payment method ────────────────────────────────────────────
+                Text("طريقة الدفع", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("كاش", "تحويل", "آجل").forEach { method ->
+                        FilterChip(
+                            selected = paymentMethod == method,
+                            onClick = { paymentMethod = method },
+                            label = { Text(method, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+
+                // ── Discount ──────────────────────────────────────────────────
+                OutlinedTextField(
+                    value = discountText,
+                    onValueChange = { discountText = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("خصم (ج)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+
+                // ── Total preview ─────────────────────────────────────────────
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("الإجمالي الجديد", fontWeight = FontWeight.Bold)
+                    Text("${newTotal.formatPrice()} ج", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    )
+
+    if (showAddProduct) {
+        WebAddProductDialog(
+            allProducts = allProducts,
+            onDismiss = { showAddProduct = false },
+            onAdd = { product ->
+                val existing = editItems.indexOfFirst { it.product.id == product.id }
+                if (existing >= 0) editItems[existing] = editItems[existing].let { it.copy(quantity = it.quantity + 1) }
+                else editItems.add(CartItem(product, 1))
+                showAddProduct = false
+            }
+        )
+    }
+
+    if (showAddOther) {
+        WebOtherProductDialog(
+            onDismiss = { showAddOther = false },
+            onAdd = { item ->
+                editItems.add(item)
+                showAddOther = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun WebAddProductDialog(
+    allProducts: List<Product>,
+    onDismiss: () -> Unit,
+    onAdd: (Product) -> Unit
+) {
+    var searchText by remember { mutableStateOf("") }
+    val filtered = remember(searchText, allProducts) {
+        if (searchText.isBlank()) allProducts
+        else allProducts.filter { it.name.contains(searchText, ignoreCase = true) }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+        title = { Text("إضافة منتج", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    label = { Text("بحث...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(18.dp)) }
+                )
+                Column(
+                    modifier = Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (allProducts.isEmpty()) {
+                        Text("جاري تحميل المنتجات...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        filtered.forEach { product ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable { onAdd(product) }.padding(vertical = 8.dp, horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(product.name, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                Text("${product.price.formatPrice()} ج", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun WebOtherProductDialog(
+    onDismiss: () -> Unit,
+    onAdd: (CartItem) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var priceText by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = {
+                    val price = priceText.toDoubleOrNull() ?: 0.0
+                    val ts = Clock.System.now().toEpochMilliseconds() % 10000
+                    val product = Product(
+                        id = "other_${name.take(8)}_$ts",
+                        name = name.trim(),
+                        price = price,
+                        brandId = "",
+                        categoryId = "",
+                        stock = 0
+                    )
+                    onAdd(CartItem(product, 1))
+                },
+                enabled = name.isNotBlank() && (priceText.toDoubleOrNull() ?: 0.0) > 0
+            ) { Text("إضافة") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+        title = { Text("خدمة / أخرى", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("الاسم") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { priceText = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("السعر (ج)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+            }
+        }
+    )
 }
 
 internal fun formatArabicDate(iso: String): String {
