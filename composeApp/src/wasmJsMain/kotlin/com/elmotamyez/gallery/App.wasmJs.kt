@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -1245,7 +1246,8 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false) {
     val isLoading by receiptVm.isLoading.collectAsState()
     val allProducts by receiptVm.allProducts.collectAsState()
     val isSaving by receiptVm.isSaving.collectAsState()
-    var editingReceipt by remember { mutableStateOf<Receipt?>(null) }
+    var editingReceipt  by remember { mutableStateOf<Receipt?>(null) }
+    var deletingReceipt by remember { mutableStateOf<Receipt?>(null) }
 
     // Current month key e.g. "2026-07"
     val currentMonthKey = remember {
@@ -1432,7 +1434,8 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false) {
                                             receiptVm.loadProductsForEdit()
                                             receiptVm.viewReceipt(receipt)
                                             editingReceipt = receipt
-                                        }
+                                        },
+                                        onDelete = { deletingReceipt = receipt }
                                     )
                                 }
                                 Spacer(Modifier.height(2.dp))
@@ -1442,6 +1445,27 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false) {
                 }
             }
         }
+    }
+
+    deletingReceipt?.let { receipt ->
+        AlertDialog(
+            onDismissRequest = { deletingReceipt = null },
+            title = { Text("حذف الفاتورة", fontWeight = FontWeight.Bold) },
+            text = { Text("هل أنت متأكد من حذف الفاتورة ${receipt.id}؟\nسيتم استعادة المخزون تلقائياً.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        receiptVm.deleteReceipt(receipt)
+                        deletingReceipt = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    enabled = !isSaving
+                ) { Text("حذف") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingReceipt = null }) { Text("إلغاء") }
+            }
+        )
     }
 
     editingReceipt?.let { receipt ->
@@ -1520,7 +1544,8 @@ internal fun WebReceiptCard(
     receipt: Receipt,
     dayIndex: Int,
     isAdmin: Boolean = false,
-    onEdit: () -> Unit = {}
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
     val discount = receipt.discount
@@ -1630,6 +1655,14 @@ internal fun WebReceiptCard(
                                 Icons.Default.Edit,
                                 contentDescription = "تعديل الفاتورة",
                                 tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "حذف الفاتورة",
+                                tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(18.dp)
                             )
                         }

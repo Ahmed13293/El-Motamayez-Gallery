@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -69,7 +70,8 @@ class ReceiptScreen : Screen {
             }.getOrElse { raw }
         } ?: ""
 
-        var showEditSheet by remember { mutableStateOf(false) }
+        var showEditSheet   by remember { mutableStateOf(false) }
+        var showDeleteDialog by remember { mutableStateOf(false) }
 
         Scaffold { padding ->
             LazyColumn(
@@ -97,6 +99,13 @@ class ReceiptScreen : Screen {
                                         Icons.Default.Edit,
                                         contentDescription = "تعديل الفاتورة",
                                         tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                IconButton(onClick = { showDeleteDialog = true }) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "حذف الفاتورة",
+                                        tint = MaterialTheme.colorScheme.error
                                     )
                                 }
                             }
@@ -269,6 +278,27 @@ class ReceiptScreen : Screen {
                     )
                 }
             }
+        }
+
+        if (showDeleteDialog && receipt != null) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("حذف الفاتورة", fontWeight = FontWeight.Bold) },
+                text = { Text("هل أنت متأكد من حذف الفاتورة ${receipt!!.id}؟\nسيتم استعادة المخزون تلقائياً.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            vm.deleteReceipt(receipt!!) { navigator.pop() }
+                            showDeleteDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        enabled = !isSaving
+                    ) { Text("حذف") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) { Text("إلغاء") }
+                }
+            )
         }
 
         if (showEditSheet && receipt != null) {

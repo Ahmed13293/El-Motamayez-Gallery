@@ -215,6 +215,24 @@ class ReceiptViewModel(
         }
     }
 
+    /** Restores stock for all items in the receipt, then deletes it from Supabase and local cache. */
+    fun deleteReceipt(receipt: Receipt, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            _isSaving.value = true
+            receipt.items
+                .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
+                .forEach { runCatching { productRepository.incrementStock(it.product.id, it.quantity) } }
+            runCatching { repository.delete(receipt.id) }
+            val updatedList = _receipts.value.filter { it.id != receipt.id }
+            _receipts.value = updatedList
+            persistCache(updatedList)
+            if (_currentReceipt.value?.id == receipt.id) _currentReceipt.value = null
+            _stockVersion.value += 1
+            _isSaving.value = false
+            onDone()
+        }
+    }
+
     private fun persistCache(receipts: List<Receipt>) {
         settings[KEY_RECEIPTS_CACHE] = json.encodeToString(receipts)
     }

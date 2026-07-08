@@ -81,6 +81,12 @@ class ReceiptRepository {
             )) { filter { eq("id", receipt.id) } }
     }
 
+    /** Delete a receipt by id. */
+    suspend fun delete(receiptId: String) {
+        supabaseClient.from("receipts")
+            .delete { filter { eq("id", receiptId) } }
+    }
+
     /** Persist a new receipt. */
     suspend fun insert(receipt: Receipt) {
         val row = ReceiptInsert(
