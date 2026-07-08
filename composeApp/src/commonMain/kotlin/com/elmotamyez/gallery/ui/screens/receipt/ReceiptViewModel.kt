@@ -181,7 +181,7 @@ class ReceiptViewModel(
      * Persists edited receipt items/total/discount to Supabase and reconciles
      * product stock (restores stock for removed/reduced items, deducts for added/increased ones).
      */
-    fun updateReceipt(newItems: List<CartItem>, discount: Double) {
+    fun updateReceipt(newItems: List<CartItem>, discount: Double, paymentMethod: String) {
         val receipt = _currentReceipt.value ?: return
         val newTotal = newItems.sumOf { it.totalPrice } - discount
 
@@ -203,7 +203,7 @@ class ReceiptViewModel(
                 }
             }
 
-            val updated = receipt.copy(items = newItems, total = newTotal, discount = discount)
+            val updated = receipt.copy(items = newItems, total = newTotal, discount = discount, paymentMethod = paymentMethod)
             runCatching { repository.update(updated) }
 
             _currentReceipt.value = updated

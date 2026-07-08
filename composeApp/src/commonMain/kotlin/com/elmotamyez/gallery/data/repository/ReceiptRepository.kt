@@ -45,7 +45,9 @@ private data class ReceiptInsert(
 private data class ReceiptItemsUpdate(
     val items: String,
     val total: Double,
-    val discount: Double
+    val discount: Double,
+    val payment_method: String,
+    val is_paid: Boolean
 )
 
 // ── Repository ────────────────────────────────────────────────────────────────
@@ -66,13 +68,15 @@ class ReceiptRepository {
         return rows.map { it.toDomain() }
     }
 
-    /** Update items, total and discount of an existing receipt. */
+    /** Update items, total, discount and payment method of an existing receipt. */
     suspend fun update(receipt: Receipt) {
         supabaseClient.from("receipts")
             .update(ReceiptItemsUpdate(
-                items    = json.encodeToString(receipt.items),
-                total    = receipt.total,
-                discount = receipt.discount
+                items          = json.encodeToString(receipt.items),
+                total          = receipt.total,
+                discount       = receipt.discount,
+                payment_method = receipt.paymentMethod,
+                is_paid        = receipt.paymentMethod != "آجل"
             )) { filter { eq("id", receipt.id) } }
     }
 

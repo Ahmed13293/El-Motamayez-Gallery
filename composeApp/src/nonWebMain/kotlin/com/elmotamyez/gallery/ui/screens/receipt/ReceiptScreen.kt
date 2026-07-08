@@ -273,13 +273,14 @@ class ReceiptScreen : Screen {
 
         if (showEditSheet && receipt != null) {
             EditReceiptSheet(
-                initialItems  = items,
-                initialDiscount = discount,
-                allProducts   = allProducts,
-                isSaving      = isSaving,
-                onDismiss     = { showEditSheet = false },
-                onSave        = { newItems, newDiscount ->
-                    vm.updateReceipt(newItems, newDiscount)
+                initialItems         = items,
+                initialDiscount      = discount,
+                initialPaymentMethod = paymentMethod,
+                allProducts          = allProducts,
+                isSaving             = isSaving,
+                onDismiss            = { showEditSheet = false },
+                onSave               = { newItems, newDiscount, newPayment ->
+                    vm.updateReceipt(newItems, newDiscount, newPayment)
                     showEditSheet = false
                 }
             )
@@ -294,14 +295,17 @@ class ReceiptScreen : Screen {
 private fun EditReceiptSheet(
     initialItems: List<CartItem>,
     initialDiscount: Double,
+    initialPaymentMethod: String,
     allProducts: List<Product>,
     isSaving: Boolean,
     onDismiss: () -> Unit,
-    onSave: (List<CartItem>, Double) -> Unit
+    onSave: (List<CartItem>, Double, String) -> Unit
 ) {
-    val editItems    = remember { mutableStateListOf<CartItem>().apply { addAll(initialItems) } }
-    var discountText by remember { mutableStateOf(if (initialDiscount > 0.0) initialDiscount.toInt().toString() else "") }
-    var showAddDialog by remember { mutableStateOf(false) }
+    val editItems     = remember { mutableStateListOf<CartItem>().apply { addAll(initialItems) } }
+    var discountText  by remember { mutableStateOf(if (initialDiscount > 0.0) initialDiscount.toInt().toString() else "") }
+    var paymentMethod by remember { mutableStateOf(initialPaymentMethod) }
+    var showAddDialog    by remember { mutableStateOf(false) }
+    var showOtherDialog  by remember { mutableStateOf(false) }
 
     val computedTotal = editItems.sumOf { it.totalPrice } - (discountText.toDoubleOrNull() ?: 0.0)
 
@@ -385,14 +389,58 @@ private fun EditReceiptSheet(
                 }
             }
 
-            // Add product button
-            OutlinedButton(
-                onClick = { showAddDialog = true },
-                modifier = Modifier.fillMaxWidth()
+            // Add product buttons row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("إضافة منتج")
+                OutlinedButton(
+                    onClick = { showAddDialog = true },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("إضافة منتج")
+                }
+                OutlinedButton(
+                    onClick = { showOtherDialog = true },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("خدمة / أخرى")
+                }
+            }
+
+            HorizontalDivider()
+
+            // Payment method toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("طريقة الدفع:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                listOf("كاش", "تحويل", "آجل").forEach { method ->
+                    val selected = paymentMethod == method
+                    Surface(
+                        onClick = { paymentMethod = method },
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                        color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.height(34.dp).weight(1f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                method,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (selected) androidx.compose.ui.graphics.Color.White
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
 
             HorizontalDivider()
@@ -422,7 +470,7 @@ private fun EditReceiptSheet(
 
             // Save button
             Button(
-                onClick = { onSave(editItems.toList(), discountText.toDoubleOrNull() ?: 0.0) },
+                onClick = { onSave(editItems.toList(), discountText.toDoubleOrNull() ?: 0.0, paymentMethod) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isSaving && editItems.isNotEmpty()
             ) {
@@ -450,6 +498,67 @@ private fun EditReceiptSheet(
             }
         )
     }
+
+    if (showOtherDialog) {
+        OtherProductDialog(
+            onDismiss = { showOtherDialog = false },
+            onAdd     = { name, price ->
+                val otherId = "other_${name.take(10).replace(" ", "_")}_${System.currentTimeMillis() % 10000}"
+                val product = com.elmotamyez.gallery.data.model.Product(
+                    id         = otherId,
+                    name       = name,
+                    price      = price,
+                    stock      = 0,
+                    brandId    = "",
+                    categoryId = ""
+                )
+                editItems.add(CartItem(product = product, quantity = 1))
+                showOtherDialog = false
+            }
+        )
+    }
+}
+
+// ── Other / service product dialog ────────────────────────────────────────────
+
+@Composable
+private fun OtherProductDialog(
+    onDismiss: () -> Unit,
+    onAdd: (String, Double) -> Unit
+) {
+    var name  by remember { mutableStateOf("") }
+    var price by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("إضافة خدمة / منتج آخر") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("الاسم") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = price,
+                    onValueChange = { price = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("السعر (ج)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onAdd(name.trim(), price.toDoubleOrNull() ?: 0.0) },
+                enabled = name.isNotBlank() && (price.toDoubleOrNull() ?: 0.0) > 0.0
+            ) { Text("إضافة") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
+    )
 }
 
 // ── Add product search dialog ─────────────────────────────────────────────────
