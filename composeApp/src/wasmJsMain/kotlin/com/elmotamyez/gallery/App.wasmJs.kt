@@ -119,6 +119,9 @@ import org.koin.compose.viewmodel.koinViewModel
 @JsFun("(num, msg) => { window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank'); }")
 private external fun openWhatsApp(number: String, message: String)
 
+@JsFun("() => window.location.search + window.location.hash")
+private external fun getLocationSuffix(): String
+
 private fun buildCartWhatsAppMsg(
     items: List<CartItem>, total: Double, paymentMethod: String
 ): String = buildString {
@@ -198,7 +201,9 @@ actual fun App() {
                 KoinContext {
                     val authVm: AuthViewModel = koinInject()
                     val authState by authVm.uiState.collectAsState()
-                    var showPublicCatalog by remember { mutableStateOf(false) }
+                    var showPublicCatalog by remember {
+                        mutableStateOf(getLocationSuffix().contains("catalog", ignoreCase = true))
+                    }
                     when {
                         authState.user != null -> WebApp(
                             user = authState.user!!,
