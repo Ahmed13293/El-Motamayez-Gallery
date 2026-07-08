@@ -128,7 +128,6 @@ class ProductRepository {
     }
 
     suspend fun decrementStock(productId: String, quantity: Int) {
-        // Fetch current stock, subtract, then update
         val current = supabaseClient.from("products")
             .select { filter { eq("id", productId) } }
             .decodeList<Product>()
@@ -136,6 +135,18 @@ class ProductRepository {
         val newStock = (current - quantity).coerceAtLeast(0)
         supabaseClient.from("products")
             .update(buildJsonObject { put("stock", newStock) }) {
+                filter { eq("id", productId) }
+            }
+        clearCache()
+    }
+
+    suspend fun incrementStock(productId: String, quantity: Int) {
+        val current = supabaseClient.from("products")
+            .select { filter { eq("id", productId) } }
+            .decodeList<Product>()
+            .firstOrNull()?.stock ?: return
+        supabaseClient.from("products")
+            .update(buildJsonObject { put("stock", current + quantity) }) {
                 filter { eq("id", productId) }
             }
         clearCache()

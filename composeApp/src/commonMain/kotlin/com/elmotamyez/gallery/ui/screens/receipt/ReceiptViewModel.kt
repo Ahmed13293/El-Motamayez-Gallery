@@ -35,6 +35,12 @@ class ReceiptViewModel(
     private val _stockVersion = MutableStateFlow(0)
     val stockVersion: StateFlow<Int> = _stockVersion.asStateFlow()
 
+    private val _allProducts = MutableStateFlow<List<com.elmotamyez.gallery.data.model.Product>>(emptyList())
+    val allProducts: StateFlow<List<com.elmotamyez.gallery.data.model.Product>> = _allProducts.asStateFlow()
+
+    private val _isSaving = MutableStateFlow(false)
+    val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
     // Currently viewed receipt (shown in ReceiptScreen)
     private val _currentReceipt = MutableStateFlow<Receipt?>(null)
     val currentReceipt: StateFlow<Receipt?> = _currentReceipt.asStateFlow()
@@ -154,6 +160,53 @@ class ReceiptViewModel(
     /** Called when tapping a receipt from the history list. */
     fun viewReceipt(receipt: Receipt) {
         _currentReceipt.value = receipt
+    }
+
+    /** Loads all products so the edit sheet can offer an add-product search. */
+    fun loadProductsForEdit() {
+        if (_allProducts.value.isNotEmpty()) return
+        viewModelScope.launch {
+            runCatching { productRepository.getProducts() }
+                .onSuccess { _allProducts.value = it }
+        }
+    }
+
+    /**
+     * Persists edited receipt items/total/discount to Supabase and reconciles
+     * product stock (restores stock for removed/reduced items, deducts for added/increased ones).
+     */
+    fun updateReceipt(newItems: List<CartItem>, discount: Double) {
+        val receipt = _currentReceipt.value ?: return
+        val newTotal = newItems.sumOf { it.totalPrice } - discount
+
+        viewModelScope.launch {
+            _isSaving.value = true
+
+            val oldQtyMap = receipt.items
+                .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
+                .associate { it.product.id to it.quantity }
+            val newQtyMap = newItems
+                .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
+                .associate { it.product.id to it.quantity }
+
+            (oldQtyMap.keys + newQtyMap.keys).toSet().forEach { id ->
+                val diff = (newQtyMap[id] ?: 0) - (oldQtyMap[id] ?: 0)
+                when {
+                    diff > 0 -> runCatching { productRepository.decrementStock(id, diff) }
+                    diff < 0 -> runCatching { productRepository.incrementStock(id, -diff) }
+                }
+            }
+
+            val updated = receipt.copy(items = newItems, total = newTotal, discount = discount)
+            runCatching { repository.update(updated) }
+
+            _currentReceipt.value = updated
+            val updatedList = _receipts.value.map { if (it.id == updated.id) updated else it }
+            _receipts.value = updatedList
+            persistCache(updatedList)
+            _stockVersion.value += 1
+            _isSaving.value = false
+        }
     }
 
     private fun persistCache(receipts: List<Receipt>) {

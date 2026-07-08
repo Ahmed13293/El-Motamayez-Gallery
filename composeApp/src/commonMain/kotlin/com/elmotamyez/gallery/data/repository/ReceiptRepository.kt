@@ -41,6 +41,13 @@ private data class ReceiptInsert(
     val username: String?       = null
 )
 
+@Serializable
+private data class ReceiptItemsUpdate(
+    val items: String,
+    val total: Double,
+    val discount: Double
+)
+
 // ── Repository ────────────────────────────────────────────────────────────────
 
 class ReceiptRepository {
@@ -57,6 +64,16 @@ class ReceiptRepository {
             .decodeList<ReceiptRow>()
 
         return rows.map { it.toDomain() }
+    }
+
+    /** Update items, total and discount of an existing receipt. */
+    suspend fun update(receipt: Receipt) {
+        supabaseClient.from("receipts")
+            .update(ReceiptItemsUpdate(
+                items    = json.encodeToString(receipt.items),
+                total    = receipt.total,
+                discount = receipt.discount
+            )) { filter { eq("id", receipt.id) } }
     }
 
     /** Persist a new receipt. */
