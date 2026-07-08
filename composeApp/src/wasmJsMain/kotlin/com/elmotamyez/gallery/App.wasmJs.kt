@@ -1871,7 +1871,7 @@ private fun WebEditReceiptDialog(
                 // ── Payment method ────────────────────────────────────────────
                 Text("طريقة الدفع", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("كاش", "تحويل", "آجل").forEach { method ->
+                    listOf("كاش", "تحويل").forEach { method ->
                         FilterChip(
                             selected = paymentMethod == method,
                             onClick = { paymentMethod = method },

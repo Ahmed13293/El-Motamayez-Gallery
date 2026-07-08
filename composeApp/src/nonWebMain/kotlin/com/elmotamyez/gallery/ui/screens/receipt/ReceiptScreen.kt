@@ -421,7 +421,7 @@ private fun EditReceiptSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("طريقة الدفع:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                listOf("كاش", "تحويل", "آجل").forEach { method ->
+                listOf("كاش", "تحويل").forEach { method ->
                     val selected = paymentMethod == method
                     Surface(
                         onClick = { paymentMethod = method },
