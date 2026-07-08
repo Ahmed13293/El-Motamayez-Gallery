@@ -50,7 +50,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -621,6 +625,7 @@ private fun WebProductCard(
 
 // ── Cart Tab ──────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WebCartTab(
     cartVm: CartViewModel,
@@ -630,9 +635,15 @@ private fun WebCartTab(
 ) {
     val receiptVm: ReceiptViewModel = koinInject()
     val cartItems by cartVm.cartItems.collectAsState()
+    val isAdmin = user.role == UserRole.ADMIN
     var discount by remember { mutableStateOf("") }
     var paymentMethod by remember { mutableStateOf("كاش") }
     var showConfirmDialog by remember { mutableStateOf(false) }
+    var overrideDate   by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val overrideDateLabel = overrideDate?.let { (y, m, d) ->
+        "${twoDigit(d)}/${twoDigit(m)}/$y"
+    }
 
     val discountValue = discount.toDoubleOrNull() ?: 0.0
     val total = (cartVm.totalPrice - discountValue).coerceAtLeast(0.0)
@@ -751,6 +762,33 @@ private fun WebCartTab(
                                     selected = paymentMethod == method,
                                     onClick = { paymentMethod = method },
                                     label = { Text(method) })
+                            }
+                        }
+                        if (isAdmin) {
+                            Surface(
+                                onClick = { showDatePicker = true },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (overrideDate != null) MaterialTheme.colorScheme.tertiaryContainer
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(16.dp),
+                                            tint = if (overrideDate != null) MaterialTheme.colorScheme.tertiary
+                                                   else MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("تاريخ الفاتورة:", style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Text(overrideDateLabel ?: "اليوم", style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (overrideDate != null) MaterialTheme.colorScheme.tertiary
+                                                else MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                         }
                         Button(
@@ -879,6 +917,33 @@ private fun WebCartTab(
                         }
                     }
                     Spacer(Modifier.weight(1f))
+                    if (isAdmin) {
+                        Surface(
+                            onClick = { showDatePicker = true },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (overrideDate != null) MaterialTheme.colorScheme.tertiaryContainer
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(16.dp),
+                                        tint = if (overrideDate != null) MaterialTheme.colorScheme.tertiary
+                                               else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("تاريخ الفاتورة:", style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Text(overrideDateLabel ?: "اليوم", style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (overrideDate != null) MaterialTheme.colorScheme.tertiary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                     Button(
                         onClick = { showConfirmDialog = true },
                         modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -930,7 +995,8 @@ private fun WebCartTab(
                         total = total,
                         discount = discountValue,
                         paymentMethod = paymentMethod,
-                        username = user.name
+                        username = user.name,
+                        overrideDate = overrideDate
                     )
                     cartVm.clearCart()
                     showConfirmDialog = false
@@ -938,10 +1004,38 @@ private fun WebCartTab(
                 }) { Text("تأكيد") }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showConfirmDialog = false
-                }) { Text("إلغاء") }
+                TextButton(onClick = { showConfirmDialog = false }) { Text("إلغاء") }
             })
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val millis = datePickerState.selectedDateMillis
+                    if (millis != null) {
+                        val local = Instant.fromEpochMilliseconds(millis)
+                            .toLocalDateTime(TimeZone.UTC)
+                        overrideDate = Triple(local.year, local.monthNumber, local.dayOfMonth)
+                    }
+                    showDatePicker = false
+                }) { Text("موافق") }
+            },
+            dismissButton = {
+                Row {
+                    if (overrideDate != null) {
+                        TextButton(onClick = { overrideDate = null; showDatePicker = false }) {
+                            Text("اليوم", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    TextButton(onClick = { showDatePicker = false }) { Text("إلغاء") }
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
     }
 }
 
