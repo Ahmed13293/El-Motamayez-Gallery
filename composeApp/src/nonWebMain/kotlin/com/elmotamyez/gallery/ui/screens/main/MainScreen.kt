@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -32,6 +33,8 @@ import com.elmotamyez.gallery.ui.screens.admin.AdminScreen
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
 import com.elmotamyez.gallery.ui.screens.cart.CartViewModel
 import com.elmotamyez.gallery.ui.screens.home.CategoriesHomeScreen
+import com.elmotamyez.gallery.ui.screens.orders.OrderViewModel
+import com.elmotamyez.gallery.ui.screens.orders.OrdersScreen
 import com.elmotamyez.gallery.ui.screens.receipts.ReceiptsListScreen
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.ui.screens.cart.CartScreen
@@ -65,9 +68,17 @@ object ReceiptsTab : Tab {
     override fun Content() = ReceiptsListScreen().Content()
 }
 
+object OrdersTab : Tab {
+    override val options: TabOptions
+        @Composable get() = TabOptions(index = 3u, title = "الطلبات")
+
+    @Composable
+    override fun Content() = OrdersScreen().Content()
+}
+
 object AdminTab : Tab {
     override val options: TabOptions
-        @Composable get() = TabOptions(index = 3u, title = "الإدارة")
+        @Composable get() = TabOptions(index = 4u, title = "الإدارة")
 
     @Composable
     override fun Content() {
@@ -80,13 +91,15 @@ object AdminTab : Tab {
 class MainScreen : Screen {
     @Composable
     override fun Content() {
-        val cartVm: CartViewModel     = koinInject()
+        val cartVm: CartViewModel       = koinInject()
         val receiptVm: ReceiptViewModel = koinInject()
-        val authVm: AuthViewModel     = koinInject()
+        val orderVm: OrderViewModel     = koinInject()
+        val authVm: AuthViewModel       = koinInject()
 
-        val cartItems by cartVm.cartItems.collectAsState()
-        val receipts  by receiptVm.receipts.collectAsState()
-        val authState by authVm.uiState.collectAsState()
+        val cartItems    by cartVm.cartItems.collectAsState()
+        val receipts     by receiptVm.receipts.collectAsState()
+        val authState    by authVm.uiState.collectAsState()
+        val pendingOrders by orderVm.pendingCount.collectAsState()
 
         val isAdmin = authState.user?.role == UserRole.ADMIN
 
@@ -105,7 +118,8 @@ class MainScreen : Screen {
                                 badgeCount = newReceiptsCount,
                                 onSelected = { seenReceiptsCount = receipts.size })
                         if (isAdmin) {
-                            NavItem(AdminTab, Icons.Default.Person, tabNavigator)
+                            NavItem(OrdersTab, Icons.Default.ListAlt, tabNavigator, badgeCount = pendingOrders)
+                            NavItem(AdminTab,  Icons.Default.Person,  tabNavigator)
                         }
                     }
                 }
