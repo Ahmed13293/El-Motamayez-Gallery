@@ -2446,6 +2446,7 @@ private fun webOrderStatusColor(status: OrderStatus) = when (status) {
     OrderStatus.RECEIVED   -> MaterialTheme.colorScheme.tertiary
     OrderStatus.PREPARING  -> MaterialTheme.colorScheme.secondary
     OrderStatus.DELIVERING -> MaterialTheme.colorScheme.primary
+    OrderStatus.DELIVERED  -> MaterialTheme.colorScheme.outline
 }
 
 @Composable

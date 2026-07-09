@@ -289,9 +289,10 @@ private fun OrderStatusStepper(currentStatus: OrderStatus, modifier: Modifier = 
 
 @Composable
 private fun statusColor(status: OrderStatus) = when (status) {
-    OrderStatus.RECEIVED  -> MaterialTheme.colorScheme.tertiary
-    OrderStatus.PREPARING -> MaterialTheme.colorScheme.secondary
+    OrderStatus.RECEIVED   -> MaterialTheme.colorScheme.tertiary
+    OrderStatus.PREPARING  -> MaterialTheme.colorScheme.secondary
     OrderStatus.DELIVERING -> MaterialTheme.colorScheme.primary
+    OrderStatus.DELIVERED  -> MaterialTheme.colorScheme.outline
 }
 
 // ── Edit dialog ───────────────────────────────────────────────────────────────
