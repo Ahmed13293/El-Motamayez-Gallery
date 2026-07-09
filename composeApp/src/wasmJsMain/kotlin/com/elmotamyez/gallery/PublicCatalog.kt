@@ -26,8 +26,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elmotamyez.gallery.data.model.Brand
+import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
+import com.elmotamyez.gallery.ui.screens.orders.OrderViewModel
 import com.elmotamyez.gallery.ui.screens.products.ProductsViewModel
 import com.elmotamyez.gallery.util.formatPrice
 import org.koin.compose.koinInject
@@ -79,6 +81,7 @@ private data class CopyOpenState(val platformName: String, val platformColor: Co
 @Composable
 fun PublicCatalogScreen(onLoginClick: () -> Unit) {
     val vm: ProductsViewModel = koinInject()
+    val orderVm: OrderViewModel = koinInject()
     val state by vm.uiState.collectAsState()
 
     val categories  = state.categories
@@ -129,10 +132,30 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
     // ── Send order dialog ─────────────────────────────────────────────────────
     if (showOrderDialog) {
         val orderMsg = buildCartMsg(cartProducts)
+        var customerName  by remember { mutableStateOf("") }
+        var customerPhone by remember { mutableStateOf("") }
+        var customerNotes by remember { mutableStateOf("") }
+        var paymentMethod by remember { mutableStateOf("كاش") }
+
+        fun saveAndSend(openPlatform: () -> Unit) {
+            val items = cartProducts.map { (p, qty) -> CartItem(p, qty) }
+            orderVm.createOrder(
+                items         = items,
+                total         = cartTotal,
+                paymentMethod = paymentMethod,
+                customerName  = customerName.trim().ifBlank { null },
+                customerPhone = customerPhone.trim().ifBlank { null },
+                notes         = customerNotes.trim().ifBlank { null }
+            )
+            openPlatform()
+            showOrderDialog = false
+            cart.clear()
+        }
+
         AlertDialog(
             onDismissRequest = { showOrderDialog = false },
             title = {
-                Text("اختر طريقة الإرسال", fontWeight = FontWeight.Bold,
+                Text("إرسال الطلب", fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium)
             },
             text = {
@@ -140,13 +163,52 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                     Text("$cartCount منتج  •  ${cartTotal.formatPrice()} ج",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+
                     HorizontalDivider()
-                    // WhatsApp — pre-filled
+
+                    // Customer info (optional)
+                    OutlinedTextField(
+                        value = customerName,
+                        onValueChange = { customerName = it },
+                        label = { Text("الاسم (اختياري)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = customerPhone,
+                        onValueChange = { customerPhone = it },
+                        label = { Text("رقم الهاتف (اختياري)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = customerNotes,
+                        onValueChange = { customerNotes = it },
+                        label = { Text("ملاحظات (اختياري)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Payment method
+                    Text("طريقة الدفع", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("كاش", "تحويل").forEach { method ->
+                            FilterChip(
+                                selected = paymentMethod == method,
+                                onClick  = { paymentMethod = method },
+                                label    = { Text(method) }
+                            )
+                        }
+                    }
+
+                    HorizontalDivider()
+
+                    Text("اختر طريقة الإرسال", style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    // WhatsApp
                     Button(
-                        onClick = {
-                            openWhatsApp(WA_NUMBER, orderMsg)
-                            showOrderDialog = false
-                        },
+                        onClick = { saveAndSend { openWhatsApp(WA_NUMBER, orderMsg) } },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
                         shape = RoundedCornerShape(10.dp)
@@ -155,12 +217,11 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                         Spacer(Modifier.width(8.dp))
                         Text("واتساب", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
-                    // Facebook — copy then show redirect dialog
+                    // Facebook
                     Button(
                         onClick = {
                             copyToClipboard(orderMsg)
-                            showOrderDialog = false
-                            copyOpenState = CopyOpenState("فيسبوك", Color(0xFF1877F2), FB_PAGE_URL)
+                            saveAndSend { copyOpenState = CopyOpenState("فيسبوك", Color(0xFF1877F2), FB_PAGE_URL) }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
@@ -170,12 +231,11 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                         Spacer(Modifier.width(8.dp))
                         Text("فيسبوك", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
-                    // Instagram — copy then show redirect dialog
+                    // Instagram
                     Button(
                         onClick = {
                             copyToClipboard(orderMsg)
-                            showOrderDialog = false
-                            copyOpenState = CopyOpenState("انستغرام", Color(0xFFE1306C), IG_PAGE_URL)
+                            saveAndSend { copyOpenState = CopyOpenState("انستغرام", Color(0xFFE1306C), IG_PAGE_URL) }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
