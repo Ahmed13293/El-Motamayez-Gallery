@@ -5,13 +5,25 @@ import androidx.lifecycle.viewModelScope
 import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Order
 import com.elmotamyez.gallery.data.model.OrderStatus
+import com.elmotamyez.gallery.data.model.Receipt
 import com.elmotamyez.gallery.data.repository.OrderRepository
+import com.elmotamyez.gallery.data.repository.ProductRepository
+import com.elmotamyez.gallery.data.repository.ReceiptRepository
+import com.elmotamyez.gallery.util.dateString
+import com.elmotamyez.gallery.util.dateTimeString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
-class OrderViewModel(private val repository: OrderRepository) : ViewModel() {
+class OrderViewModel(
+    private val repository: OrderRepository,
+    private val receiptRepo: ReceiptRepository,
+    private val productRepo: ProductRepository
+) : ViewModel() {
 
     private val _orders = MutableStateFlow<List<Order>>(emptyList())
     val orders: StateFlow<List<Order>> = _orders.asStateFlow()
@@ -33,7 +45,7 @@ class OrderViewModel(private val repository: OrderRepository) : ViewModel() {
             runCatching { repository.fetchAll() }
                 .onSuccess { list ->
                     _orders.value = list
-                    _pendingCount.value = list.count { it.status != OrderStatus.DELIVERING.key }
+                    _pendingCount.value = list.count { it.status != OrderStatus.DELIVERED.key }
                 }
             _isLoading.value = false
         }
@@ -76,12 +88,44 @@ class OrderViewModel(private val repository: OrderRepository) : ViewModel() {
             _isSaving.value = true
             val newPreparedBy = if (next == OrderStatus.PREPARING) adminUsername else order.preparedBy
             runCatching { repository.updateStatus(order.id, next.key, newPreparedBy) }
+
+            if (next == OrderStatus.DELIVERED) {
+                runCatching { createReceiptFromOrder(order, adminUsername) }
+                order.items.filter { !it.product.id.startsWith("other_") }.forEach { item ->
+                    runCatching { productRepo.decrementStock(item.product.id, item.quantity) }
+                }
+            }
+
             val updated = order.copy(status = next.key, preparedBy = newPreparedBy)
             val newList = _orders.value.map { if (it.id == order.id) updated else it }
             _orders.value = newList
-            _pendingCount.value = newList.count { it.status != OrderStatus.DELIVERING.key }
+            _pendingCount.value = newList.count { it.status != OrderStatus.DELIVERED.key }
             _isSaving.value = false
         }
+    }
+
+    private suspend fun createReceiptFromOrder(order: Order, username: String?) {
+        val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        val todayPrefix = dateString(now.year, now.monthNumber, now.dayOfMonth)
+        val existingMax = receiptRepo.fetchAll()
+            .filter { it.createdAt?.startsWith(todayPrefix) == true }
+            .maxOfOrNull { it.orderNumber } ?: 0
+        val nextNumber = existingMax + 1
+        val nowIso = dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second)
+        val receipt = Receipt(
+            id            = "${todayPrefix}-${nextNumber.toString().padStart(4, '0')}",
+            orderNumber   = nextNumber,
+            items         = order.items,
+            total         = order.total,
+            discount      = order.discount,
+            paymentMethod = order.paymentMethod,
+            isPaid        = true,
+            createdAt     = nowIso,
+            customerPhone = order.customerPhone,
+            customerInfo  = order.customerName,
+            username      = username
+        )
+        receiptRepo.insert(receipt)
     }
 
     fun updateOrder(
@@ -114,7 +158,7 @@ class OrderViewModel(private val repository: OrderRepository) : ViewModel() {
             if (result.isSuccess) {
                 val newList = _orders.value.filter { it.id != order.id }
                 _orders.value = newList
-                _pendingCount.value = newList.count { it.status != OrderStatus.DELIVERING.key }
+                _pendingCount.value = newList.count { it.status != OrderStatus.DELIVERED.key }
                 onDone()
             }
             _isSaving.value = false

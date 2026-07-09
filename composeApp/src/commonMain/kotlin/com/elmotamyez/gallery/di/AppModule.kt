@@ -27,7 +27,7 @@ val appModule = module {
     // Singletons — shared state across all tabs
     singleOf(::CartViewModel)
     singleOf(::ReceiptViewModel)
-    singleOf(::OrderViewModel)
+    single { OrderViewModel(get(), get(), get()) }
     singleOf(::AuthViewModel)
     singleOf(::ExpenseViewModel)
 
