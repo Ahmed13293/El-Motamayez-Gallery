@@ -161,63 +161,68 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                     style = MaterialTheme.typography.titleMedium)
             },
             text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("$cartCount منتج  •  ${cartTotal.formatPrice()} ج",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                     HorizontalDivider()
 
-                    // Customer info (optional)
+                    // Customer info — compact height via reduced content padding
+                    val fieldModifier = Modifier.fillMaxWidth().height(52.dp)
                     OutlinedTextField(
                         value = customerName,
                         onValueChange = { customerName = it },
-                        label = { Text("الاسم (اختياري)") },
+                        label = { Text("الاسم (اختياري)", fontSize = 11.sp) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        modifier = fieldModifier
                     )
                     OutlinedTextField(
                         value = customerPhone,
                         onValueChange = { customerPhone = it },
-                        label = { Text("رقم الهاتف (اختياري)") },
+                        label = { Text("رقم الهاتف (اختياري)", fontSize = 11.sp) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        modifier = fieldModifier
                     )
                     OutlinedTextField(
                         value = customerNotes,
                         onValueChange = { customerNotes = it },
-                        label = { Text("ملاحظات (اختياري)") },
+                        label = { Text("ملاحظات (اختياري)", fontSize = 11.sp) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        modifier = fieldModifier
                     )
 
                     // Payment method
-                    Text("طريقة الدفع", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("الدفع:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
                         listOf("كاش", "تحويل").forEach { method ->
                             FilterChip(
                                 selected = paymentMethod == method,
                                 onClick  = { paymentMethod = method },
-                                label    = { Text(method) }
+                                label    = { Text(method, fontSize = 11.sp) }
                             )
                         }
                     }
 
                     HorizontalDivider()
 
-                    Text("اختر طريقة الإرسال", style = MaterialTheme.typography.labelMedium,
+                    Text("اختر طريقة الإرسال", style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                     // WhatsApp
                     Button(
                         onClick = { saveAndSend { openWhatsApp(WA_NUMBER, orderMsg) } },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {
-                        Icon(Icons.Default.Phone, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("واتساب", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Icon(Icons.Default.Phone, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("واتساب", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                     // Facebook
                     Button(
@@ -225,13 +230,14 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                             copyToClipboard(orderMsg)
                             saveAndSend { copyOpenState = CopyOpenState("فيسبوك", Color(0xFF1877F2), FB_PAGE_URL) }
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {
-                        Icon(Icons.Default.Person, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("فيسبوك", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Icon(Icons.Default.Person, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("فيسبوك", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                     // Instagram
                     Button(
@@ -239,13 +245,14 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                             copyToClipboard(orderMsg)
                             saveAndSend { copyOpenState = CopyOpenState("انستغرام", Color(0xFFE1306C), IG_PAGE_URL) }
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {
-                        Icon(Icons.Default.Favorite, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("انستغرام", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Icon(Icons.Default.Favorite, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("انستغرام", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             },
