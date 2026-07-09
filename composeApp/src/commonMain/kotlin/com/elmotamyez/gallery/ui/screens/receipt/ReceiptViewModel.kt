@@ -41,6 +41,10 @@ class ReceiptViewModel(
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
 
+    private val _deleteError = MutableStateFlow<String?>(null)
+    val deleteError: StateFlow<String?> = _deleteError.asStateFlow()
+    fun clearDeleteError() { _deleteError.value = null }
+
     // Currently viewed receipt (shown in ReceiptScreen)
     private val _currentReceipt = MutableStateFlow<Receipt?>(null)
     val currentReceipt: StateFlow<Receipt?> = _currentReceipt.asStateFlow()
@@ -215,21 +219,26 @@ class ReceiptViewModel(
         }
     }
 
-    /** Restores stock for all items in the receipt, then deletes it from Supabase and local cache. */
+    /** Restores stock for all items in the receipt, then deletes it from Supabase and local cache.
+     *  Only removes locally if Supabase confirms the deletion. */
     fun deleteReceipt(receipt: Receipt, onDone: () -> Unit = {}) {
         viewModelScope.launch {
             _isSaving.value = true
-            receipt.items
-                .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
-                .forEach { runCatching { productRepository.incrementStock(it.product.id, it.quantity) } }
-            runCatching { repository.delete(receipt.id) }
-            val updatedList = _receipts.value.filter { it.id != receipt.id }
-            _receipts.value = updatedList
-            persistCache(updatedList)
-            if (_currentReceipt.value?.id == receipt.id) _currentReceipt.value = null
-            _stockVersion.value += 1
+            val result = runCatching { repository.delete(receipt.id) }
+            val deleted = result.isSuccess
+            if (!deleted) _deleteError.value = result.exceptionOrNull()?.message ?: "فشل الحذف"
+            if (deleted) {
+                receipt.items
+                    .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
+                    .forEach { runCatching { productRepository.incrementStock(it.product.id, it.quantity) } }
+                val updatedList = _receipts.value.filter { it.id != receipt.id }
+                _receipts.value = updatedList
+                persistCache(updatedList)
+                if (_currentReceipt.value?.id == receipt.id) _currentReceipt.value = null
+                _stockVersion.value += 1
+                onDone()
+            }
             _isSaving.value = false
-            onDone()
         }
     }
 

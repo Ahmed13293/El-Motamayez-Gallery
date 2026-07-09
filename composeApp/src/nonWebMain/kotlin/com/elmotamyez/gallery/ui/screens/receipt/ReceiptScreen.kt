@@ -44,6 +44,7 @@ class ReceiptScreen : Screen {
 
         val receipt        by vm.currentReceipt.collectAsState()
         val isSaving       by vm.isSaving.collectAsState()
+        val deleteError    by vm.deleteError.collectAsState()
         val allProducts    by vm.allProducts.collectAsState()
         val authState      by authVm.uiState.collectAsState()
         val isAdmin        = authState.user?.role == UserRole.ADMIN
@@ -278,6 +279,15 @@ class ReceiptScreen : Screen {
                     )
                 }
             }
+        }
+
+        if (deleteError != null) {
+            AlertDialog(
+                onDismissRequest = { vm.clearDeleteError() },
+                title = { Text("فشل الحذف", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
+                text = { Text(deleteError ?: "") },
+                confirmButton = { TextButton(onClick = { vm.clearDeleteError() }) { Text("حسناً") } }
+            )
         }
 
         if (showDeleteDialog && receipt != null) {

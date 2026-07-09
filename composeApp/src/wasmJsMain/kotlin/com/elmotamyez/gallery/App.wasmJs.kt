@@ -1246,6 +1246,7 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false) {
     val isLoading by receiptVm.isLoading.collectAsState()
     val allProducts by receiptVm.allProducts.collectAsState()
     val isSaving by receiptVm.isSaving.collectAsState()
+    val deleteError by receiptVm.deleteError.collectAsState()
     var editingReceipt  by remember { mutableStateOf<Receipt?>(null) }
     var deletingReceipt by remember { mutableStateOf<Receipt?>(null) }
 
@@ -1445,6 +1446,15 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false) {
                 }
             }
         }
+    }
+
+    deleteError?.let { err ->
+        AlertDialog(
+            onDismissRequest = { receiptVm.clearDeleteError() },
+            title = { Text("فشل الحذف", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
+            text = { Text(err) },
+            confirmButton = { TextButton(onClick = { receiptVm.clearDeleteError() }) { Text("حسناً") } }
+        )
     }
 
     deletingReceipt?.let { receipt ->
