@@ -212,47 +212,46 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                     Text("اختر طريقة الإرسال", style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                    // WhatsApp
-                    Button(
-                        onClick = { saveAndSend { openWhatsApp(WA_NUMBER, orderMsg) } },
-                        modifier = Modifier.fillMaxWidth().height(40.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Icon(Icons.Default.Phone, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("واتساب", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    }
-                    // Facebook
-                    Button(
-                        onClick = {
-                            copyToClipboard(orderMsg)
-                            saveAndSend { copyOpenState = CopyOpenState("فيسبوك", Color(0xFF1877F2), FB_PAGE_URL) }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(40.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Icon(Icons.Default.Person, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("فيسبوك", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    }
-                    // Instagram
-                    Button(
-                        onClick = {
-                            copyToClipboard(orderMsg)
-                            saveAndSend { copyOpenState = CopyOpenState("انستغرام", Color(0xFFE1306C), IG_PAGE_URL) }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(40.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Icon(Icons.Default.Favorite, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("انستغرام", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Button(
+                            onClick = { saveAndSend { openWhatsApp(WA_NUMBER, orderMsg) } },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                        ) {
+                            Icon(Icons.Default.Phone, null, Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("واتساب", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                        Button(
+                            onClick = {
+                                copyToClipboard(orderMsg)
+                                saveAndSend { copyOpenState = CopyOpenState("فيسبوك", Color(0xFF1877F2), FB_PAGE_URL) }
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                        ) {
+                            Icon(Icons.Default.Person, null, Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("فيسبوك", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                        Button(
+                            onClick = {
+                                copyToClipboard(orderMsg)
+                                saveAndSend { copyOpenState = CopyOpenState("انستغرام", Color(0xFFE1306C), IG_PAGE_URL) }
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                        ) {
+                            Icon(Icons.Default.Favorite, null, Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("انستغرام", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
                     }
                 }
             },
