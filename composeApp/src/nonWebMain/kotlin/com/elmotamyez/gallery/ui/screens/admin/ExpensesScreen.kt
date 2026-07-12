@@ -189,7 +189,7 @@ private fun ExpenseRow(
                 if (dateText != null) {
                     Text(dateText,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline)
+                        color = MaterialTheme.colorScheme.onSurface)
                 }
             }
             Text("${expense.amount.formatPrice()} ج",

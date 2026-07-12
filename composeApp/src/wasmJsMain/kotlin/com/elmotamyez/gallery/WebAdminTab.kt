@@ -832,7 +832,7 @@ private fun AdminExpensesSection(isMobile: Boolean = false) {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(expense.type, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                                 if (!expense.note.isNullOrBlank()) Text(expense.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (dateText != null) Text(dateText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                if (dateText != null) Text(dateText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
                             }
                             Text("${expense.amount.formatPrice()} ج", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(4.dp))
