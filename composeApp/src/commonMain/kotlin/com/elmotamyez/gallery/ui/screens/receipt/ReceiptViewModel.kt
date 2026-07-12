@@ -101,8 +101,13 @@ class ReceiptViewModel(
             _isLoading.value = true
             runCatching { repository.fetchAll() }
                 .onSuccess { fresh ->
-                    _receipts.value = fresh
-                    persistCache(fresh)
+                    // Preserve any locally-added receipts not yet confirmed by Supabase
+                    // (avoids overwriting a receipt whose insert is still in-flight or failed)
+                    val freshIds = fresh.map { it.id }.toSet()
+                    val localOnly = _receipts.value.filter { it.id !in freshIds }
+                    val merged = (fresh + localOnly).sortedByDescending { it.createdAt ?: "" }
+                    _receipts.value = merged
+                    persistCache(merged)
                 }
             _isLoading.value = false
         }
@@ -155,8 +160,9 @@ class ReceiptViewModel(
             _currentReceipt.value = receipt
             persistCache(updated)
 
-            // Push receipt to Supabase
-            runCatching { repository.insert(receipt) }
+            // Push receipt to Supabase — retry once on failure
+            var inserted = runCatching { repository.insert(receipt) }.isSuccess
+            if (!inserted) inserted = runCatching { repository.insert(receipt) }.isSuccess
 
             // Decrement stock for each real product (skip printing/other virtual items)
             items
