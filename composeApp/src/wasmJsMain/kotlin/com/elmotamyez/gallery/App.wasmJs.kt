@@ -2372,7 +2372,7 @@ private fun WebOrderCard(
                     if (order.depositFee > 0) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("عربون", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
-                            Text("+ ${order.depositFee.formatPrice()} ج", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+                            Text("- ${order.depositFee.formatPrice()} ج", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
                         }
                     }
                     if (order.deliveryFee > 0) {
@@ -2477,7 +2477,7 @@ private fun WebOrderEditDialog(
     val discount    = discountText.toDoubleOrNull() ?: 0.0
     val depositFee  = depositText.toDoubleOrNull()  ?: 0.0
     val deliveryFee = deliveryText.toDoubleOrNull() ?: 0.0
-    val newTotal    = editItems.sumOf { it.totalPrice } - discount + depositFee + deliveryFee
+    val newTotal    = editItems.sumOf { it.totalPrice } - discount - depositFee + deliveryFee
 
     AlertDialog(
         onDismissRequest = onDismiss,

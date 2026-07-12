@@ -142,7 +142,7 @@ class OrderViewModel(
         deliveryFee: Double,
         paymentMethod: String
     ) {
-        val newTotal = newItems.sumOf { it.totalPrice } - discount + depositFee + deliveryFee
+        val newTotal = newItems.sumOf { it.totalPrice } - discount - depositFee + deliveryFee
         val updated = order.copy(
             items         = newItems,
             total         = newTotal,

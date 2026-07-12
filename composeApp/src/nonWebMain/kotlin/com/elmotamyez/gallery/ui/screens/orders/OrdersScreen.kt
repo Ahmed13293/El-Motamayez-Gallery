@@ -348,7 +348,7 @@ private fun OrderCard(
                         ) {
                             Text("عربون", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
                             Text(
-                                "+ ${order.depositFee.formatPrice()} ج",
+                                "- ${order.depositFee.formatPrice()} ج",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.tertiary
                             )
@@ -508,7 +508,7 @@ private fun OrderEditDialog(
     val discount    = discountText.toDoubleOrNull() ?: 0.0
     val depositFee  = depositText.toDoubleOrNull()  ?: 0.0
     val deliveryFee = deliveryText.toDoubleOrNull() ?: 0.0
-    val newTotal = editItems.sumOf { it.totalPrice } - discount + depositFee + deliveryFee
+    val newTotal = editItems.sumOf { it.totalPrice } - discount - depositFee + deliveryFee
 
     AlertDialog(
         onDismissRequest = onDismiss,
