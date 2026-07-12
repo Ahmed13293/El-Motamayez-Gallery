@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -21,12 +23,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import com.elmotamyez.gallery.data.model.Brand
 import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Category
@@ -348,24 +352,12 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Column {
-                            Text("مكتبة المتميز",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.ExtraBold, color = Color.White)
-                            Text("فرع الشيخ زايد",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.8f))
-                        }
-                        TextButton(onClick = onLoginClick,
-                            colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) {
-                            Icon(Icons.Default.Person, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("تسجيل الدخول")
-                        }
-                    }
+                    Text("مكتبة المتميز",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold, color = Color.White)
+                    Text("فرع الشيخ زايد",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SocialButton("واتساب", Color(0xFF25D366)) {
                             openWhatsApp(WA_NUMBER, "مرحباً، أريد الاستفسار عن منتجاتكم 😊")
@@ -375,6 +367,9 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                     }
                 }
             }
+
+            // ── Banner slider ─────────────────────────────────────────────────
+            BannerSlider()
 
             // ── Search bar (always visible) ───────────────────────────────────
             OutlinedTextField(
@@ -734,5 +729,111 @@ private fun SocialButton(label: String, color: Color, onClick: () -> Unit) {
         shape = RoundedCornerShape(8.dp),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
         Text(label, fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+    }
+}
+
+// ── Banner slider ─────────────────────────────────────────────────────────────
+
+private data class BannerSlide(
+    val title: String,
+    val subtitle: String,
+    val emoji: String,
+    val gradientStart: Color,
+    val gradientEnd: Color
+)
+
+private val BANNER_SLIDES = listOf(
+    BannerSlide(
+        title = "مكتبة المتميز",
+        subtitle = "كل ما تحتاجه من مستلزمات مدرسية ومكتبية في مكان واحد",
+        emoji = "📚",
+        gradientStart = Color(0xFF0D3B6E),
+        gradientEnd   = Color(0xFF1565C0)
+    ),
+    BannerSlide(
+        title = "توصيل لجميع المحافظات",
+        subtitle = "نوصلك لو مكانك فين — اطلب الآن عبر واتساب أو فيسبوك أو انستغرام",
+        emoji = "🚚",
+        gradientStart = Color(0xFF1B5E20),
+        gradientEnd   = Color(0xFF43A047)
+    ),
+    BannerSlide(
+        title = "أسعار تنافسية",
+        subtitle = "جودة عالية بأسعار مناسبة — تسوّق الآن من كتالوجنا",
+        emoji = "🎒",
+        gradientStart = Color(0xFF4A148C),
+        gradientEnd   = Color(0xFF7B1FA2)
+    ),
+    BannerSlide(
+        title = "العودة للمدرسة",
+        subtitle = "جهّز شنطتك — طقم الكتابة الكامل وكل المستلزمات المدرسية",
+        emoji = "✏️",
+        gradientStart = Color(0xFFBF360C),
+        gradientEnd   = Color(0xFFE64A19)
+    )
+)
+
+@Composable
+private fun BannerSlider() {
+    val pagerState = rememberPagerState(pageCount = { BANNER_SLIDES.size })
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(3500)
+            val next = (pagerState.currentPage + 1) % BANNER_SLIDES.size
+            pagerState.animateScrollToPage(next)
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            val slide = BANNER_SLIDES[page]
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Brush.horizontalGradient(listOf(slide.gradientEnd, slide.gradientStart))),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(slide.emoji, fontSize = 52.sp)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            slide.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                        Text(
+                            slide.subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.9f),
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // Dot indicators
+        Row(
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            repeat(BANNER_SLIDES.size) { i ->
+                Box(
+                    modifier = Modifier
+                        .size(if (i == pagerState.currentPage) 10.dp else 6.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (i == pagerState.currentPage) Color.White
+                            else Color.White.copy(alpha = 0.4f)
+                        )
+                )
+            }
+        }
     }
 }
