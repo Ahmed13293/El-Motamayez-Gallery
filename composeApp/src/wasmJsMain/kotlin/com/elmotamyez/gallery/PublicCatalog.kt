@@ -906,7 +906,7 @@ private fun BannerDelivery() {
                 drawRect(
                     color    = Color(0x0CFFFFFF),
                     topLeft  = androidx.compose.ui.geometry.Offset(0f, roadY - 14.dp.toPx()),
-                    size     = androidx.compose.ui.Size(size.width, 28.dp.toPx())
+                    size     = androidx.compose.ui.geometry.Size(size.width, 28.dp.toPx())
                 )
             },
         contentAlignment = Alignment.CenterStart
@@ -1035,7 +1035,7 @@ private fun BannerBackToSchool() {
                 drawRect(
                     color   = Color(0xFFC8951E),
                     topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
-                    size    = androidx.compose.ui.Size(5.dp.toPx(), size.height)
+                    size    = androidx.compose.ui.geometry.Size(5.dp.toPx(), size.height)
                 )
             },
         contentAlignment = Alignment.CenterStart
