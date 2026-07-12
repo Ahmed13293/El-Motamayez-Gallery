@@ -37,7 +37,12 @@ import com.elmotamyez.gallery.ui.screens.admin.ExpenseViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.fmt2f
 import com.elmotamyez.gallery.util.formatPrice
+import com.elmotamyez.gallery.util.dateTimeString
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -779,13 +784,13 @@ private fun AdminExpensesSection(isMobile: Boolean = false) {
 
     if (showAdd) {
         ExpenseDialog(title = "إضافة مصروف", initial = null, isSaving = isSaving,
-            onConfirm = { type, amount, note -> vm.addExpense(type, amount, note) {}; showAdd = false },
+            onConfirm = { type, amount, note, isoDate -> vm.addExpense(type, amount, note, isoDate) {}; showAdd = false },
             onDismiss = { showAdd = false })
     }
     editTarget?.let { expense ->
         ExpenseDialog(title = "تعديل: ${expense.type}", initial = expense, isSaving = isSaving,
-            onConfirm = { type, amount, note ->
-                vm.updateExpense(expense.copy(type = type, amount = amount, note = note?.ifBlank { null })) {}
+            onConfirm = { type, amount, note, isoDate ->
+                vm.updateExpense(expense.copy(type = type, amount = amount, note = note?.ifBlank { null }, createdAt = isoDate)) {}
                 editTarget = null
             },
             onDismiss = { editTarget = null })
@@ -850,12 +855,39 @@ private fun AdminExpensesSection(isMobile: Boolean = false) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ExpenseDialog(title: String, initial: Expense?, isSaving: Boolean, onConfirm: (String, Double, String?) -> Unit, onDismiss: () -> Unit) {
+private fun ExpenseDialog(title: String, initial: Expense?, isSaving: Boolean, onConfirm: (String, Double, String?, String) -> Unit, onDismiss: () -> Unit) {
     var selectedType by remember { mutableStateOf(initial?.type) }
     var amountInput  by remember { mutableStateOf(initial?.amount?.let { if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString() } ?: "") }
     var noteInput    by remember { mutableStateOf(initial?.note ?: "") }
     val isEdit = initial != null
+
+    val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+    fun parseDate(iso: String?): LocalDate = iso?.let {
+        runCatching { LocalDate(it.substring(0,4).toInt(), it.substring(5,7).toInt(), it.substring(8,10).toInt()) }.getOrNull()
+    } ?: LocalDate(today.year, today.monthNumber, today.dayOfMonth)
+
+    var selectedDate by remember { mutableStateOf(parseDate(initial?.createdAt)) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = (selectedDate.toEpochDays().toLong() * 86400 + 43200) * 1000L
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        selectedDate = LocalDate.fromEpochDays((millis / 1000 / 86400).toInt())
+                    }
+                    showDatePicker = false
+                }) { Text("تأكيد") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("إلغاء") } }
+        ) { DatePicker(state = datePickerState) }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -881,6 +913,14 @@ private fun ExpenseDialog(title: String, initial: Expense?, isSaving: Boolean, o
                     OutlinedTextField(value = noteInput, onValueChange = { noteInput = it },
                         label = { Text("ملاحظة (اختياري)") }, minLines = 2, maxLines = 3,
                         shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = "${selectedDate.dayOfMonth.toString().padStart(2,'0')}/${selectedDate.monthNumber.toString().padStart(2,'0')}/${selectedDate.year}",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("التاريخ") },
+                        trailingIcon = { IconButton(onClick = { showDatePicker = true }) { Icon(Icons.Default.CalendarMonth, null) } },
+                        shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         },
@@ -888,7 +928,8 @@ private fun ExpenseDialog(title: String, initial: Expense?, isSaving: Boolean, o
             if (selectedType != null || isEdit) {
                 Button(onClick = {
                     val amount = amountInput.toDoubleOrNull() ?: return@Button
-                    onConfirm(selectedType ?: initial!!.type, amount, noteInput.ifBlank { null })
+                    val isoDate = dateTimeString(selectedDate.year, selectedDate.monthNumber, selectedDate.dayOfMonth, 0, 0, 0)
+                    onConfirm(selectedType ?: initial!!.type, amount, noteInput.ifBlank { null }, isoDate)
                 }, enabled = amountInput.toDoubleOrNull() != null && !isSaving) {
                     if (isSaving) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                     else Text(if (isEdit) "حفظ التعديل" else "تأكيد المصروف")

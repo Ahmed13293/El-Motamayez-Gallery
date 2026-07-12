@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,6 +19,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elmotamyez.gallery.data.model.Expense
 import com.elmotamyez.gallery.ui.screens.admin.ExpenseViewModel
+import com.elmotamyez.gallery.util.dateTimeString
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.koinInject
 
 val EXPENSE_TYPES = listOf("الإيجار", "مرتبات", "النت", "الكهرباء", "بضاعه", "مصاريف عامة")
@@ -31,14 +37,47 @@ fun ExpensesSheet(
     val vm: ExpenseViewModel = koinInject()
     val isSaving by vm.isSaving.collectAsState()
 
+    val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+
+    fun parseExistingDate(iso: String?): LocalDate? = iso?.let {
+        runCatching { LocalDate(it.substring(0,4).toInt(), it.substring(5,7).toInt(), it.substring(8,10).toInt()) }.getOrNull()
+    }
+
     // In edit mode, jump straight to step 2 with pre-filled values
     var selectedType by remember { mutableStateOf(editExpense?.type) }
     var amountInput  by remember { mutableStateOf(editExpense?.amount?.let {
         if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString()
     } ?: "") }
     var noteInput    by remember { mutableStateOf(editExpense?.note ?: "") }
+    var selectedDate by remember { mutableStateOf(parseExistingDate(editExpense?.createdAt) ?: LocalDate(today.year, today.monthNumber, today.dayOfMonth)) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     val isEditMode = editExpense != null
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = run {
+                // milliseconds for selectedDate at noon UTC to avoid timezone off-by-one
+                val days = (selectedDate.toEpochDays()).toLong()
+                (days * 86400 + 43200) * 1000L
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val days = (millis / 1000 / 86400).toInt()
+                        selectedDate = LocalDate.fromEpochDays(days)
+                    }
+                    showDatePicker = false
+                }) { Text("تأكيد") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("إلغاء") } }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -131,16 +170,31 @@ fun ExpensesSheet(
                             modifier = Modifier.fillMaxWidth()
                         )
 
+                        OutlinedTextField(
+                            value = "${selectedDate.dayOfMonth.toString().padStart(2,'0')}/${selectedDate.monthNumber.toString().padStart(2,'0')}/${selectedDate.year}",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("التاريخ") },
+                            trailingIcon = {
+                                IconButton(onClick = { showDatePicker = true }) {
+                                    Icon(Icons.Default.CalendarMonth, null)
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true }
+                        )
+
                         Button(
                             onClick = {
                                 val amount = amountInput.toDoubleOrNull() ?: return@Button
                                 val note = noteInput.ifBlank { null }
+                                val isoDate = dateTimeString(selectedDate.year, selectedDate.monthNumber, selectedDate.dayOfMonth, 0, 0, 0)
                                 if (isEditMode) {
-                                    vm.updateExpense(editExpense!!.copy(type = type, amount = amount, note = note)) {
+                                    vm.updateExpense(editExpense!!.copy(type = type, amount = amount, note = note, createdAt = isoDate)) {
                                         onDismiss()
                                     }
                                 } else {
-                                    vm.addExpense(type, amount, note) {
+                                    vm.addExpense(type, amount, note, isoDate) {
                                         onDismiss()
                                     }
                                 }

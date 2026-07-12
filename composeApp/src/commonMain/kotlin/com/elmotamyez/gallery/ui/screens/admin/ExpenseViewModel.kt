@@ -35,11 +35,11 @@ class ExpenseViewModel(private val repo: ExpenseRepository) : ViewModel() {
     }
 
     @OptIn(ExperimentalUuidApi::class)
-    fun addExpense(type: String, amount: Double, note: String?, onDone: () -> Unit) {
+    fun addExpense(type: String, amount: Double, note: String?, createdAt: String? = null, onDone: () -> Unit) {
         viewModelScope.launch {
             _isSaving.value = true
             val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-            val nowIso = dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second)
+            val nowIso = createdAt ?: dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second)
             val expense = Expense(id = Uuid.random().toString(), type = type, amount = amount, note = note?.ifBlank { null }, createdAt = nowIso)
             _expenses.value = listOf(expense) + _expenses.value
             runCatching { repo.insert(expense) }
