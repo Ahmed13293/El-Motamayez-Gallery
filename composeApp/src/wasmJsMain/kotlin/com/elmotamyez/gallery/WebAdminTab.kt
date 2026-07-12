@@ -49,6 +49,10 @@ import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
+// Safari requires setTimeout(0) before .select() — works on all browsers
+@JsFun("() => { setTimeout(function(){ var el = document.activeElement; if(el && typeof el.select === 'function') el.select(); }, 0); }")
+private external fun selectAllInFocusedInput()
+
 private enum class AdminSection(val label: String, val icon: ImageVector) {
     PROFILE(   "الحساب",       Icons.Default.Person),
     CATEGORIES("الأقسام",     Icons.Default.Category),
@@ -728,24 +732,24 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it },
                     label = { Text("اسم المنتج") }, singleLine = true, shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) name = name.selectAll() })
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) { name = name.selectAll(); selectAllInFocusedInput() } })
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = price, onValueChange = { if (it.text.all { c -> c.isDigit() || c == '.' }) price = it },
                         label = { Text("السعر") }, suffix = { Text("ج") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) price = price.selectAll() })
+                        modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) { price = price.selectAll(); selectAllInFocusedInput() } })
                     OutlinedTextField(value = wholesale, onValueChange = { if (it.text.all { c -> c.isDigit() || c == '.' }) wholesale = it },
                         label = { Text("سعر الجملة") }, suffix = { Text("ج") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) wholesale = wholesale.selectAll() })
+                        modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) { wholesale = wholesale.selectAll(); selectAllInFocusedInput() } })
                 }
                 OutlinedTextField(value = stock, onValueChange = { if (it.text.all { c -> c.isDigit() }) stock = it },
                     label = { Text("المخزون") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) stock = stock.selectAll() })
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) { stock = stock.selectAll(); selectAllInFocusedInput() } })
                 // Category dropdown
                 Box {
                     OutlinedTextField(value = catName, onValueChange = {}, readOnly = true, label = { Text("القسم") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
