@@ -58,6 +58,7 @@ class OrderViewModel(
         discount: Double = 0.0,
         customerName: String? = null,
         customerPhone: String? = null,
+        customerAddress: String? = null,
         notes: String? = null,
         createdBy: String? = null,
         onDone: () -> Unit = {}
@@ -65,14 +66,15 @@ class OrderViewModel(
         viewModelScope.launch {
             _isSaving.value = true
             val order = Order(
-                items         = items,
-                total         = total,
-                discount      = discount,
-                paymentMethod = paymentMethod,
-                customerName  = customerName,
-                customerPhone = customerPhone,
-                notes         = notes,
-                createdBy     = createdBy
+                items           = items,
+                total           = total,
+                discount        = discount,
+                paymentMethod   = paymentMethod,
+                customerName    = customerName,
+                customerPhone   = customerPhone,
+                customerAddress = customerAddress,
+                notes           = notes,
+                createdBy       = createdBy
             )
             runCatching { repository.insert(order) }
             loadOrders()
@@ -132,14 +134,16 @@ class OrderViewModel(
         order: Order,
         newItems: List<CartItem>,
         discount: Double,
+        depositFee: Double,
         deliveryFee: Double,
         paymentMethod: String
     ) {
-        val newTotal = newItems.sumOf { it.totalPrice } - discount + deliveryFee
+        val newTotal = newItems.sumOf { it.totalPrice } - discount + depositFee + deliveryFee
         val updated = order.copy(
             items         = newItems,
             total         = newTotal,
             discount      = discount,
+            depositFee    = depositFee,
             deliveryFee   = deliveryFee,
             paymentMethod = paymentMethod
         )

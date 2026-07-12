@@ -2255,8 +2255,8 @@ private fun WebOrdersTab(user: User) {
             order     = order,
             isSaving  = isSaving,
             onDismiss = { editingOrder = null },
-            onSave    = { items, discount, deliveryFee, payment ->
-                vm.updateOrder(order, items, discount, deliveryFee, payment)
+            onSave    = { items, discount, depositFee, deliveryFee, payment ->
+                vm.updateOrder(order, items, discount, depositFee, deliveryFee, payment)
                 editingOrder = null
             }
         )
@@ -2363,6 +2363,12 @@ private fun WebOrderCard(
                             Text("- ${order.discount.formatPrice()} ج", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                         }
                     }
+                    if (order.depositFee > 0) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("عربون", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+                            Text("+ ${order.depositFee.formatPrice()} ج", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+                        }
+                    }
                     if (order.deliveryFee > 0) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("توصيل", style = MaterialTheme.typography.bodySmall)
@@ -2372,6 +2378,10 @@ private fun WebOrderCard(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("الإجمالي", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                         Text("${order.total.formatPrice()} ج", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+
+                    if (!order.customerAddress.isNullOrBlank()) {
+                        Text("العنوان: ${order.customerAddress}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2454,23 +2464,25 @@ private fun WebOrderEditDialog(
     order: Order,
     isSaving: Boolean,
     onDismiss: () -> Unit,
-    onSave: (List<CartItem>, Double, Double, String) -> Unit
+    onSave: (List<CartItem>, Double, Double, Double, String) -> Unit
 ) {
     val editItems     = remember(order.id) { mutableStateListOf<CartItem>().also { it.addAll(order.items) } }
     var discountText  by remember(order.id) { mutableStateOf(order.discount.fmt2f()) }
+    var depositText   by remember(order.id) { mutableStateOf(order.depositFee.fmt2f()) }
     var deliveryText  by remember(order.id) { mutableStateOf(order.deliveryFee.fmt2f()) }
     var paymentMethod by remember(order.id) { mutableStateOf(order.paymentMethod) }
     var showAddOther  by remember { mutableStateOf(false) }
 
     val discount    = discountText.toDoubleOrNull() ?: 0.0
+    val depositFee  = depositText.toDoubleOrNull()  ?: 0.0
     val deliveryFee = deliveryText.toDoubleOrNull() ?: 0.0
-    val newTotal    = editItems.sumOf { it.totalPrice } - discount + deliveryFee
+    val newTotal    = editItems.sumOf { it.totalPrice } - discount + depositFee + deliveryFee
 
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             Button(
-                onClick  = { onSave(editItems.toList(), discount, deliveryFee, paymentMethod) },
+                onClick  = { onSave(editItems.toList(), discount, depositFee, deliveryFee, paymentMethod) },
                 enabled  = !isSaving && editItems.isNotEmpty()
             ) {
                 if (isSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -2515,6 +2527,12 @@ private fun WebOrderEditDialog(
                     value = discountText,
                     onValueChange = { discountText = it.filter { c -> c.isDigit() || c == '.' } },
                     label = { Text("خصم (ج)") }, modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true
+                )
+                OutlinedTextField(
+                    value = depositText,
+                    onValueChange = { depositText = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("عربون (ج)") }, modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true
                 )
                 OutlinedTextField(

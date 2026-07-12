@@ -19,11 +19,13 @@ private data class OrderRow(
     val total: Double,
     val discount: Double = 0.0,
     @SerialName("delivery_fee") val deliveryFee: Double = 0.0,
+    @SerialName("deposit_fee") val depositFee: Double = 0.0,
     @SerialName("payment_method") val paymentMethod: String = "كاش",
     val status: String = "received",
     @SerialName("prepared_by") val preparedBy: String? = null,
     @SerialName("customer_name") val customerName: String? = null,
     @SerialName("customer_phone") val customerPhone: String? = null,
+    @SerialName("customer_address") val customerAddress: String? = null,
     val notes: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("created_by") val createdBy: String? = null
@@ -35,10 +37,12 @@ private data class OrderInsert(
     val total: Double,
     val discount: Double = 0.0,
     @SerialName("delivery_fee") val deliveryFee: Double = 0.0,
+    @SerialName("deposit_fee") val depositFee: Double = 0.0,
     @SerialName("payment_method") val paymentMethod: String,
     val status: String = "received",
     @SerialName("customer_name") val customerName: String? = null,
     @SerialName("customer_phone") val customerPhone: String? = null,
+    @SerialName("customer_address") val customerAddress: String? = null,
     val notes: String? = null,
     @SerialName("created_by") val createdBy: String? = null
 )
@@ -55,6 +59,7 @@ private data class OrderUpdate(
     val total: Double,
     val discount: Double,
     @SerialName("delivery_fee") val deliveryFee: Double,
+    @SerialName("deposit_fee") val depositFee: Double,
     @SerialName("payment_method") val paymentMethod: String
 )
 
@@ -73,15 +78,17 @@ class OrderRepository {
     suspend fun insert(order: Order) {
         supabaseClient.from("orders").insert(
             OrderInsert(
-                items         = json.encodeToString(order.items),
-                total         = order.total,
-                discount      = order.discount,
-                deliveryFee   = order.deliveryFee,
-                paymentMethod = order.paymentMethod,
-                customerName  = order.customerName,
-                customerPhone = order.customerPhone,
-                notes         = order.notes,
-                createdBy     = order.createdBy
+                items           = json.encodeToString(order.items),
+                total           = order.total,
+                discount        = order.discount,
+                deliveryFee     = order.deliveryFee,
+                depositFee      = order.depositFee,
+                paymentMethod   = order.paymentMethod,
+                customerName    = order.customerName,
+                customerPhone   = order.customerPhone,
+                customerAddress = order.customerAddress,
+                notes           = order.notes,
+                createdBy       = order.createdBy
             )
         )
     }
@@ -101,6 +108,7 @@ class OrderRepository {
                     total         = order.total,
                     discount      = order.discount,
                     deliveryFee   = order.deliveryFee,
+                    depositFee    = order.depositFee,
                     paymentMethod = order.paymentMethod
                 )
             ) { filter { eq("id", order.id) } }
@@ -113,18 +121,20 @@ class OrderRepository {
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private fun OrderRow.toDomain() = Order(
-        id            = id,
-        items         = runCatching { json.decodeFromString<List<CartItem>>(items) }.getOrElse { emptyList() },
-        total         = total,
-        discount      = discount,
-        deliveryFee   = deliveryFee,
-        paymentMethod = paymentMethod,
-        status        = status,
-        preparedBy    = preparedBy,
-        customerName  = customerName,
-        customerPhone = customerPhone,
-        notes         = notes,
-        createdAt     = createdAt,
-        createdBy     = createdBy
+        id              = id,
+        items           = runCatching { json.decodeFromString<List<CartItem>>(items) }.getOrElse { emptyList() },
+        total           = total,
+        discount        = discount,
+        deliveryFee     = deliveryFee,
+        depositFee      = depositFee,
+        paymentMethod   = paymentMethod,
+        status          = status,
+        preparedBy      = preparedBy,
+        customerName    = customerName,
+        customerPhone   = customerPhone,
+        customerAddress = customerAddress,
+        notes           = notes,
+        createdAt       = createdAt,
+        createdBy       = createdBy
     )
 }

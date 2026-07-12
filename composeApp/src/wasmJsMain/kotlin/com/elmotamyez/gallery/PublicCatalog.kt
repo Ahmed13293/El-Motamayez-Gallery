@@ -133,21 +133,31 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
 
     // ── Send order dialog ─────────────────────────────────────────────────────
     if (showOrderDialog) {
-        val orderMsg = buildCartMsg(cartProducts)
-        var customerName  by remember { mutableStateOf("") }
-        var customerPhone by remember { mutableStateOf("") }
-        var customerNotes by remember { mutableStateOf("") }
-        var paymentMethod by remember { mutableStateOf("كاش") }
+        var customerName    by remember { mutableStateOf("") }
+        var customerPhone   by remember { mutableStateOf("") }
+        var customerAddress by remember { mutableStateOf("") }
+        var customerNotes   by remember { mutableStateOf("") }
+        var paymentMethod   by remember { mutableStateOf("كاش") }
+
+        val canSend = customerName.isNotBlank() && customerPhone.isNotBlank() && customerAddress.isNotBlank()
+
+        fun buildFullMsg(): String = buildCartMsg(cartProducts) +
+            "\n\nالاسم: ${customerName.trim()}" +
+            "\nالهاتف: ${customerPhone.trim()}" +
+            "\nالعنوان: ${customerAddress.trim()}" +
+            (if (customerNotes.isNotBlank()) "\nملاحظات: ${customerNotes.trim()}" else "") +
+            "\nطريقة الدفع: $paymentMethod"
 
         fun saveAndSend(openPlatform: () -> Unit) {
             val items = cartProducts.map { (p, qty) -> CartItem(p, qty) }
             orderVm.createOrder(
-                items         = items,
-                total         = cartTotal,
-                paymentMethod = paymentMethod,
-                customerName  = customerName.trim().ifBlank { null },
-                customerPhone = customerPhone.trim().ifBlank { null },
-                notes         = customerNotes.trim().ifBlank { null }
+                items           = items,
+                total           = cartTotal,
+                paymentMethod   = paymentMethod,
+                customerName    = customerName.trim(),
+                customerPhone   = customerPhone.trim(),
+                customerAddress = customerAddress.trim(),
+                notes           = customerNotes.trim().ifBlank { null }
             )
             openPlatform()
             showOrderDialog = false
@@ -168,12 +178,11 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
 
                     HorizontalDivider()
 
-                    // Customer info — compact height via reduced content padding
                     val fieldModifier = Modifier.fillMaxWidth().height(52.dp)
                     OutlinedTextField(
                         value = customerName,
                         onValueChange = { customerName = it },
-                        label = { Text("الاسم (اختياري)", fontSize = 11.sp) },
+                        label = { Text("الاسم *", fontSize = 11.sp) },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodySmall,
                         modifier = fieldModifier
@@ -181,7 +190,15 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                     OutlinedTextField(
                         value = customerPhone,
                         onValueChange = { customerPhone = it },
-                        label = { Text("رقم الهاتف (اختياري)", fontSize = 11.sp) },
+                        label = { Text("رقم الهاتف *", fontSize = 11.sp) },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        modifier = fieldModifier
+                    )
+                    OutlinedTextField(
+                        value = customerAddress,
+                        onValueChange = { customerAddress = it },
+                        label = { Text("العنوان *", fontSize = 11.sp) },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodySmall,
                         modifier = fieldModifier
@@ -207,6 +224,12 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                         }
                     }
 
+                    if (!canSend) {
+                        Text("* الاسم والهاتف والعنوان مطلوبة",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error)
+                    }
+
                     HorizontalDivider()
 
                     Text("اختر طريقة الإرسال", style = MaterialTheme.typography.labelSmall,
@@ -214,7 +237,8 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Button(
-                            onClick = { saveAndSend { openWhatsApp(WA_NUMBER, orderMsg) } },
+                            onClick = { saveAndSend { openWhatsApp(WA_NUMBER, buildFullMsg()) } },
+                            enabled = canSend,
                             modifier = Modifier.weight(1f).height(44.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
                             shape = RoundedCornerShape(10.dp),
@@ -226,9 +250,10 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                         }
                         Button(
                             onClick = {
-                                copyToClipboard(orderMsg)
+                                copyToClipboard(buildFullMsg())
                                 saveAndSend { copyOpenState = CopyOpenState("فيسبوك", Color(0xFF1877F2), FB_PAGE_URL) }
                             },
+                            enabled = canSend,
                             modifier = Modifier.weight(1f).height(44.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
                             shape = RoundedCornerShape(10.dp),
@@ -240,9 +265,10 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                         }
                         Button(
                             onClick = {
-                                copyToClipboard(orderMsg)
+                                copyToClipboard(buildFullMsg())
                                 saveAndSend { copyOpenState = CopyOpenState("انستغرام", Color(0xFFE1306C), IG_PAGE_URL) }
                             },
+                            enabled = canSend,
                             modifier = Modifier.weight(1f).height(44.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
                             shape = RoundedCornerShape(10.dp),
