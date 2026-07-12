@@ -17,8 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -703,14 +706,16 @@ private fun BrandDialog(title: String, nameValue: String, onNameChange: (String)
 
 @Composable
 private fun ProductDialog(title: String, initial: Product?, categories: List<Category>, brands: List<Brand>, onConfirm: (String, Double, Double?, Int, String, String) -> Unit, onDismiss: () -> Unit) {
-    var name         by remember { mutableStateOf(initial?.name ?: "") }
-    var price        by remember { mutableStateOf(initial?.price?.toString() ?: "") }
-    var wholesale    by remember { mutableStateOf(initial?.wholesalePrice?.toString() ?: "") }
-    var stock        by remember { mutableStateOf(initial?.stock?.toString() ?: "") }
+    fun tfv(s: String) = TextFieldValue(s, TextRange(s.length))
+    var name         by remember { mutableStateOf(tfv(initial?.name ?: "")) }
+    var price        by remember { mutableStateOf(tfv(initial?.price?.toString() ?: "")) }
+    var wholesale    by remember { mutableStateOf(tfv(initial?.wholesalePrice?.toString() ?: "")) }
+    var stock        by remember { mutableStateOf(tfv(initial?.stock?.toString() ?: "")) }
     var catId        by remember { mutableStateOf(initial?.categoryId ?: categories.firstOrNull()?.id ?: "") }
     var brandId      by remember { mutableStateOf(initial?.brandId ?: brands.firstOrNull()?.id ?: "") }
     var catExpanded  by remember { mutableStateOf(false) }
     var brandExpanded by remember { mutableStateOf(false) }
+    fun TextFieldValue.selectAll() = copy(selection = TextRange(0, text.length))
 
     val filteredBrands = brands.filter { it.categoryId == catId }
     val catName   = categories.find { it.id == catId }?.name ?: "اختر قسماً"
@@ -721,21 +726,26 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("اسم المنتج") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
+                OutlinedTextField(value = name, onValueChange = { name = it },
+                    label = { Text("اسم المنتج") }, singleLine = true, shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) name = name.selectAll() })
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = price, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) price = it },
+                    OutlinedTextField(value = price, onValueChange = { if (it.text.all { c -> c.isDigit() || c == '.' }) price = it },
                         label = { Text("السعر") }, suffix = { Text("ج") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = wholesale, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) wholesale = it },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) price = price.selectAll() })
+                    OutlinedTextField(value = wholesale, onValueChange = { if (it.text.all { c -> c.isDigit() || c == '.' }) wholesale = it },
                         label = { Text("سعر الجملة") }, suffix = { Text("ج") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f))
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) wholesale = wholesale.selectAll() })
                 }
-                OutlinedTextField(value = stock, onValueChange = { if (it.all { c -> c.isDigit() }) stock = it },
+                OutlinedTextField(value = stock, onValueChange = { if (it.text.all { c -> c.isDigit() }) stock = it },
                     label = { Text("المخزون") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) stock = stock.selectAll() })
                 // Category dropdown
                 Box {
                     OutlinedTextField(value = catName, onValueChange = {}, readOnly = true, label = { Text("القسم") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
@@ -761,12 +771,12 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
         confirmButton = {
             Button(
                 onClick = {
-                    val p = price.toDoubleOrNull() ?: return@Button
-                    val w = wholesale.toDoubleOrNull()
-                    val s = stock.toIntOrNull() ?: 0
-                    onConfirm(name, p, w, s, brandId, catId)
+                    val p = price.text.toDoubleOrNull() ?: return@Button
+                    val w = wholesale.text.toDoubleOrNull()
+                    val s = stock.text.toIntOrNull() ?: 0
+                    onConfirm(name.text, p, w, s, brandId, catId)
                 },
-                enabled = name.isNotBlank() && price.isNotBlank() && catId.isNotBlank() && brandId.isNotBlank()
+                enabled = name.text.isNotBlank() && price.text.isNotBlank() && catId.isNotBlank() && brandId.isNotBlank()
             ) { Text("حفظ") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
