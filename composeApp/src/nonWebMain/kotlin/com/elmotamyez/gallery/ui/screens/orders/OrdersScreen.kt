@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -90,6 +91,7 @@ class OrdersScreen : Screen {
         val orders by vm.orders.collectAsState()
         val isLoading by vm.isLoading.collectAsState()
         val isSaving by vm.isSaving.collectAsState()
+        val products by vm.products.collectAsState()
         val authState by authVm.uiState.collectAsState()
         val username = authState.user?.username
 
@@ -150,6 +152,7 @@ class OrdersScreen : Screen {
             OrderEditDialog(
                 order = order,
                 isSaving = isSaving,
+                products = products,
                 onDismiss = { editingOrder = null },
                 onSave = { items, discount, depositFee, deliveryFee, payment ->
                     vm.updateOrder(order, items, discount, depositFee, deliveryFee, payment)
@@ -491,6 +494,7 @@ private fun statusColor(status: OrderStatus) = when (status) {
 private fun OrderEditDialog(
     order: Order,
     isSaving: Boolean,
+    products: List<Product>,
     onDismiss: () -> Unit,
     onSave: (List<CartItem>, Double, Double, Double, String) -> Unit
 ) {
@@ -501,6 +505,7 @@ private fun OrderEditDialog(
     var deliveryText by remember(order.id) { mutableStateOf(order.deliveryFee.fmt2f()) }
     var paymentMethod by remember(order.id) { mutableStateOf(order.paymentMethod) }
     var showAddOther by remember { mutableStateOf(false) }
+    var showAddStock by remember { mutableStateOf(false) }
 
     val discount    = discountText.toDoubleOrNull() ?: 0.0
     val depositFee  = depositText.toDoubleOrNull()  ?: 0.0
@@ -580,12 +585,21 @@ private fun OrderEditDialog(
                     }
                 }
 
-                OutlinedButton(
-                    onClick = { showAddOther = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("+ خدمة / أخرى", style = MaterialTheme.typography.labelSmall)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(
+                        onClick = { showAddStock = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("+ من المخزون", style = MaterialTheme.typography.labelSmall)
+                    }
+                    OutlinedButton(
+                        onClick = { showAddOther = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("+ خدمة / أخرى", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
 
                 HorizontalDivider()
@@ -651,6 +665,121 @@ private fun OrderEditDialog(
         AddOtherItemDialog(
             onDismiss = { showAddOther = false },
             onAdd = { item -> editItems.add(item); showAddOther = false })
+    }
+    if (showAddStock) {
+        AddStockItemDialog(
+            products = products,
+            onDismiss = { showAddStock = false },
+            onAdd = { product, qty ->
+                val existing = editItems.indexOfFirst { it.product.id == product.id }
+                if (existing >= 0) editItems[existing] = editItems[existing].copy(quantity = editItems[existing].quantity + qty)
+                else editItems.add(CartItem(product = product, quantity = qty))
+                showAddStock = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun AddStockItemDialog(
+    products: List<Product>,
+    onDismiss: () -> Unit,
+    onAdd: (Product, Int) -> Unit
+) {
+    var search by remember { mutableStateOf("") }
+    var selected by remember { mutableStateOf<Product?>(null) }
+    var qtyText by remember { mutableStateOf("1") }
+
+    val filtered = products.filter { it.name.contains(search, ignoreCase = true) }
+
+    if (selected == null) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+            title = { Text("إضافة من المخزون", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = search,
+                        onValueChange = { search = it },
+                        label = { Text("بحث...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Column(
+                        modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (filtered.isEmpty()) {
+                            Text(
+                                "لا توجد منتجات",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                        filtered.forEach { product ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth().clickable { selected = product }
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        product.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        "${product.price.formatPrice()} ج",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    } else {
+        val product = selected!!
+        AlertDialog(
+            onDismissRequest = { selected = null },
+            confirmButton = {
+                Button(
+                    onClick = { onAdd(product, qtyText.toIntOrNull()?.coerceAtLeast(1) ?: 1) },
+                    enabled = (qtyText.toIntOrNull() ?: 0) > 0
+                ) { Text("إضافة") }
+            },
+            dismissButton = { TextButton(onClick = { selected = null }) { Text("رجوع") } },
+            title = { Text(product.name, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "السعر: ${product.price.formatPrice()} ج  •  المخزون: ${product.stock}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = qtyText,
+                        onValueChange = { qtyText = it.filter { c -> c.isDigit() } },
+                        label = { Text("الكمية") },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
+                    )
+                }
+            }
+        )
     }
 }
 

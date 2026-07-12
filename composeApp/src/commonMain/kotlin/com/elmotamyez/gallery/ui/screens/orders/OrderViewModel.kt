@@ -37,6 +37,9 @@ class OrderViewModel(
     private val _pendingCount = MutableStateFlow(0)
     val pendingCount: StateFlow<Int> = _pendingCount.asStateFlow()
 
+    private val _products = MutableStateFlow<List<com.elmotamyez.gallery.data.model.Product>>(emptyList())
+    val products: StateFlow<List<com.elmotamyez.gallery.data.model.Product>> = _products.asStateFlow()
+
     init { loadOrders() }
 
     fun loadOrders() {
@@ -47,6 +50,7 @@ class OrderViewModel(
                     _orders.value = list
                     _pendingCount.value = list.count { it.status != OrderStatus.DELIVERED.key }
                 }
+            runCatching { productRepo.getProducts() }.onSuccess { _products.value = it }
             _isLoading.value = false
         }
     }

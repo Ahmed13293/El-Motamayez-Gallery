@@ -2204,6 +2204,7 @@ private fun WebOrdersTab(user: User) {
     val orders    by vm.orders.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
     val isSaving  by vm.isSaving.collectAsState()
+    val products  by vm.products.collectAsState()
     val username  = user.username
 
     var editingOrder  by remember { mutableStateOf<Order?>(null) }
@@ -2254,6 +2255,7 @@ private fun WebOrdersTab(user: User) {
         WebOrderEditDialog(
             order     = order,
             isSaving  = isSaving,
+            products  = products,
             onDismiss = { editingOrder = null },
             onSave    = { items, discount, depositFee, deliveryFee, payment ->
                 vm.updateOrder(order, items, discount, depositFee, deliveryFee, payment)
@@ -2463,6 +2465,7 @@ private fun webOrderStatusColor(status: OrderStatus) = when (status) {
 private fun WebOrderEditDialog(
     order: Order,
     isSaving: Boolean,
+    products: List<com.elmotamyez.gallery.data.model.Product>,
     onDismiss: () -> Unit,
     onSave: (List<CartItem>, Double, Double, Double, String) -> Unit
 ) {
@@ -2472,6 +2475,7 @@ private fun WebOrderEditDialog(
     var deliveryText  by remember(order.id) { mutableStateOf(order.deliveryFee.fmt2f()) }
     var paymentMethod by remember(order.id) { mutableStateOf(order.paymentMethod) }
     var showAddOther  by remember { mutableStateOf(false) }
+    var showAddStock  by remember { mutableStateOf(false) }
 
     val discount    = discountText.toDoubleOrNull() ?: 0.0
     val depositFee  = depositText.toDoubleOrNull()  ?: 0.0
@@ -2509,8 +2513,13 @@ private fun WebOrderEditDialog(
                     }
                 }
 
-                OutlinedButton(onClick = { showAddOther = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp)) {
-                    Text("+ خدمة / أخرى", style = MaterialTheme.typography.labelSmall)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(onClick = { showAddStock = true }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) {
+                        Text("+ من المخزون", style = MaterialTheme.typography.labelSmall)
+                    }
+                    OutlinedButton(onClick = { showAddOther = true }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) {
+                        Text("+ خدمة / أخرى", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
 
                 HorizontalDivider()
@@ -2554,6 +2563,99 @@ private fun WebOrderEditDialog(
         WebOrderAddOtherDialog(
             onDismiss = { showAddOther = false },
             onAdd     = { item -> editItems.add(item); showAddOther = false }
+        )
+    }
+    if (showAddStock) {
+        WebAddStockItemDialog(
+            products  = products,
+            onDismiss = { showAddStock = false },
+            onAdd     = { product, qty ->
+                val existing = editItems.indexOfFirst { it.product.id == product.id }
+                if (existing >= 0) editItems[existing] = editItems[existing].copy(quantity = editItems[existing].quantity + qty)
+                else editItems.add(CartItem(product = product, quantity = qty))
+                showAddStock = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun WebAddStockItemDialog(
+    products: List<com.elmotamyez.gallery.data.model.Product>,
+    onDismiss: () -> Unit,
+    onAdd: (com.elmotamyez.gallery.data.model.Product, Int) -> Unit
+) {
+    var search   by remember { mutableStateOf("") }
+    var selected by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Product?>(null) }
+    var qtyText  by remember { mutableStateOf("1") }
+
+    val filtered = products.filter { it.name.contains(search, ignoreCase = true) }
+
+    if (selected == null) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+            title = { Text("إضافة من المخزون", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = search, onValueChange = { search = it },
+                        label = { Text("بحث...") }, modifier = Modifier.fillMaxWidth(), singleLine = true
+                    )
+                    Column(
+                        modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (filtered.isEmpty()) {
+                            Text("لا توجد منتجات", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(vertical = 8.dp))
+                        }
+                        filtered.forEach { product ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth().clickable { selected = product }
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(product.name, style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("${product.price.formatPrice()} ج", style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    } else {
+        val product = selected!!
+        AlertDialog(
+            onDismissRequest = { selected = null },
+            confirmButton = {
+                Button(
+                    onClick = { onAdd(product, qtyText.toIntOrNull()?.coerceAtLeast(1) ?: 1) },
+                    enabled = (qtyText.toIntOrNull() ?: 0) > 0
+                ) { Text("إضافة") }
+            },
+            dismissButton = { TextButton(onClick = { selected = null }) { Text("رجوع") } },
+            title = { Text(product.name, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("السعر: ${product.price.formatPrice()} ج  •  المخزون: ${product.stock}",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedTextField(
+                        value = qtyText, onValueChange = { qtyText = it.filter { c -> c.isDigit() } },
+                        label = { Text("الكمية") }, modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true
+                    )
+                }
+            }
         )
     }
 }
