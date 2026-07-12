@@ -2314,6 +2314,10 @@ private fun WebOrderCard(
                             Text("• ${order.customerPhone}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Text("${order.items.size} منتج  •  ${order.total.formatPrice()} ج", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!order.customerAddress.isNullOrBlank())
+                        Text("العنوان: ${order.customerAddress}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!order.preparedBy.isNullOrBlank())
+                        Text("تحضير: ${order.preparedBy}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Surface(shape = RoundedCornerShape(6.dp), color = webOrderStatusColor(status).copy(alpha = 0.15f)) {
                         Text(
                             status.arabicLabel,
@@ -2382,17 +2386,10 @@ private fun WebOrderCard(
                         Text("${order.total.formatPrice()} ج", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                     }
 
-                    if (!order.customerAddress.isNullOrBlank()) {
-                        Text("العنوان: ${order.customerAddress}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
                             Text(order.paymentMethod, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                        }
-                        if (!order.preparedBy.isNullOrBlank()) {
-                            Text("تحضير: ${order.preparedBy}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 

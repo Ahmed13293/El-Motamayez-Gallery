@@ -228,6 +228,20 @@ private fun OrderCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (!order.customerAddress.isNullOrBlank()) {
+                        Text(
+                            "العنوان: ${order.customerAddress}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (!order.preparedBy.isNullOrBlank()) {
+                        Text(
+                            "تحضير: ${order.preparedBy}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = statusColor(status).copy(alpha = 0.15f)
@@ -366,15 +380,6 @@ private fun OrderCard(
                         )
                     }
 
-                    // Customer info
-                    if (!order.customerAddress.isNullOrBlank()) {
-                        Text(
-                            "العنوان: ${order.customerAddress}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
                     // Meta
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Surface(
@@ -386,13 +391,6 @@ private fun OrderCard(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                        if (!order.preparedBy.isNullOrBlank()) {
-                            Text(
-                                "تحضير: ${order.preparedBy}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
