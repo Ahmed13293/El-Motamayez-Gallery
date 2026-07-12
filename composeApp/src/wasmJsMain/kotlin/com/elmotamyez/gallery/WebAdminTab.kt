@@ -442,7 +442,12 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
                     val catName   = categories.find { it.id == product.categoryId }?.name ?: ""
                     CrudItemRow(
                         title = product.name,
-                        subtitle = "$catName / $brandName | السعر: ${product.price.fmt2f()} ج | المخزون: ${product.stock}",
+                        subtitle = buildString {
+                            append("$catName / $brandName")
+                            append(" | السعر: ${product.price.fmt2f()} ج")
+                            if (product.wholesalePrice != null) append(" | الجملة: ${product.wholesalePrice.fmt2f()} ج")
+                            append(" | المخزون: ${product.stock}")
+                        },
                         subtitleColor = when {
                             product.stock == 0 -> MaterialTheme.colorScheme.error
                             product.stock <= 2 -> Color(0xFFE65100)
