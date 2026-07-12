@@ -23,8 +23,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -734,105 +739,273 @@ private fun SocialButton(label: String, color: Color, onClick: () -> Unit) {
 
 // ── Banner slider ─────────────────────────────────────────────────────────────
 
-private data class BannerSlide(
-    val title: String,
-    val subtitle: String,
-    val emoji: String,
-    val gradientStart: Color,
-    val gradientEnd: Color
-)
-
-private val BANNER_SLIDES = listOf(
-    BannerSlide(
-        title = "مكتبة المتميز",
-        subtitle = "كل ما تحتاجه من مستلزمات مدرسية ومكتبية في مكان واحد",
-        emoji = "📚",
-        gradientStart = Color(0xFF0D3B6E),
-        gradientEnd   = Color(0xFF1565C0)
-    ),
-    BannerSlide(
-        title = "توصيل لجميع المحافظات",
-        subtitle = "نوصلك لو مكانك فين — اطلب الآن عبر واتساب أو فيسبوك أو انستغرام",
-        emoji = "🚚",
-        gradientStart = Color(0xFF1B5E20),
-        gradientEnd   = Color(0xFF43A047)
-    ),
-    BannerSlide(
-        title = "أسعار تنافسية",
-        subtitle = "جودة عالية بأسعار مناسبة — تسوّق الآن من كتالوجنا",
-        emoji = "🎒",
-        gradientStart = Color(0xFF4A148C),
-        gradientEnd   = Color(0xFF7B1FA2)
-    ),
-    BannerSlide(
-        title = "العودة للمدرسة",
-        subtitle = "جهّز شنطتك — طقم الكتابة الكامل وكل المستلزمات المدرسية",
-        emoji = "✏️",
-        gradientStart = Color(0xFFBF360C),
-        gradientEnd   = Color(0xFFE64A19)
-    )
-)
+private val BANNER_COUNT = 4
 
 @Composable
 private fun BannerSlider() {
-    val pagerState = rememberPagerState(pageCount = { BANNER_SLIDES.size })
-
+    val pagerState = rememberPagerState(pageCount = { BANNER_COUNT })
     LaunchedEffect(Unit) {
         while (true) {
-            delay(3500)
-            val next = (pagerState.currentPage + 1) % BANNER_SLIDES.size
-            pagerState.animateScrollToPage(next)
+            delay(4000)
+            pagerState.animateScrollToPage((pagerState.currentPage + 1) % BANNER_COUNT)
         }
     }
-
-    Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().height(180.dp)) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-            val slide = BANNER_SLIDES[page]
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Brush.horizontalGradient(listOf(slide.gradientEnd, slide.gradientStart))),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(slide.emoji, fontSize = 52.sp)
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            slide.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                        Text(
-                            slide.subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.9f),
-                            lineHeight = 18.sp
-                        )
-                    }
-                }
+            when (page) {
+                0 -> BannerStore()
+                1 -> BannerDelivery()
+                2 -> BannerPricing()
+                else -> BannerBackToSchool()
             }
         }
-
         // Dot indicators
         Row(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            repeat(BANNER_SLIDES.size) { i ->
+            repeat(BANNER_COUNT) { i ->
                 Box(
                     modifier = Modifier
-                        .size(if (i == pagerState.currentPage) 10.dp else 6.dp)
-                        .clip(CircleShape)
+                        .size(if (i == pagerState.currentPage) 28.dp else 8.dp)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
                         .background(
                             if (i == pagerState.currentPage) Color.White
                             else Color.White.copy(alpha = 0.4f)
                         )
                 )
+            }
+        }
+    }
+}
+
+// ── Banner 1: Store ───────────────────────────────────────────────────────────
+@Composable
+private fun BannerStore() {
+    Box(
+        modifier = Modifier.fillMaxSize().background(
+            Brush.horizontalGradient(listOf(Color(0xFF1565C0), Color(0xFF0D3B6E)))
+        ).drawBehind {
+            // large decorative circle top-right
+            drawCircle(color = Color(0x221976D2), radius = 160f, center = androidx.compose.ui.geometry.Offset(size.width - 80f, 0f))
+            drawCircle(color = Color(0x151976D2), radius = 110f, center = androidx.compose.ui.geometry.Offset(size.width - 40f, size.height * 0.4f))
+            // small circle bottom-left
+            drawCircle(color = Color(0x20FFFFFF), radius = 70f, center = androidx.compose.ui.geometry.Offset(40f, size.height))
+            // diagonal stripe
+            val path = Path().apply {
+                moveTo(size.width * 0.55f, 0f)
+                lineTo(size.width * 0.65f, 0f)
+                lineTo(size.width * 0.45f, size.height)
+                lineTo(size.width * 0.35f, size.height)
+                close()
+            }
+            drawPath(path, color = Color(0x10FFFFFF))
+        }
+    ) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Illustration: stacked books
+            Box(Modifier.size(110.dp, 130.dp)) {
+                // Book 3 (back)
+                Box(Modifier.size(80.dp, 100.dp).offset(20.dp, 20.dp)
+                    .clip(RoundedCornerShape(4.dp)).background(Color(0xFF42A5F5)))
+                // Book 2
+                Box(Modifier.size(80.dp, 100.dp).offset(10.dp, 10.dp)
+                    .clip(RoundedCornerShape(4.dp)).background(Color(0xFF66BB6A)))
+                // Book 1 (front)
+                Box(Modifier.size(80.dp, 100.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFEF5350))) {
+                    Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(0.6f)))
+                        Box(Modifier.fillMaxWidth(0.7f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(0.4f)))
+                        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(0.4f)))
+                        Box(Modifier.fillMaxWidth(0.8f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(0.3f)))
+                    }
+                    // Book spine
+                    Box(Modifier.width(8.dp).fillMaxHeight().background(Color.Black.copy(0.15f)))
+                }
+            }
+            Spacer(Modifier.width(20.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(shape = RoundedCornerShape(20.dp), color = Color(0xFFFFD54F).copy(0.25f)) {
+                    Text("⭐ الأفضل في الشيخ زايد", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall, color = Color(0xFFFFD54F), fontWeight = FontWeight.Bold)
+                }
+                Text("مكتبة المتميز", style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold, color = Color.White, lineHeight = 30.sp)
+                Text("كل ما تحتاجه من مستلزمات\nمدرسية ومكتبية في مكان واحد",
+                    style = MaterialTheme.typography.bodySmall, color = Color.White.copy(0.85f), lineHeight = 18.sp)
+            }
+        }
+    }
+}
+
+// ── Banner 2: Delivery ────────────────────────────────────────────────────────
+@Composable
+private fun BannerDelivery() {
+    Box(
+        modifier = Modifier.fillMaxSize().background(
+            Brush.horizontalGradient(listOf(Color(0xFF2E7D32), Color(0xFF1B5E20)))
+        ).drawBehind {
+            drawCircle(color = Color(0x2043A047), radius = 140f, center = androidx.compose.ui.geometry.Offset(size.width - 60f, size.height * 0.3f))
+            drawCircle(color = Color(0x15FFFFFF), radius = 90f, center = androidx.compose.ui.geometry.Offset(60f, size.height))
+            // Road dashes
+            val dashY = size.height * 0.72f
+            var x = 0f
+            while (x < size.width) {
+                drawLine(color = Color(0x40FFFFFF), start = androidx.compose.ui.geometry.Offset(x, dashY),
+                    end = androidx.compose.ui.geometry.Offset(x + 30f, dashY), strokeWidth = 3f)
+                x += 50f
+            }
+        }
+    ) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Truck illustration
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.size(120.dp, 70.dp)) {
+                    // Truck body
+                    Box(Modifier.size(80.dp, 50.dp).align(Alignment.CenterEnd)
+                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                        .background(Color(0xFFFFFFFF).copy(0.9f)))
+                    // Cab
+                    Box(Modifier.size(45.dp, 45.dp).align(Alignment.CenterStart).offset(y = 5.dp)
+                        .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 4.dp, bottomStart = 0.dp, bottomEnd = 0.dp))
+                        .background(Color(0xFFE8F5E9)))
+                    // Window
+                    Box(Modifier.size(22.dp, 18.dp).align(Alignment.TopStart).offset(6.dp, 4.dp)
+                        .clip(RoundedCornerShape(4.dp)).background(Color(0xFF81D4FA)))
+                    // Wheels
+                    Box(Modifier.size(22.dp).align(Alignment.BottomStart).offset(8.dp)
+                        .clip(CircleShape).background(Color(0xFF37474F)))
+                    Box(Modifier.size(22.dp).align(Alignment.BottomEnd).offset((-8).dp)
+                        .clip(CircleShape).background(Color(0xFF37474F)))
+                }
+                // Location pin below truck
+                Icon(Icons.Default.LocationOn, null, tint = Color(0xFFFFD54F), modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(20.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(shape = RoundedCornerShape(20.dp), color = Color(0x3081C784)) {
+                    Text("🚀 توصيل سريع", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+                Text("توصيل لجميع\nالمحافظات", style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold, color = Color.White, lineHeight = 30.sp)
+                Text("هنوصلك لو مكانك فين\nاطلب الآن عبر واتساب",
+                    style = MaterialTheme.typography.bodySmall, color = Color.White.copy(0.85f), lineHeight = 18.sp)
+            }
+        }
+    }
+}
+
+// ── Banner 3: Pricing ─────────────────────────────────────────────────────────
+@Composable
+private fun BannerPricing() {
+    Box(
+        modifier = Modifier.fillMaxSize().background(
+            Brush.horizontalGradient(listOf(Color(0xFF6A1B9A), Color(0xFF4A148C)))
+        ).drawBehind {
+            drawCircle(color = Color(0x307B1FA2), radius = 150f, center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, -20f))
+            drawCircle(color = Color(0x20AB47BC), radius = 100f, center = androidx.compose.ui.geometry.Offset(size.width - 40f, size.height + 20f))
+            // Decorative stars
+            for (i in 0..4) {
+                val cx = size.width * (0.1f + i * 0.18f)
+                val cy = size.height * 0.15f
+                drawCircle(color = Color(0x40FFD54F), radius = 4f, center = androidx.compose.ui.geometry.Offset(cx, cy))
+            }
+        }
+    ) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Price tag illustration
+            Box(Modifier.size(110.dp), contentAlignment = Alignment.Center) {
+                // Tag shape
+                Box(Modifier.size(90.dp, 90.dp).clip(RoundedCornerShape(12.dp))
+                    .background(Color.White.copy(0.15f)), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("%", fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFFFD54F))
+                        Box(Modifier.fillMaxWidth(0.6f).height(2.dp).background(Color.White.copy(0.4f)))
+                        Text("خصم", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+                // Small circle top-right
+                Box(Modifier.size(22.dp).align(Alignment.TopEnd).offset((-4).dp, 4.dp)
+                    .clip(CircleShape).background(Color(0xFFFFD54F)), contentAlignment = Alignment.Center) {
+                    Text("★", fontSize = 10.sp, color = Color(0xFF4A148C))
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(shape = RoundedCornerShape(20.dp), color = Color(0x40CE93D8)) {
+                    Text("💎 جودة عالية", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+                Text("أسعار تنافسية\nلا تُقاوَم", style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold, color = Color.White, lineHeight = 30.sp)
+                Text("جودة عالية بأسعار مناسبة\nتسوّق الآن من كتالوجنا",
+                    style = MaterialTheme.typography.bodySmall, color = Color.White.copy(0.85f), lineHeight = 18.sp)
+            }
+        }
+    }
+}
+
+// ── Banner 4: Back to School ──────────────────────────────────────────────────
+@Composable
+private fun BannerBackToSchool() {
+    Box(
+        modifier = Modifier.fillMaxSize().background(
+            Brush.horizontalGradient(listOf(Color(0xFFE65100), Color(0xFFBF360C)))
+        ).drawBehind {
+            drawCircle(color = Color(0x30F57C00), radius = 160f, center = androidx.compose.ui.geometry.Offset(size.width * 0.8f, -30f))
+            drawCircle(color = Color(0x20FFFFFF), radius = 80f, center = androidx.compose.ui.geometry.Offset(20f, size.height * 0.8f))
+            // Notebook lines in background
+            for (i in 0..3) {
+                val y = size.height * (0.25f + i * 0.18f)
+                drawLine(color = Color(0x15FFFFFF), start = androidx.compose.ui.geometry.Offset(size.width * 0.5f, y),
+                    end = androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 2f)
+            }
+        }
+    ) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Pencil + ruler illustration
+            Box(Modifier.size(110.dp, 130.dp), contentAlignment = Alignment.Center) {
+                // Ruler
+                Box(Modifier.size(18.dp, 110.dp).offset((-20).dp).clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFFFFD54F))) {
+                    Column(Modifier.fillMaxSize().padding(vertical = 6.dp), verticalArrangement = Arrangement.SpaceEvenly) {
+                        repeat(6) {
+                            Box(Modifier.fillMaxWidth(0.5f).height(1.dp).background(Color.Black.copy(0.3f)))
+                        }
+                    }
+                }
+                // Pencil body
+                Box(Modifier.size(22.dp, 110.dp).clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                    .background(Color(0xFFFFCC02))) {
+                    // Eraser
+                    Box(Modifier.size(22.dp, 16.dp).clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                        .background(Color(0xFFEF9A9A)))
+                    // Metal band
+                    Box(Modifier.size(22.dp, 8.dp).align(Alignment.TopCenter).offset(y = 16.dp)
+                        .background(Color(0xFFBDBDBD)))
+                    // Tip
+                    Box(Modifier.size(22.dp, 20.dp).align(Alignment.BottomCenter)
+                        .clip(RoundedCornerShape(bottomStart = 2.dp, bottomEnd = 2.dp))
+                        .background(Color(0xFFFFCC02)))
+                }
+                // Backpack icon
+                Box(Modifier.size(40.dp).align(Alignment.BottomEnd).offset(10.dp, 10.dp)
+                    .clip(CircleShape).background(Color.White.copy(0.2f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.ShoppingBag, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(shape = RoundedCornerShape(20.dp), color = Color(0x30FF8F00)) {
+                    Text("🎒 موسم المدارس", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall, color = Color(0xFFFFE082), fontWeight = FontWeight.Bold)
+                }
+                Text("العودة\nللمدرسة", style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold, color = Color.White, lineHeight = 30.sp)
+                Text("جهّز شنطتك بطقم الكتابة الكامل\nوكل المستلزمات المدرسية",
+                    style = MaterialTheme.typography.bodySmall, color = Color.White.copy(0.85f), lineHeight = 18.sp)
             }
         }
     }
