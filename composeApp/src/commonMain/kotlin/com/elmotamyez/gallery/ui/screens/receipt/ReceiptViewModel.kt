@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.offsetAt
 import kotlinx.datetime.toLocalDateTime
 import com.elmotamyez.gallery.util.dateString
 import com.elmotamyez.gallery.util.dateTimeString
@@ -121,7 +122,10 @@ class ReceiptViewModel(
     ) {
         val isPaid = paymentMethod != "آجل"
         viewModelScope.launch {
-            val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+            val tz       = TimeZone.currentSystemDefault()
+            val instant  = Clock.System.now()
+            val now      = instant.toLocalDateTime(tz)
+            val offset   = tz.offsetAt(instant)          // e.g. +02:00
             val (year, month, day) = overrideDate ?: Triple(now.year, now.monthNumber, now.dayOfMonth)
             val todayPrefix = dateString(year, month, day)
             val todayMax = _receipts.value
@@ -131,7 +135,7 @@ class ReceiptViewModel(
             val nowIso = if (overrideDate != null)
                 "${todayPrefix}T12:00:00+00:00"
             else
-                dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second)
+                dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second) + offset
             val receipt = Receipt(
                 id            = "${todayPrefix}-${nextNumber.toString().padStart(4, '0')}",
                 orderNumber   = nextNumber,
