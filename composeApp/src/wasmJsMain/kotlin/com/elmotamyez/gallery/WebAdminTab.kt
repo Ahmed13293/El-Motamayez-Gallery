@@ -765,7 +765,7 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
 
 // ── Expenses Section ──────────────────────────────────────────────────────────
 
-private val EXPENSE_TYPES = listOf("الإيجار", "مرتبات", "النت", "الكهرباء", "مصاريف عامة")
+private val EXPENSE_TYPES = listOf("الإيجار", "مرتبات", "النت", "الكهرباء", "بضاعه", "مصاريف عامة")
 
 @Composable
 private fun AdminExpensesSection(isMobile: Boolean = false) {
