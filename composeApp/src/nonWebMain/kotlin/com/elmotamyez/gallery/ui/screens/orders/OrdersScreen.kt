@@ -498,9 +498,9 @@ private fun OrderEditDialog(
 ) {
     val editItems =
         remember(order.id) { mutableStateListOf<CartItem>().also { it.addAll(order.items) } }
-    var discountText by remember(order.id) { mutableStateOf(order.discount.fmt2f()) }
-    var depositText  by remember(order.id) { mutableStateOf(order.depositFee.fmt2f()) }
-    var deliveryText by remember(order.id) { mutableStateOf(order.deliveryFee.fmt2f()) }
+    var discountText by remember(order.id) { mutableStateOf(if (order.discount > 0) order.discount.fmt2f() else "") }
+    var depositText  by remember(order.id) { mutableStateOf(if (order.depositFee > 0) order.depositFee.fmt2f() else "") }
+    var deliveryText by remember(order.id) { mutableStateOf(if (order.deliveryFee > 0) order.deliveryFee.fmt2f() else "") }
     var paymentMethod by remember(order.id) { mutableStateOf(order.paymentMethod) }
     var showAddOther by remember { mutableStateOf(false) }
     var showAddStock by remember { mutableStateOf(false) }
