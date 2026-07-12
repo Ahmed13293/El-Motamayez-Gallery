@@ -4,9 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elmotamyez.gallery.data.model.Expense
 import com.elmotamyez.gallery.data.repository.ExpenseRepository
+import com.elmotamyez.gallery.util.dateTimeString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -34,7 +38,9 @@ class ExpenseViewModel(private val repo: ExpenseRepository) : ViewModel() {
     fun addExpense(type: String, amount: Double, note: String?, onDone: () -> Unit) {
         viewModelScope.launch {
             _isSaving.value = true
-            val expense = Expense(id = Uuid.random().toString(), type = type, amount = amount, note = note?.ifBlank { null })
+            val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+            val nowIso = dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second)
+            val expense = Expense(id = Uuid.random().toString(), type = type, amount = amount, note = note?.ifBlank { null }, createdAt = nowIso)
             _expenses.value = listOf(expense) + _expenses.value
             runCatching { repo.insert(expense) }
                 .onFailure { _error.value = "insert: ${it.message}" }

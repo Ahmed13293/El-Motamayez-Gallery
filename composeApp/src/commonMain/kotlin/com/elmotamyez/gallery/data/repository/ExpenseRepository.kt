@@ -20,7 +20,8 @@ private data class ExpenseInsert(
     val id: String,
     val type: String,
     val amount: Double,
-    val note: String? = null
+    val note: String? = null,
+    val created_at: String? = null
 )
 
 @Serializable
@@ -41,7 +42,7 @@ class ExpenseRepository {
 
     suspend fun insert(expense: Expense) {
         supabaseClient.from("expenses").insert(
-            ExpenseInsert(id = expense.id, type = expense.type, amount = expense.amount, note = expense.note)
+            ExpenseInsert(id = expense.id, type = expense.type, amount = expense.amount, note = expense.note, created_at = expense.createdAt)
         )
     }
 
