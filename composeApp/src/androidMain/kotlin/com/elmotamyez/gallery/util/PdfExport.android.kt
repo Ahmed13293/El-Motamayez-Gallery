@@ -1,14 +1,25 @@
 package com.elmotamyez.gallery.util
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
+import android.os.Bundle
+import android.os.CancellationSignal
+import android.os.ParcelFileDescriptor
+import android.print.PageRange
+import android.print.PrintAttributes
+import android.print.PrintDocumentAdapter
+import android.print.PrintDocumentInfo
+import android.print.PrintManager
 import androidx.core.content.FileProvider
 import com.elmotamyez.gallery.data.model.Receipt
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 
 actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
     val context = ApplicationContextHolder.context ?: return
@@ -145,12 +156,50 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
     cacheFile.outputStream().use { pdf.writeTo(it) }
     pdf.close()
 
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", cacheFile)
-    val intent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, "application/pdf")
-        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+    // Use PrintManager so Mopria works as a print service (not a viewer).
+    val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
+    val jobName = "فاتورة #${receipt.orderNumber}"
+
+    val adapter = object : PrintDocumentAdapter() {
+        override fun onLayout(
+            oldAttributes: PrintAttributes?,
+            newAttributes: PrintAttributes,
+            cancellationSignal: CancellationSignal,
+            callback: LayoutResultCallback,
+            extras: Bundle?
+        ) {
+            if (cancellationSignal.isCanceled) { callback.onLayoutCancelled(); return }
+            val info = PrintDocumentInfo.Builder(fileName)
+                .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+                .setPageCount(1)
+                .build()
+            callback.onLayoutFinished(info, newAttributes != oldAttributes)
+        }
+
+        override fun onWrite(
+            pages: Array<out PageRange>,
+            destination: ParcelFileDescriptor,
+            cancellationSignal: CancellationSignal,
+            callback: WriteResultCallback
+        ) {
+            try {
+                FileInputStream(cacheFile).use { input ->
+                    FileOutputStream(destination.fileDescriptor).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                callback.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
+            } catch (e: Exception) {
+                callback.onWriteFailed(e.message)
+            }
+        }
     }
-    context.startActivity(Intent.createChooser(intent, "فتح الفاتورة").apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-    })
+
+    val printAttributes = PrintAttributes.Builder()
+        .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+        .setResolution(PrintAttributes.Resolution("default", "default", 300, 300))
+        .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+        .build()
+
+    printManager.print(jobName, adapter, printAttributes)
 }
