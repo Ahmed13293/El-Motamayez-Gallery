@@ -429,11 +429,11 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
 
             // ── Body: sidebar + right panel ───────────────────────────────────
             if (state.isLoading) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             } else {
-                Row(Modifier.fillMaxSize()) {
+                Row(Modifier.weight(1f).fillMaxWidth()) {
 
                     // ── Category sidebar ──────────────────────────────────────
                     Surface(color = MaterialTheme.colorScheme.surfaceVariant,
