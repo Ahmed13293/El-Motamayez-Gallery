@@ -11,6 +11,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -374,63 +375,29 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                 }
             }
 
-            // ── Banner slider ─────────────────────────────────────────────────
-            BannerSlider()
-
-            // ── Search bar (always visible) ───────────────────────────────────
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("ابحث في جميع المنتجات…") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty())
-                        IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
-            )
-
-            // ── Breadcrumb ────────────────────────────────────────────────────
-            if (selectedCategory != null) {
-                Surface(color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.fillMaxWidth()) {
-                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        IconButton(onClick = {
-                            selectedCategory = null
-                            selectedBrand    = null
-                            catalogView      = CatalogView.ALL_PRODUCTS
-                        }, modifier = Modifier.size(30.dp)) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null,
-                                tint = MaterialTheme.colorScheme.primary)
-                        }
-                        Text(selectedCategory!!.name,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (selectedBrand == null) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (selectedBrand == null) FontWeight.Bold else FontWeight.Normal,
-                            modifier = Modifier.clickable {
-                                selectedBrand = null
-                                catalogView   = CatalogView.SUBCATEGORIES
-                            })
-                        if (selectedBrand != null) {
-                            Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(selectedBrand!!.name,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                }
-            }
-
             // ── Body: sidebar + right panel ───────────────────────────────────
+            // Banner, search, and breadcrumb live INSIDE the scroll container so
+            // they scroll away as the user scrolls down to see more products.
             if (state.isLoading) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                Column(Modifier.weight(1f).fillMaxWidth()
+                    .verticalScroll(rememberScrollState())) {
+                    BannerSlider()
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("ابحث في جميع المنتجات…") },
+                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty())
+                                IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
+                    )
+                    Box(Modifier.fillMaxWidth().padding(64.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
                 }
             } else {
                 Row(Modifier.weight(1f).fillMaxWidth()) {
@@ -500,10 +467,47 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                         // Subcategory grid
                         CatalogView.SUBCATEGORIES -> {
                             if (subcategories.isEmpty()) {
-                                Box(Modifier.weight(1f).fillMaxHeight(),
-                                    contentAlignment = Alignment.Center) {
-                                    Text("لا توجد أقسام فرعية",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Column(Modifier.weight(1f).fillMaxHeight()
+                                    .verticalScroll(rememberScrollState())) {
+                                    BannerSlider()
+                                    OutlinedTextField(
+                                        value = searchQuery,
+                                        onValueChange = { searchQuery = it },
+                                        placeholder = { Text("ابحث في جميع المنتجات…") },
+                                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                                        trailingIcon = {
+                                            if (searchQuery.isNotEmpty())
+                                                IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) }
+                                        },
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
+                                    )
+                                    if (selectedCategory != null) {
+                                        Surface(color = MaterialTheme.colorScheme.surfaceVariant,
+                                            modifier = Modifier.fillMaxWidth()) {
+                                            Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                IconButton(onClick = {
+                                                    selectedCategory = null; selectedBrand = null
+                                                    catalogView = CatalogView.ALL_PRODUCTS
+                                                }, modifier = Modifier.size(30.dp)) {
+                                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null,
+                                                        tint = MaterialTheme.colorScheme.primary)
+                                                }
+                                                Text(selectedCategory!!.name,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                    Box(Modifier.fillMaxWidth().padding(64.dp),
+                                        contentAlignment = Alignment.Center) {
+                                        Text("لا توجد أقسام فرعية",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 }
                             } else {
                                 LazyVerticalGrid(
@@ -513,6 +517,44 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                     modifier = Modifier.weight(1f).fillMaxHeight()
                                 ) {
+                                    item(span = { GridItemSpan(maxLineSpan) }) { BannerSlider() }
+                                    item(span = { GridItemSpan(maxLineSpan) }) {
+                                        OutlinedTextField(
+                                            value = searchQuery,
+                                            onValueChange = { searchQuery = it },
+                                            placeholder = { Text("ابحث في جميع المنتجات…") },
+                                            leadingIcon = { Icon(Icons.Default.Search, null) },
+                                            trailingIcon = {
+                                                if (searchQuery.isNotEmpty())
+                                                    IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) }
+                                            },
+                                            singleLine = true,
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 0.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                    if (selectedCategory != null) {
+                                        item(span = { GridItemSpan(maxLineSpan) }) {
+                                            Surface(color = MaterialTheme.colorScheme.surfaceVariant,
+                                                modifier = Modifier.fillMaxWidth()) {
+                                                Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                    IconButton(onClick = {
+                                                        selectedCategory = null; selectedBrand = null
+                                                        catalogView = CatalogView.ALL_PRODUCTS
+                                                    }, modifier = Modifier.size(30.dp)) {
+                                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null,
+                                                            tint = MaterialTheme.colorScheme.primary)
+                                                    }
+                                                    Text(selectedCategory!!.name,
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    }
                                     items(subcategories, key = { it.id }) { brand ->
                                         SubcategoryCard(name = brand.name, onClick = {
                                             selectedBrand = brand
@@ -526,22 +568,121 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                         // Products grid (ALL or filtered by brand)
                         else -> {
                             if (displayedProducts.isEmpty()) {
-                                Box(Modifier.weight(1f).fillMaxHeight(),
-                                    contentAlignment = Alignment.Center) {
-                                    Text("لا توجد منتجات",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Column(Modifier.weight(1f).fillMaxHeight()
+                                    .verticalScroll(rememberScrollState())) {
+                                    BannerSlider()
+                                    OutlinedTextField(
+                                        value = searchQuery,
+                                        onValueChange = { searchQuery = it },
+                                        placeholder = { Text("ابحث في جميع المنتجات…") },
+                                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                                        trailingIcon = {
+                                            if (searchQuery.isNotEmpty())
+                                                IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) }
+                                        },
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
+                                    )
+                                    if (selectedCategory != null) {
+                                        Surface(color = MaterialTheme.colorScheme.surfaceVariant,
+                                            modifier = Modifier.fillMaxWidth()) {
+                                            Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                IconButton(onClick = {
+                                                    selectedCategory = null; selectedBrand = null
+                                                    catalogView = CatalogView.ALL_PRODUCTS
+                                                }, modifier = Modifier.size(30.dp)) {
+                                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null,
+                                                        tint = MaterialTheme.colorScheme.primary)
+                                                }
+                                                Text(selectedCategory!!.name,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = if (selectedBrand == null) MaterialTheme.colorScheme.primary
+                                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    fontWeight = if (selectedBrand == null) FontWeight.Bold else FontWeight.Normal,
+                                                    modifier = Modifier.clickable {
+                                                        selectedBrand = null
+                                                        catalogView   = CatalogView.SUBCATEGORIES
+                                                    })
+                                                if (selectedBrand != null) {
+                                                    Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Text(selectedBrand!!.name,
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Box(Modifier.fillMaxWidth().padding(64.dp),
+                                        contentAlignment = Alignment.Center) {
+                                        Text("لا توجد منتجات",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 }
                             } else {
                                 LazyVerticalGrid(
                                     columns = GridCells.Adaptive(minSize = 160.dp),
                                     contentPadding = PaddingValues(
-                                        start = 16.dp, end = 16.dp, top = 8.dp,
+                                        start = 16.dp, end = 16.dp, top = 0.dp,
                                         bottom = if (cartCount > 0) 100.dp else 16.dp
                                     ),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     modifier = Modifier.weight(1f).fillMaxHeight()
                                 ) {
+                                    item(span = { GridItemSpan(maxLineSpan) }) { BannerSlider() }
+                                    item(span = { GridItemSpan(maxLineSpan) }) {
+                                        OutlinedTextField(
+                                            value = searchQuery,
+                                            onValueChange = { searchQuery = it },
+                                            placeholder = { Text("ابحث في جميع المنتجات…") },
+                                            leadingIcon = { Icon(Icons.Default.Search, null) },
+                                            trailingIcon = {
+                                                if (searchQuery.isNotEmpty())
+                                                    IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) }
+                                            },
+                                            singleLine = true,
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 0.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                    if (selectedCategory != null) {
+                                        item(span = { GridItemSpan(maxLineSpan) }) {
+                                            Surface(color = MaterialTheme.colorScheme.surfaceVariant,
+                                                modifier = Modifier.fillMaxWidth()) {
+                                                Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                    IconButton(onClick = {
+                                                        selectedCategory = null; selectedBrand = null
+                                                        catalogView = CatalogView.ALL_PRODUCTS
+                                                    }, modifier = Modifier.size(30.dp)) {
+                                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null,
+                                                            tint = MaterialTheme.colorScheme.primary)
+                                                    }
+                                                    Text(selectedCategory!!.name,
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = if (selectedBrand == null) MaterialTheme.colorScheme.primary
+                                                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        fontWeight = if (selectedBrand == null) FontWeight.Bold else FontWeight.Normal,
+                                                        modifier = Modifier.clickable {
+                                                            selectedBrand = null
+                                                            catalogView   = CatalogView.SUBCATEGORIES
+                                                        })
+                                                    if (selectedBrand != null) {
+                                                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        Text(selectedBrand!!.name,
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.primary)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                     items(displayedProducts, key = { it.id }) { product ->
                                         PublicProductCard(
                                             product  = product,
