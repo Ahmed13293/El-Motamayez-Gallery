@@ -94,6 +94,7 @@ class OrdersScreen : Screen {
         val isLoading by vm.isLoading.collectAsState()
         val isSaving by vm.isSaving.collectAsState()
         val products by vm.products.collectAsState()
+        val error by vm.error.collectAsState()
         val authState by authVm.uiState.collectAsState()
         val username = authState.user?.username
 
@@ -156,6 +157,16 @@ class OrdersScreen : Screen {
                     }
                 }
             }
+        }
+
+        // ── Error dialog ──────────────────────────────────────────────────────
+        error?.let {
+            AlertDialog(
+                onDismissRequest = { vm.clearError() },
+                title = { Text("خطأ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
+                text  = { Text(it) },
+                confirmButton = { TextButton(onClick = { vm.clearError() }) { Text("حسناً") } }
+            )
         }
 
         // ── Edit dialog ───────────────────────────────────────────────────────

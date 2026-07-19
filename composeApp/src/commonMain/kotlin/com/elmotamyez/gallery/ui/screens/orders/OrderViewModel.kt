@@ -40,7 +40,12 @@ class OrderViewModel(
     private val _products = MutableStateFlow<List<com.elmotamyez.gallery.data.model.Product>>(emptyList())
     val products: StateFlow<List<com.elmotamyez.gallery.data.model.Product>> = _products.asStateFlow()
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
     init { loadOrders() }
+
+    fun clearError() { _error.value = null }
 
     fun loadOrders() {
         viewModelScope.launch {
@@ -49,6 +54,10 @@ class OrderViewModel(
                 .onSuccess { list ->
                     _orders.value = list
                     _pendingCount.value = list.count { it.status != OrderStatus.DELIVERED.key }
+                }
+                .onFailure { e ->
+                    println("OrderViewModel.loadOrders failed: $e")
+                    _error.value = "فشل تحميل الطلبات: ${e.message}"
                 }
             runCatching { productRepo.getProducts() }.onSuccess { _products.value = it }
             _isLoading.value = false
@@ -81,6 +90,10 @@ class OrderViewModel(
                 createdBy       = createdBy
             )
             runCatching { repository.insert(order) }
+                .onFailure { e ->
+                    println("OrderViewModel.createOrder insert failed: $e")
+                    _error.value = "فشل حفظ الطلب: ${e.message}"
+                }
             loadOrders()
             _isSaving.value = false
             onDone()
