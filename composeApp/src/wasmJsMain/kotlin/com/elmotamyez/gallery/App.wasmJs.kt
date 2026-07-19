@@ -69,6 +69,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -295,67 +297,117 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                 }
             }
 
-            // Tab Row — icons only on mobile to avoid overflow
-            val selectedIndex = currentTab.ordinal.coerceAtMost(if (isAdmin) 4 else 2)
-            ScrollableTabRow(
-                selectedTabIndex = selectedIndex,
-                containerColor = MaterialTheme.colorScheme.surface,
-                edgePadding = if (isMobile) 0.dp else 16.dp
-            ) {
-                Tab(
-                    selected = currentTab == WebTab.HOME,
-                    onClick = { currentTab = WebTab.HOME },
-                    icon = { Icon(Icons.Default.Home, null, modifier = Modifier.size(20.dp)) },
-                    text = if (isMobile) null else ({ Text("المنتجات") })
-                )
-                Tab(
-                    selected = currentTab == WebTab.CART,
-                    onClick = { currentTab = WebTab.CART },
-                    icon = {
-                        BadgedBox(badge = { if (cartItems.isNotEmpty()) Badge { Text("${cartItems.size}") } }) {
-                            Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(20.dp))
-                        }
-                    },
-                    text = if (isMobile) null else ({ Text("السلة") })
-                )
-                Tab(
-                    selected = currentTab == WebTab.RECEIPTS,
-                    onClick = { currentTab = WebTab.RECEIPTS },
-                    icon = { Icon(Icons.Default.Receipt, null, modifier = Modifier.size(20.dp)) },
-                    text = if (isMobile) null else ({ Text("الفواتير") })
-                )
-                if (isAdmin) {
+            // Desktop: tab row at top
+            if (!isMobile) {
+                val selectedIndex = currentTab.ordinal.coerceAtMost(if (isAdmin) 4 else 2)
+                ScrollableTabRow(
+                    selectedTabIndex = selectedIndex,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    edgePadding = 16.dp
+                ) {
                     Tab(
-                        selected = currentTab == WebTab.ORDERS,
-                        onClick = { currentTab = WebTab.ORDERS },
+                        selected = currentTab == WebTab.HOME,
+                        onClick = { currentTab = WebTab.HOME },
+                        icon = { Icon(Icons.Default.Home, null, modifier = Modifier.size(20.dp)) },
+                        text = { Text("المنتجات") }
+                    )
+                    Tab(
+                        selected = currentTab == WebTab.CART,
+                        onClick = { currentTab = WebTab.CART },
                         icon = {
-                            BadgedBox(badge = { if (pendingOrders > 0) Badge { Text("$pendingOrders") } }) {
-                                Icon(Icons.Default.ListAlt, null, modifier = Modifier.size(20.dp))
+                            BadgedBox(badge = { if (cartItems.isNotEmpty()) Badge { Text("${cartItems.size}") } }) {
+                                Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(20.dp))
                             }
                         },
-                        text = if (isMobile) null else ({ Text("الطلبات") })
+                        text = { Text("السلة") }
                     )
                     Tab(
-                        selected = currentTab == WebTab.ADMIN,
-                        onClick = { currentTab = WebTab.ADMIN },
-                        icon = { Icon(Icons.Default.AdminPanelSettings, null, modifier = Modifier.size(20.dp)) },
-                        text = if (isMobile) null else ({ Text("الإدارة") })
+                        selected = currentTab == WebTab.RECEIPTS,
+                        onClick = { currentTab = WebTab.RECEIPTS },
+                        icon = { Icon(Icons.Default.Receipt, null, modifier = Modifier.size(20.dp)) },
+                        text = { Text("الفواتير") }
                     )
+                    if (isAdmin) {
+                        Tab(
+                            selected = currentTab == WebTab.ORDERS,
+                            onClick = { currentTab = WebTab.ORDERS },
+                            icon = {
+                                BadgedBox(badge = { if (pendingOrders > 0) Badge { Text("$pendingOrders") } }) {
+                                    Icon(Icons.Default.ListAlt, null, modifier = Modifier.size(20.dp))
+                                }
+                            },
+                            text = { Text("الطلبات") }
+                        )
+                        Tab(
+                            selected = currentTab == WebTab.ADMIN,
+                            onClick = { currentTab = WebTab.ADMIN },
+                            icon = { Icon(Icons.Default.AdminPanelSettings, null, modifier = Modifier.size(20.dp)) },
+                            text = { Text("الإدارة") }
+                        )
+                    }
                 }
             }
 
-            // Content
-            when (currentTab) {
-                WebTab.HOME -> WebHomeTab(cartVm = cartVm, isMobile = isMobile)
-                WebTab.CART -> WebCartTab(
-                    cartVm = cartVm,
-                    user = user,
-                    isMobile = isMobile,
-                    onOrderConfirmed = { currentTab = WebTab.RECEIPTS })
+            // Content — fills remaining space
+            Box(Modifier.weight(1f)) {
+                when (currentTab) {
+                    WebTab.HOME -> WebHomeTab(cartVm = cartVm, isMobile = isMobile)
+                    WebTab.CART -> WebCartTab(
+                        cartVm = cartVm,
+                        user = user,
+                        isMobile = isMobile,
+                        onOrderConfirmed = { currentTab = WebTab.RECEIPTS })
 
-                WebTab.RECEIPTS -> WebReceiptsTab(isAdmin = isAdmin)
-                WebTab.ORDERS  -> if (isAdmin) WebOrdersTab(user = user)
-                WebTab.ADMIN   -> if (isAdmin) WebAdminTab(user = user, onLogout = onLogout)
+                    WebTab.RECEIPTS -> WebReceiptsTab(isAdmin = isAdmin, isMobile = isMobile)
+                    WebTab.ORDERS  -> if (isAdmin) WebOrdersTab(user = user)
+                    WebTab.ADMIN   -> if (isAdmin) WebAdminTab(user = user, onLogout = onLogout)
+                }
+            }
+
+            // Mobile: navigation bar at bottom
+            if (isMobile) {
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = currentTab == WebTab.HOME,
+                        onClick  = { currentTab = WebTab.HOME },
+                        icon     = { Icon(Icons.Default.Home, null) },
+                        label    = { Text("المنتجات", fontSize = 11.sp) }
+                    )
+                    NavigationBarItem(
+                        selected = currentTab == WebTab.CART,
+                        onClick  = { currentTab = WebTab.CART },
+                        icon = {
+                            BadgedBox(badge = { if (cartItems.isNotEmpty()) Badge { Text("${cartItems.size}") } }) {
+                                Icon(Icons.Default.ShoppingCart, null)
+                            }
+                        },
+                        label = { Text("السلة", fontSize = 11.sp) }
+                    )
+                    NavigationBarItem(
+                        selected = currentTab == WebTab.RECEIPTS,
+                        onClick  = { currentTab = WebTab.RECEIPTS },
+                        icon     = { Icon(Icons.Default.Receipt, null) },
+                        label    = { Text("الفواتير", fontSize = 11.sp) }
+                    )
+                    if (isAdmin) {
+                        NavigationBarItem(
+                            selected = currentTab == WebTab.ORDERS,
+                            onClick  = { currentTab = WebTab.ORDERS },
+                            icon = {
+                                BadgedBox(badge = { if (pendingOrders > 0) Badge { Text("$pendingOrders") } }) {
+                                    Icon(Icons.Default.ListAlt, null)
+                                }
+                            },
+                            label = { Text("الطلبات", fontSize = 11.sp) }
+                        )
+                        NavigationBarItem(
+                            selected = currentTab == WebTab.ADMIN,
+                            onClick  = { currentTab = WebTab.ADMIN },
+                            icon     = { Icon(Icons.Default.AdminPanelSettings, null) },
+                            label    = { Text("الإدارة", fontSize = 11.sp) }
+                        )
+                    }
+                }
             }
         }
     }
@@ -1410,7 +1462,7 @@ private fun String.webToArabicMonth(): String {
 }
 
 @Composable
-internal fun WebReceiptsTab(isAdmin: Boolean = false) {
+internal fun WebReceiptsTab(isAdmin: Boolean = false, isMobile: Boolean = false) {
     val receiptVm: ReceiptViewModel = koinInject()
     val receipts by receiptVm.receipts.collectAsState()
     val isLoading by receiptVm.isLoading.collectAsState()
@@ -1456,13 +1508,16 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(0.dp)) {
         // ── Header row ────────────────────────────────────────────────────────
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().padding(
+                horizontal = if (isMobile) 12.dp else 16.dp,
+                vertical = if (isMobile) 8.dp else 12.dp
+            ),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 "سجل الفواتير",
-                style = MaterialTheme.typography.titleLarge,
+                style = if (isMobile) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             OutlinedButton(
@@ -1523,8 +1578,8 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false) {
             }
 
             else -> LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                contentPadding = PaddingValues(if (isMobile) 8.dp else 16.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isMobile) 8.dp else 10.dp)
             ) {
                 // ── Monthly summary card ──────────────────────────────────────
                 item(key = "month_summary") {
