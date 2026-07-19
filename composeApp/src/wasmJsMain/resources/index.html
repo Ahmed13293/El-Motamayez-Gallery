@@ -12,6 +12,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js"></script>
     <script>
       window._fcmToken = "";
+      // Set by service worker message or URL param when opened from a notification
+      window._pendingNavigation = new URLSearchParams(window.location.search).get('navigate') || "";
       (async function initFcmPush() {
         if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
         try {
@@ -32,6 +34,10 @@
             serviceWorkerRegistration: reg,
           });
           window._fcmToken = token || "";
+          // Listen for messages from service worker (notification click)
+          navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data?.navigateTo) window._pendingNavigation = event.data.navigateTo;
+          });
           // Foreground message — show a browser notification
           messaging.onMessage((payload) => {
             const title = payload.notification?.title || 'مكتبة المتميز';

@@ -13,11 +13,13 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.elmotamyez.gallery.NavigationController
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -108,6 +110,16 @@ class MainScreen : Screen {
         val newReceiptsCount = (receipts.size - seenReceiptsCount).coerceAtLeast(0)
 
         TabNavigator(CategoriesTab) { tabNavigator ->
+            val navController: NavigationController = koinInject()
+            val pendingTab by navController.pendingTab.collectAsState()
+
+            LaunchedEffect(pendingTab) {
+                if (pendingTab == "orders" && isAdmin) {
+                    tabNavigator.current = OrdersTab
+                    navController.consume()
+                }
+            }
+
             Scaffold(
                 bottomBar = {
                     NavigationBar {

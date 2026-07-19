@@ -148,6 +148,9 @@ private external fun getLocationSuffix(): String
 @JsFun("() => window._fcmToken || ''")
 private external fun getWebFcmToken(): String
 
+@JsFun("() => { const v = window._pendingNavigation || ''; window._pendingNavigation = ''; return v; }")
+private external fun popPendingNavigation(): String
+
 private fun buildCartWhatsAppMsg(
     items: List<CartItem>, total: Double, paymentMethod: String
 ): String = buildString {
@@ -258,6 +261,12 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
     var currentTab by remember { mutableStateOf(WebTab.HOME) }
     val cartVm: CartViewModel = koinInject()
     val orderVm: OrderViewModel = koinInject()
+
+    // Navigate to orders tab if opened from a push notification
+    LaunchedEffect(Unit) {
+        val nav = popPendingNavigation()
+        if (nav == "orders") currentTab = WebTab.ORDERS
+    }
 
     // Save web push token to Supabase after Firebase initialises (~3s)
     LaunchedEffect(Unit) {

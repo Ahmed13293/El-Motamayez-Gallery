@@ -1,5 +1,6 @@
 package com.elmotamyez.gallery.di
 
+import com.elmotamyez.gallery.NavigationController
 import com.elmotamyez.gallery.data.repository.AuthRepository
 import com.elmotamyez.gallery.data.repository.ExpenseRepository
 import com.elmotamyez.gallery.data.repository.OrderRepository
@@ -17,6 +18,8 @@ import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 val appModule = module {
+    single { NavigationController() }
+
     // Repositories
     single { ProductRepository() }
     single { ReceiptRepository() }
