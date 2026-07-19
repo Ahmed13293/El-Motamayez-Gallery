@@ -117,6 +117,7 @@ class MainScreen : Screen {
                 if (pendingTab == "orders" && isAdmin) {
                     tabNavigator.current = OrdersTab
                     navController.consume()
+                    orderVm.loadOrders()
                 }
             }
 

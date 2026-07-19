@@ -75,6 +75,7 @@ async function sendFcm(
         message: {
           token,
           notification: { title, body },
+          data: { navigate_to: "orders" },
           android: { priority: "high" },
           webpush: {
             notification: { title, body, dir: "rtl", lang: "ar" },
