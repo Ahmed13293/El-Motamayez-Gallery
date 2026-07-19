@@ -49,6 +49,22 @@ class CartViewModel : ViewModel() {
         persist()
     }
 
+    fun addWithQuantity(product: Product, quantity: Int) {
+        if (quantity <= 0) return
+        _cartItems.update { items ->
+            val existing = items.find { it.product.id == product.id }
+            if (existing != null) {
+                items.map {
+                    if (it.product.id == product.id) it.copy(quantity = it.quantity + quantity)
+                    else it
+                }
+            } else {
+                items + CartItem(product, quantity)
+            }
+        }
+        persist()
+    }
+
     fun removeFromCart(productId: String) {
         _cartItems.update { items -> items.filter { it.product.id != productId } }
         persist()

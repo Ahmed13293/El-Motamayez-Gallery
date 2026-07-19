@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
@@ -367,6 +368,17 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
     val productsVm: ProductsViewModel = koinViewModel()
     val state by productsVm.uiState.collectAsState()
     val cartItems by cartVm.cartItems.collectAsState()
+    var showOtherDialog by remember { mutableStateOf(false) }
+
+    if (showOtherDialog) {
+        OtherProductDialog(
+            onDismiss = { showOtherDialog = false },
+            onAddToCart = { product, qty ->
+                cartVm.addWithQuantity(product, qty)
+                showOtherDialog = false
+            }
+        )
+    }
 
     when {
         state.isLoading -> Box(
@@ -440,6 +452,9 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                 onAdd = { cartVm.addToCart(product) },
                                 onIncrease = { cartVm.increaseQuantity(product.id) },
                                 onDecrease = { cartVm.decreaseQuantity(product.id) })
+                        }
+                        item {
+                            OtherProductGridCard(onClick = { showOtherDialog = true })
                         }
                     }
                 }
@@ -527,6 +542,9 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                     onAdd = { cartVm.addToCart(product) },
                                     onIncrease = { cartVm.increaseQuantity(product.id) },
                                     onDecrease = { cartVm.decreaseQuantity(product.id) })
+                            }
+                            item {
+                                OtherProductGridCard(onClick = { showOtherDialog = true })
                             }
                         }
                     }
@@ -639,6 +657,146 @@ private fun WebProductCard(
             }
         }
     }
+}
+
+// ── Other product tile ────────────────────────────────────────────────────────
+
+@Composable
+private fun OtherProductGridCard(onClick: () -> Unit) {
+    Card(
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEEDD)),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp).fillMaxWidth().heightIn(min = 80.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                Icons.Default.Add,
+                contentDescription = null,
+                tint = Color(0xFF08396C).copy(alpha = 0.75f),
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "منتج اخر",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun OtherProductDialog(
+    onDismiss: () -> Unit,
+    onAddToCart: (Product, Int) -> Unit
+) {
+    var productName by remember { mutableStateOf("") }
+    var priceText   by remember { mutableStateOf("") }
+    var quantity    by remember { mutableStateOf(1) }
+    var nameError   by remember { mutableStateOf(false) }
+    var priceError  by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("منتج اخر", fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = productName,
+                    onValueChange = { productName = it; nameError = false },
+                    label = { Text("اسم المنتج") },
+                    singleLine = true,
+                    isError = nameError,
+                    supportingText = if (nameError) {{ Text("يرجى إدخال اسم المنتج") }} else null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { priceText = it; priceError = false },
+                    label = { Text("السعر") },
+                    singleLine = true,
+                    isError = priceError,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    supportingText = if (priceError) {{ Text("يرجى إدخال سعر صحيح") }} else null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("الكمية", style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium)
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.height(40.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        ) {
+                            Box(
+                                Modifier.size(30.dp).clickable { if (quantity > 1) quantity-- },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("−", color = Color.White, fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold, lineHeight = 20.sp)
+                            }
+                            Text(
+                                "$quantity",
+                                color = Color.White, fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.widthIn(min = 28.dp),
+                                textAlign = TextAlign.Center
+                            )
+                            Box(
+                                Modifier.size(30.dp).clickable { quantity++ },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Add, null, tint = Color.White,
+                                    modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val price = priceText.trim().toDoubleOrNull()
+                    nameError  = productName.isBlank()
+                    priceError = price == null || price <= 0
+                    if (!nameError && !priceError) {
+                        val product = Product(
+                            id         = "other_${productName.trim().hashCode()}",
+                            name       = productName.trim(),
+                            price      = price!!,
+                            stock      = 999,
+                            brandId    = "",
+                            categoryId = ""
+                        )
+                        onAddToCart(product, quantity)
+                    }
+                },
+                shape = RoundedCornerShape(10.dp)
+            ) { Text("إضافة للسلة", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("إلغاء") }
+        },
+        shape = RoundedCornerShape(16.dp)
+    )
 }
 
 // ── Cart Tab ──────────────────────────────────────────────────────────────────
