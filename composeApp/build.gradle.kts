@@ -22,6 +22,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android.application)
+    id("com.google.gms.google-services")
 }
 
 kotlin {
@@ -101,6 +102,8 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.koin.android)
             implementation(libs.androidx.activity.compose)
+            implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+            implementation("com.google.firebase:firebase-messaging-ktx")
         }
 
         desktopMain.dependencies {

@@ -79,6 +79,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -87,6 +88,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.elmotamyez.gallery.data.repository.PushTokenRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -139,6 +144,9 @@ private external fun openWhatsApp(number: String, message: String)
 
 @JsFun("() => window.location.search + window.location.hash")
 private external fun getLocationSuffix(): String
+
+@JsFun("() => window._fcmToken || ''")
+private external fun getWebFcmToken(): String
 
 private fun buildCartWhatsAppMsg(
     items: List<CartItem>, total: Double, paymentMethod: String
@@ -250,6 +258,15 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
     var currentTab by remember { mutableStateOf(WebTab.HOME) }
     val cartVm: CartViewModel = koinInject()
     val orderVm: OrderViewModel = koinInject()
+
+    // Save web push token to Supabase after Firebase initialises (~3s)
+    LaunchedEffect(Unit) {
+        delay(4000L)
+        val token = getWebFcmToken()
+        if (token.isNotEmpty()) {
+            launch(Dispatchers.Default) { PushTokenRepository().upsertToken(token, "web") }
+        }
+    }
     val cartItems    by cartVm.cartItems.collectAsState()
     val pendingOrders by orderVm.pendingCount.collectAsState()
     val isAdmin = user.role == UserRole.ADMIN

@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1013516234653",
+    "firebase_url": "https://el-motamayz-library-default-rtdb.firebaseio.com",
+    "project_id": "el-motamayz-library",
+    "storage_bucket": "el-motamayz-library.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1013516234653:android:b40c8192f98829bf4c8974",
+        "android_client_info": {
+          "package_name": "com.elmotamyez.gallery"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-8C0zLisk4aj0yXPBym5URU0cCGU4lzU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
