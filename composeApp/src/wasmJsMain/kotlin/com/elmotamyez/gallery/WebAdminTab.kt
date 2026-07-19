@@ -38,6 +38,7 @@ import com.elmotamyez.gallery.data.repository.ProductRepository
 import com.elmotamyez.gallery.ui.screens.admin.AdminViewModel
 import com.elmotamyez.gallery.ui.screens.admin.ExpenseViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
+import com.elmotamyez.gallery.util.buildBrandPath
 import com.elmotamyez.gallery.util.fmt2f
 import com.elmotamyez.gallery.util.formatPrice
 import com.elmotamyez.gallery.util.dateTimeString
@@ -766,7 +767,19 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
                         trailingIcon = { IconButton(onClick = { brandExpanded = true }) { Icon(Icons.Default.ArrowDropDown, null) } })
                     DropdownMenu(expanded = brandExpanded, onDismissRequest = { brandExpanded = false }) {
                         filteredBrands.forEach { brand ->
-                            DropdownMenuItem(text = { Text(brand.name) }, onClick = { brandId = brand.id; brandExpanded = false })
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(brand.name, fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            buildBrandPath(brand, categories, brands),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                },
+                                onClick = { brandId = brand.id; brandExpanded = false }
+                            )
                         }
                     }
                 }
