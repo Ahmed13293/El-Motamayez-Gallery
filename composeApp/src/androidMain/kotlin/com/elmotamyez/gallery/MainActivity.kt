@@ -1,5 +1,6 @@
 package com.elmotamyez.gallery
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -28,10 +29,7 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 0)
         }
 
-        // If opened from a push notification, signal navigation to orders tab
-        if (intent.getStringExtra("navigate_to") == "orders") {
-            get<NavigationController>().navigateTo("orders")
-        }
+        handleNotificationIntent(intent)
 
         // Register FCM token with Supabase
         FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
@@ -42,6 +40,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             App()
+        }
+    }
+
+    // Called when the app is already running and a notification is tapped
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    private fun handleNotificationIntent(intent: Intent) {
+        if (intent.getStringExtra("navigate_to") == "orders") {
+            get<NavigationController>().navigateTo("orders")
         }
     }
 }

@@ -262,10 +262,13 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
     val cartVm: CartViewModel = koinInject()
     val orderVm: OrderViewModel = koinInject()
 
-    // Navigate to orders tab if opened from a push notification
+    // Poll for navigation requests from service worker or URL param
     LaunchedEffect(Unit) {
-        val nav = popPendingNavigation()
-        if (nav == "orders") currentTab = WebTab.ORDERS
+        while (true) {
+            val nav = popPendingNavigation()
+            if (nav == "orders") currentTab = WebTab.ORDERS
+            delay(500L)
+        }
     }
 
     // Save web push token to Supabase after Firebase initialises (~3s)
