@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -351,10 +352,13 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
     }
 
     // ── Root layout ───────────────────────────────────────────────────────────
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    val isMobile = maxWidth < 600.dp
     Box(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxSize()) {
 
-            // ── Category sidebar (always fixed) ───────────────────────────────
+            // ── Category sidebar (hidden on mobile) ───────────────────────────
+            if (!isMobile) {
             Surface(color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.width(130.dp).fillMaxHeight()) {
                 LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
@@ -398,6 +402,7 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                     }
                 }
             }
+            } // end if (!isMobile)
 
             // ── Right panel: LazyColumn with scrollable header+banner and sticky search
             BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
@@ -441,6 +446,7 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                         Surface(color = MaterialTheme.colorScheme.background,
                             shadowElevation = 3.dp,
                             modifier = Modifier.fillMaxWidth()) {
+                            Column {
                             OutlinedTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
@@ -457,6 +463,38 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                                 modifier = Modifier.fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 8.dp)
                             )
+                            if (isMobile) {
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    item {
+                                        FilterChip(
+                                            selected = selectedCategory == null,
+                                            onClick = {
+                                                selectedCategory = null
+                                                selectedBrand = null
+                                                catalogView = CatalogView.ALL_PRODUCTS
+                                            },
+                                            label = { Text("الكل") }
+                                        )
+                                    }
+                                    items(categories) { cat ->
+                                        FilterChip(
+                                            selected = selectedCategory?.id == cat.id,
+                                            onClick = {
+                                                selectedCategory = cat
+                                                selectedBrand = null
+                                                catalogView = CatalogView.SUBCATEGORIES
+                                                searchQuery = ""
+                                            },
+                                            label = { Text(cat.name) }
+                                        )
+                                    }
+                                }
+                            }
+                            }
                         }
                     }
 
@@ -623,6 +661,7 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
             }
         }
     }
+    } // end BoxWithConstraints
 }
 
 // ── Subcategory card ──────────────────────────────────────────────────────────
