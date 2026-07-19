@@ -97,6 +97,16 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
     val vm: ProductsViewModel = koinInject()
     val orderVm: OrderViewModel = koinInject()
     val state by vm.uiState.collectAsState()
+    val orderError by orderVm.error.collectAsState()
+
+    orderError?.let {
+        AlertDialog(
+            onDismissRequest = { orderVm.clearError() },
+            title = { Text("فشل حفظ الطلب", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
+            text  = { Text(it) },
+            confirmButton = { TextButton(onClick = { orderVm.clearError() }) { Text("حسناً") } }
+        )
+    }
 
     val categories  = state.categories
     val allProducts = state.allProducts
