@@ -160,13 +160,18 @@ class OrdersScreen : Screen {
         }
 
         // ── Error dialog ──────────────────────────────────────────────────────
+        // Only block the UI when there is no data yet; silently drop refresh errors.
         error?.let {
-            AlertDialog(
-                onDismissRequest = { vm.clearError() },
-                title = { Text("خطأ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
-                text  = { Text(it) },
-                confirmButton = { TextButton(onClick = { vm.clearError() }) { Text("حسناً") } }
-            )
+            if (orders.isEmpty()) {
+                AlertDialog(
+                    onDismissRequest = { vm.clearError() },
+                    title = { Text("خطأ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
+                    text  = { Text(it) },
+                    confirmButton = { TextButton(onClick = { vm.clearError() }) { Text("حسناً") } }
+                )
+            } else {
+                LaunchedEffect(it) { vm.clearError() }
+            }
         }
 
         // ── Edit dialog ───────────────────────────────────────────────────────

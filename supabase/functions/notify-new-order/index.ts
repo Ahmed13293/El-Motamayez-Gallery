@@ -76,7 +76,7 @@ async function sendFcm(
           token,
           notification: { title, body },
           data: { navigate_to: "orders" },
-          android: { priority: "high" },
+          android: { priority: "high", notification: { channel_id: "orders_channel" } },
           webpush: {
             notification: { title, body, dir: "rtl", lang: "ar" },
             fcm_options: { link: "/" },

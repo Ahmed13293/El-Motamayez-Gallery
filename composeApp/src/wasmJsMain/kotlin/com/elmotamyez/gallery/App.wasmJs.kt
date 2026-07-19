@@ -271,12 +271,18 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
         }
     }
 
-    // Save web push token to Supabase after Firebase initialises (~3s)
+    // Save web push token to Supabase once Firebase initialises.
+    // Poll every second for up to 30s — the SW install + permission dialog can take longer than a fixed delay.
     LaunchedEffect(Unit) {
-        delay(4000L)
-        val token = getWebFcmToken()
-        if (token.isNotEmpty()) {
-            launch(Dispatchers.Default) { PushTokenRepository().upsertToken(token, "web") }
+        var attempts = 0
+        while (attempts < 30) {
+            delay(1000L)
+            attempts++
+            val token = getWebFcmToken()
+            if (token.isNotEmpty()) {
+                launch(Dispatchers.Default) { PushTokenRepository().upsertToken(token, "web") }
+                break
+            }
         }
     }
     val cartItems    by cartVm.cartItems.collectAsState()
