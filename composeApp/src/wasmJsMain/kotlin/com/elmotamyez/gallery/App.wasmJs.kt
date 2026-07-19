@@ -2452,6 +2452,15 @@ private fun WebOrdersTab(user: User) {
     var editingOrder  by remember { mutableStateOf<Order?>(null) }
     var deletingOrder by remember { mutableStateOf<Order?>(null) }
 
+    // Refresh immediately when this tab becomes visible, then every 30s
+    LaunchedEffect(Unit) {
+        vm.loadOrders()
+        while (true) {
+            delay(30_000L)
+            vm.loadOrders()
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
         // Top bar
         Row(
