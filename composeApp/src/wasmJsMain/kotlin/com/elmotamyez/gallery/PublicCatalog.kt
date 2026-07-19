@@ -42,6 +42,7 @@ import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.ui.screens.orders.OrderViewModel
 import com.elmotamyez.gallery.ui.screens.products.ProductsViewModel
+import com.elmotamyez.gallery.util.buildProductPath
 import com.elmotamyez.gallery.util.formatPrice
 import org.koin.compose.koinInject
 
@@ -554,10 +555,11 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
                                         row.forEach { product ->
                                             Box(Modifier.weight(1f)) {
                                                 PublicProductCard(
-                                                    product  = product,
-                                                    quantity = cart[product.id] ?: 0,
-                                                    onAdd    = { cart[product.id] = (cart[product.id] ?: 0) + 1 },
-                                                    onRemove = {
+                                                    product      = product,
+                                                    categoryPath = buildProductPath(product, categories, allBrands),
+                                                    quantity     = cart[product.id] ?: 0,
+                                                    onAdd        = { cart[product.id] = (cart[product.id] ?: 0) + 1 },
+                                                    onRemove     = {
                                                         val cur = cart[product.id] ?: 0
                                                         if (cur <= 1) cart.remove(product.id)
                                                         else cart[product.id] = cur - 1
@@ -665,6 +667,7 @@ private fun SubcategoryCard(name: String, onClick: () -> Unit) {
 @Composable
 private fun PublicProductCard(
     product: Product,
+    categoryPath: String = "",
     quantity: Int,
     onAdd: () -> Unit,
     onRemove: () -> Unit
@@ -686,6 +689,16 @@ private fun PublicProductCard(
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth())
+            if (categoryPath.isNotBlank()) {
+                Text(
+                    categoryPath,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             Text("${product.price.formatPrice()} ج",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.ExtraBold,
