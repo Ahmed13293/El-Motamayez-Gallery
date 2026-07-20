@@ -42,6 +42,8 @@
       window.initFcmPush = async function() {
         if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
         if (window._fcmToken) return; // already done
+        // Skip on Android — the native app handles push notifications there
+        if (/android/i.test(navigator.userAgent)) return;
         try {
           if (!firebase.apps.length) {
             firebase.initializeApp({
