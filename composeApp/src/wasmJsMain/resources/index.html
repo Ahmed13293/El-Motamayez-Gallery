@@ -28,10 +28,15 @@
           !/crios|fxios/i.test(navigator.userAgent);
       window._isStandalone = window.navigator.standalone === true;
 
-      // Resolve a path relative to this page's URL (works for root or sub-path deployments)
-      function _relUrl(name) {
-        return new URL(name, document.currentScript ? document.currentScript.src : location.href).href;
-      }
+      // Stable device ID persisted in localStorage — one row per browser profile in push_tokens
+      window._getDeviceId = function() {
+        let id = localStorage.getItem('_fcm_device_id');
+        if (!id) {
+          id = (crypto.randomUUID ? crypto.randomUUID() : 'web-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+          localStorage.setItem('_fcm_device_id', id);
+        }
+        return id;
+      };
 
       // Called by Kotlin after login so the permission request is tied to a user action
       window.initFcmPush = async function() {

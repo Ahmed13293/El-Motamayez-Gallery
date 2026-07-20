@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.get
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,10 +42,11 @@ class MainActivity : ComponentActivity() {
 
         handleNotificationIntent(intent)
 
-        // Register FCM token with Supabase
+        // Register FCM token with Supabase using a stable device ID
+        val deviceId = getOrCreateDeviceId()
         FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
             CoroutineScope(Dispatchers.IO).launch {
-                PushTokenRepository().upsertToken(token, "android")
+                PushTokenRepository().upsertToken(token, "android", deviceId)
             }
         }
 
@@ -63,5 +65,15 @@ class MainActivity : ComponentActivity() {
         if (intent.getStringExtra("navigate_to") == "orders") {
             get<NavigationController>().navigateTo("orders")
         }
+    }
+
+    private fun getOrCreateDeviceId(): String {
+        val prefs = getSharedPreferences("fcm_prefs", MODE_PRIVATE)
+        var id = prefs.getString("device_id", null)
+        if (id == null) {
+            id = UUID.randomUUID().toString()
+            prefs.edit().putString("device_id", id).apply()
+        }
+        return id
     }
 }

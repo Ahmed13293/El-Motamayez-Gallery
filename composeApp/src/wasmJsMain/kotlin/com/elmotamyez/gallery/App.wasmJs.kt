@@ -157,6 +157,9 @@ private external fun isIosSafari(): Boolean
 @JsFun("() => window._isStandalone === true")
 private external fun isStandalone(): Boolean
 
+@JsFun("() => window._getDeviceId ? window._getDeviceId() : ''")
+private external fun getWebDeviceId(): String
+
 @JsFun("() => { const v = window._pendingNavigation || ''; window._pendingNavigation = ''; return v; }")
 private external fun popPendingNavigation(): String
 
@@ -301,7 +304,8 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
             attempts++
             val token = getWebFcmToken()
             if (token.isNotEmpty()) {
-                launch(Dispatchers.Default) { PushTokenRepository().upsertToken(token, "web") }
+                val deviceId = getWebDeviceId()
+                launch(Dispatchers.Default) { PushTokenRepository().upsertToken(token, "web", deviceId) }
                 notifEnabled = true
                 break
             }
