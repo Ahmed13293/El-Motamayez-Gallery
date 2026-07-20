@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>مكتبة المتميز</title>
+    <!-- PWA manifest (required for iOS Safari push notifications) -->
+    <link rel="manifest" href="/manifest.json">
+    <!-- iOS Safari PWA meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="المتميز">
+    <link rel="apple-touch-icon" href="/icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=block" rel="stylesheet">
@@ -14,6 +21,10 @@
       window._fcmToken = "";
       // Set by service worker message or URL param when opened from a notification
       window._pendingNavigation = new URLSearchParams(window.location.search).get('navigate') || "";
+      // iOS Safari detection — push only works as PWA (added to Home Screen)
+      window._isIosSafari = /iphone|ipad|ipod/i.test(navigator.userAgent) &&
+          !/crios|fxios/i.test(navigator.userAgent);
+      window._isStandalone = window.navigator.standalone === true;
 
       // Called by Kotlin after login so the permission request is tied to a user action
       window.initFcmPush = async function() {

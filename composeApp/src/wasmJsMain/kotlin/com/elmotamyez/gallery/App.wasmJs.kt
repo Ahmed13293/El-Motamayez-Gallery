@@ -151,6 +151,12 @@ private external fun getWebFcmToken(): String
 @JsFun("() => { if (window.initFcmPush) window.initFcmPush(); }")
 private external fun initFcmPush(): Unit
 
+@JsFun("() => window._isIosSafari === true")
+private external fun isIosSafari(): Boolean
+
+@JsFun("() => window._isStandalone === true")
+private external fun isStandalone(): Boolean
+
 @JsFun("() => { const v = window._pendingNavigation || ''; window._pendingNavigation = ''; return v; }")
 private external fun popPendingNavigation(): String
 
@@ -289,14 +295,47 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
             }
         }
     }
-    val cartItems    by cartVm.cartItems.collectAsState()
+    val cartItems     by cartVm.cartItems.collectAsState()
     val pendingOrders by orderVm.pendingCount.collectAsState()
     val isAdmin = user.role == UserRole.ADMIN
+
+    // Show "Add to Home Screen" banner for iOS Safari users not yet in standalone mode
+    val showIosBanner = remember { isIosSafari() && !isStandalone() }
+    var iosBannerDismissed by remember { mutableStateOf(false) }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val isMobile = maxWidth < 600.dp
 
         Column(Modifier.fillMaxSize()) {
+            // iOS Safari install hint
+            if (showIosBanner && !iosBannerDismissed) {
+                Surface(color = MaterialTheme.colorScheme.secondaryContainer) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "لتفعيل الإشعارات على iOS: اضغط على مشاركة ثم «إضافة للشاشة الرئيسية»",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = { iosBannerDismissed = true },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close, null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+
             // Top bar — compact on mobile
             Surface(tonalElevation = 4.dp) {
                 Row(

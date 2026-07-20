@@ -149,12 +149,15 @@ compose.desktop {
     }
 }
 
-// firebase-messaging-sw.js is not picked up by webpack automatically —
-// copy it into the production output alongside composeApp.js and index.html
+// Static files not picked up by webpack — copy them into the production output
 tasks.named("wasmJsBrowserDistribution") {
     doLast {
         copy {
-            from("src/wasmJsMain/resources/firebase-messaging-sw.js")
+            from(
+                "src/wasmJsMain/resources/firebase-messaging-sw.js",
+                "src/wasmJsMain/resources/manifest.json",
+                "src/wasmJsMain/resources/icon.png",
+            )
             into(layout.buildDirectory.dir("dist/wasmJs/productionExecutable"))
         }
     }
