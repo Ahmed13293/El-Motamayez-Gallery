@@ -148,6 +148,9 @@ private external fun getLocationSuffix(): String
 @JsFun("() => window._fcmToken || ''")
 private external fun getWebFcmToken(): String
 
+@JsFun("() => { if (window.initFcmPush) window.initFcmPush(); }")
+private external fun initFcmPush(): Unit
+
 @JsFun("() => { const v = window._pendingNavigation || ''; window._pendingNavigation = ''; return v; }")
 private external fun popPendingNavigation(): String
 
@@ -271,9 +274,10 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
         }
     }
 
-    // Save web push token to Supabase once Firebase initialises.
-    // Poll every second for up to 30s — the SW install + permission dialog can take longer than a fixed delay.
+    // Request push permission tied to the login tap (satisfies mobile Chrome's user-gesture requirement),
+    // then poll every second for up to 30s until the FCM token is ready.
     LaunchedEffect(Unit) {
+        initFcmPush()
         var attempts = 0
         while (attempts < 30) {
             delay(1000L)

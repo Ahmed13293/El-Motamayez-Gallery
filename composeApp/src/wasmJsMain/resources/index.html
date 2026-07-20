@@ -14,17 +14,22 @@
       window._fcmToken = "";
       // Set by service worker message or URL param when opened from a notification
       window._pendingNavigation = new URLSearchParams(window.location.search).get('navigate') || "";
-      (async function initFcmPush() {
+
+      // Called by Kotlin after login so the permission request is tied to a user action
+      window.initFcmPush = async function() {
         if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+        if (window._fcmToken) return; // already done
         try {
-          firebase.initializeApp({
-            apiKey: "AIzaSyD5T5Rw7VfoWP3A2PhDqaqrOH9oEtaEtzc",
-            authDomain: "el-motamayz-library.firebaseapp.com",
-            projectId: "el-motamayz-library",
-            storageBucket: "el-motamayz-library.firebasestorage.app",
-            messagingSenderId: "1013516234653",
-            appId: "1:1013516234653:web:4755d52ca8c8cae54c8974",
-          });
+          if (!firebase.apps.length) {
+            firebase.initializeApp({
+              apiKey: "AIzaSyD5T5Rw7VfoWP3A2PhDqaqrOH9oEtaEtzc",
+              authDomain: "el-motamayz-library.firebaseapp.com",
+              projectId: "el-motamayz-library",
+              storageBucket: "el-motamayz-library.firebasestorage.app",
+              messagingSenderId: "1013516234653",
+              appId: "1:1013516234653:web:4755d52ca8c8cae54c8974",
+            });
+          }
           const messaging = firebase.messaging();
           const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
           const permission = await Notification.requestPermission();
@@ -49,7 +54,10 @@
         } catch (e) {
           console.warn('FCM init error:', e);
         }
-      })();
+      };
+
+      // Try eagerly on page load for browsers that allow it (desktop Chrome, Firefox)
+      window.initFcmPush();
     </script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
