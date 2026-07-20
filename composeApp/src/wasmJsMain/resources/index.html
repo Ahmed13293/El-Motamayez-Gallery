@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>مكتبة المتميز</title>
     <!-- PWA manifest (required for iOS Safari push notifications) -->
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="manifest.json">
     <!-- iOS Safari PWA meta tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="المتميز">
-    <link rel="apple-touch-icon" href="/icon.png">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="icon" type="image/png" href="/icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="icon" type="image/png" href="icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=block" rel="stylesheet">
@@ -27,6 +27,11 @@
       window._isIosSafari = /iphone|ipad|ipod/i.test(navigator.userAgent) &&
           !/crios|fxios/i.test(navigator.userAgent);
       window._isStandalone = window.navigator.standalone === true;
+
+      // Resolve a path relative to this page's URL (works for root or sub-path deployments)
+      function _relUrl(name) {
+        return new URL(name, document.currentScript ? document.currentScript.src : location.href).href;
+      }
 
       // Called by Kotlin after login so the permission request is tied to a user action
       window.initFcmPush = async function() {
@@ -44,7 +49,9 @@
             });
           }
           const messaging = firebase.messaging();
-          const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+          // Use a path relative to the page so it works at any deployment sub-path
+          const swUrl = new URL('firebase-messaging-sw.js', location.href).href;
+          const reg = await navigator.serviceWorker.register(swUrl, { scope: './' });
           const permission = await Notification.requestPermission();
           if (permission !== 'granted') return;
           const token = await messaging.getToken({
@@ -77,8 +84,6 @@
         html, body {
             width: 100%; height: 100%; overflow: hidden;
             background: #F0F4F8;
-            /* Setting Cairo as the page default makes the browser's canvas 2D
-               font-family fallback resolve to Cairo for Arabic glyphs */
             font-family: 'Cairo', 'Segoe UI', 'Arial Unicode MS', sans-serif;
         }
         canvas { display: block; font-family: 'Cairo', 'Segoe UI', 'Arial Unicode MS', sans-serif; }
@@ -87,8 +92,6 @@
 <body>
     <canvas id="ComposeTarget"></canvas>
     <script>
-        // Ensure Cairo (and Arabic glyph support) is fully loaded before
-        // the Compose/Skiko canvas starts drawing the first frame.
         Promise.all([
             document.fonts.load("400 16px Cairo"),
             document.fonts.load("700 16px Cairo")
@@ -97,7 +100,6 @@
             s.src = "composeApp.js";
             document.body.appendChild(s);
         }).catch(function() {
-            // Font failed to load (e.g. offline) — start anyway with system fallback
             var s = document.createElement("script");
             s.src = "composeApp.js";
             document.body.appendChild(s);

@@ -2,7 +2,7 @@
   "name": "مكتبة المتميز",
   "short_name": "المتميز",
   "description": "تطبيق إدارة مكتبة المتميز",
-  "start_url": "/",
+  "start_url": ".",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#F0F4F8",
