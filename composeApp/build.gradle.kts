@@ -157,6 +157,7 @@ tasks.named("wasmJsBrowserDistribution") {
                 "src/wasmJsMain/resources/firebase-messaging-sw.js",
                 "src/wasmJsMain/resources/manifest.json",
                 "src/wasmJsMain/resources/icon.png",
+                "src/wasmJsMain/resources/favicon.svg",
             )
             into(layout.buildDirectory.dir("dist/wasmJs/productionExecutable"))
         }
