@@ -280,10 +280,21 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
         }
     }
 
-    // Request push permission tied to the login tap (satisfies mobile Chrome's user-gesture requirement),
-    // then poll every second for up to 30s until the FCM token is ready.
+    val onIosSafari   = remember { isIosSafari() }
+    val onIosStandalone = remember { onIosSafari && isStandalone() }
+    var bannerDismissed by remember { mutableStateOf(false) }
+    var notifEnabled    by remember { mutableStateOf(false) }
+    // For iOS we wait for the button tap (user gesture required); for all others start immediately.
+    var pollForToken by remember { mutableStateOf(!onIosSafari) }
+
+    // Non-iOS: call initFcmPush from LaunchedEffect (Chrome/Firefox/desktop Safari are fine with this)
     LaunchedEffect(Unit) {
-        initFcmPush()
+        if (!onIosSafari) initFcmPush()
+    }
+
+    // Poll every second for up to 30s once triggered
+    LaunchedEffect(pollForToken) {
+        if (!pollForToken) return@LaunchedEffect
         var attempts = 0
         while (attempts < 30) {
             delay(1000L)
@@ -291,24 +302,22 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
             val token = getWebFcmToken()
             if (token.isNotEmpty()) {
                 launch(Dispatchers.Default) { PushTokenRepository().upsertToken(token, "web") }
+                notifEnabled = true
                 break
             }
         }
     }
+
     val cartItems     by cartVm.cartItems.collectAsState()
     val pendingOrders by orderVm.pendingCount.collectAsState()
     val isAdmin = user.role == UserRole.ADMIN
-
-    // Show "Add to Home Screen" banner for iOS Safari users not yet in standalone mode
-    val showIosBanner = remember { isIosSafari() && !isStandalone() }
-    var iosBannerDismissed by remember { mutableStateOf(false) }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val isMobile = maxWidth < 600.dp
 
         Column(Modifier.fillMaxSize()) {
-            // iOS Safari install hint
-            if (showIosBanner && !iosBannerDismissed) {
+            // ── iOS Safari: "Add to Home Screen" hint (not yet installed as PWA) ──
+            if (onIosSafari && !onIosStandalone && !bannerDismissed) {
                 Surface(color = MaterialTheme.colorScheme.secondaryContainer) {
                     Row(
                         modifier = Modifier.fillMaxWidth()
@@ -322,15 +331,37 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.weight(1f)
                         )
-                        IconButton(
-                            onClick = { iosBannerDismissed = true },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Close, null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
+                        IconButton(onClick = { bannerDismissed = true }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                    }
+                }
+            }
+
+            // ── iOS Safari standalone: "Enable Notifications" button (must be a tap) ──
+            if (onIosStandalone && !notifEnabled && !bannerDismissed) {
+                Surface(color = MaterialTheme.colorScheme.tertiaryContainer) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "اضغط لتفعيل إشعارات الطلبات الجديدة",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = {
+                            // Direct tap → user gesture context preserved on iOS Safari
+                            initFcmPush()
+                            pollForToken = true
+                        }) { Text("تفعيل", style = MaterialTheme.typography.labelSmall) }
+                        IconButton(onClick = { bannerDismissed = true }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer)
                         }
                     }
                 }
