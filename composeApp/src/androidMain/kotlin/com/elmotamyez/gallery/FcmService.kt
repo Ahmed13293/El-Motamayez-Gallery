@@ -12,13 +12,25 @@ import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 class FcmService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
+        val deviceId = getOrCreateDeviceId()
         CoroutineScope(Dispatchers.IO).launch {
-            PushTokenRepository().upsertToken(token, "android")
+            PushTokenRepository().upsertToken(token, "android", deviceId)
         }
+    }
+
+    private fun getOrCreateDeviceId(): String {
+        val prefs = getSharedPreferences("fcm_prefs", MODE_PRIVATE)
+        var id = prefs.getString("device_id", null)
+        if (id == null) {
+            id = UUID.randomUUID().toString()
+            prefs.edit().putString("device_id", id).apply()
+        }
+        return id
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
