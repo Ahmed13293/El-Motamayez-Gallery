@@ -161,9 +161,9 @@ class ReceiptScreen : Screen {
                                 )
                             }
                         }
-                        if (orderNumber != null) {
+                        if (refNo != null) {
                             Text(
-                                "رقم الفاتورة: $orderNumber",
+                                "رقم الفاتورة: $refNo",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
