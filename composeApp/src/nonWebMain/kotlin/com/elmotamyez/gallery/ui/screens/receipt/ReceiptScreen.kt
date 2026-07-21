@@ -138,11 +138,6 @@ class ReceiptScreen : Screen {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
-                        Text(
-                            "فاتورة الطلب",
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center
-                        )
                         val refNo = receipt?.createdAt?.take(10)?.let { d ->
                             if (orderNumber != null) "${d.replace("-", "")}$orderNumber" else null
                         }
