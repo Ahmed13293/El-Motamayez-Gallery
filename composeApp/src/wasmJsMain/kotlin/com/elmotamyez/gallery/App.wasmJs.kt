@@ -1936,9 +1936,7 @@ internal fun WebReceiptCard(
                         }
                     }
                     val time = receipt.timeLabel()
-                    val refNo = receipt.createdAt?.take(10)?.let { d ->
-                        "$d-${receipt.orderNumber.toString().padStart(4, '0')}"
-                    }
+                    val refNo = "#${receipt.orderNumber.toString().padStart(4, '0')}"
                     val metaParts = buildList {
                         if (refNo != null) add(refNo)
                         add("${receipt.items.size} منتج")

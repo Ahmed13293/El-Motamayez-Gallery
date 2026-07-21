@@ -1,24 +1,14 @@
 package com.elmotamyez.gallery.util
 
-import android.content.Context
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
-import android.os.Bundle
-import android.os.CancellationSignal
-import android.os.ParcelFileDescriptor
-import android.print.PageRange
-import android.print.PrintAttributes
-import android.print.PrintDocumentAdapter
-import android.print.PrintDocumentInfo
-import android.print.PrintManager
 import androidx.core.content.FileProvider
 import com.elmotamyez.gallery.data.model.Receipt
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 
 actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
@@ -33,7 +23,6 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
 
     fun txt(size: Float, bold: Boolean = false, col: Int = Color.BLACK, align: Paint.Align = Paint.Align.LEFT) =
         Paint().apply { color = col; textSize = size; isFakeBoldText = bold; isAntiAlias = true; textAlign = align }
-    fun fill(col: Int) = Paint().apply { color = col; style = Paint.Style.FILL }
     fun line(col: Int = Color.BLACK, w: Float = 0.8f) = Paint().apply { color = col; strokeWidth = w }
 
     // ── Header ────────────────────────────────────────────────────────────────
@@ -44,7 +33,7 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
         txt(22f, bold = true, col = Color.BLACK, align = Paint.Align.CENTER))
     c.drawText("فرع الشيخ زايد  |  فاتورة طلب", cx, 58f,
         txt(12f, col = Color.BLACK, align = Paint.Align.CENTER))
-    c.drawText("رقم الفاتورة: ${receipt.orderNumber}", cx, 78f,
+    c.drawText("رقم الفاتورة: #${receipt.orderNumber.toString().padStart(4, '0')}", cx, 78f,
         txt(10f, col = Color.DKGRAY, align = Paint.Align.CENTER))
 
     var y = 108f
@@ -60,7 +49,7 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
     val infoL = txt(10.5f, col = Color.DKGRAY, align = Paint.Align.LEFT)
 
     var ry = y
-    c.drawText("رقم الفاتورة: ${receipt.orderNumber}", right, ry, infoR);  ry += 16f
+    c.drawText("رقم الفاتورة: #${receipt.orderNumber.toString().padStart(4, '0')}", right, ry, infoR);  ry += 16f
     if (dateText != null) { c.drawText("تاريخ الفاتورة: $dateText", right, ry, infoR); ry += 16f }
     c.drawText("طريقة الدفع: ${receipt.paymentMethod}", right, ry, infoR); ry += 16f
 
@@ -153,53 +142,15 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
     pdf.finishPage(page)
 
     val cacheFile = File(context.cacheDir, fileName)
-    cacheFile.outputStream().use { pdf.writeTo(it) }
+    FileOutputStream(cacheFile).use { pdf.writeTo(it) }
     pdf.close()
 
-    // Use PrintManager so Mopria works as a print service (not a viewer).
-    val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
-    val jobName = "فاتورة #${receipt.orderNumber}"
-
-    val adapter = object : PrintDocumentAdapter() {
-        override fun onLayout(
-            oldAttributes: PrintAttributes?,
-            newAttributes: PrintAttributes,
-            cancellationSignal: CancellationSignal,
-            callback: LayoutResultCallback,
-            extras: Bundle?
-        ) {
-            if (cancellationSignal.isCanceled) { callback.onLayoutCancelled(); return }
-            val info = PrintDocumentInfo.Builder(fileName)
-                .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
-                .setPageCount(1)
-                .build()
-            callback.onLayoutFinished(info, newAttributes != oldAttributes)
-        }
-
-        override fun onWrite(
-            pages: Array<out PageRange>,
-            destination: ParcelFileDescriptor,
-            cancellationSignal: CancellationSignal,
-            callback: WriteResultCallback
-        ) {
-            try {
-                FileInputStream(cacheFile).use { input ->
-                    FileOutputStream(destination.fileDescriptor).use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                callback.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
-            } catch (e: Exception) {
-                callback.onWriteFailed(e.message)
-            }
-        }
+    // Open PDF in the device's default viewer — FileProvider works with Application context
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", cacheFile)
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/pdf")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-
-    val printAttributes = PrintAttributes.Builder()
-        .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
-        .setResolution(PrintAttributes.Resolution("default", "default", 300, 300))
-        .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
-        .build()
-
-    printManager.print(jobName, adapter, printAttributes)
+    context.startActivity(intent)
 }
