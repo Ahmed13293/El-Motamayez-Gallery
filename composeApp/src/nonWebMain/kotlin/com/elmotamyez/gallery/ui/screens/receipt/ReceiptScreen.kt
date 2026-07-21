@@ -143,6 +143,24 @@ class ReceiptScreen : Screen {
                             style = MaterialTheme.typography.titleMedium,
                             textAlign = TextAlign.Center
                         )
+                        val refNo = receipt?.createdAt?.take(10)?.let { d ->
+                            if (orderNumber != null) "$d-${orderNumber.toString().padStart(4, '0')}" else null
+                        }
+                        if (refNo != null) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Text(
+                                    refNo,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
                         if (orderNumber != null) {
                             Text(
                                 "رقم الفاتورة: $orderNumber",
