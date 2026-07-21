@@ -28,11 +28,12 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
         if (!receipt.customerInfo.isNullOrBlank())  append("<p>معلومات العميل: ${receipt.customerInfo}</p>")
     }
 
+    val receiptRef = receipt.createdAt?.take(10)?.replace("-", "")?.let { "${it}${receipt.orderNumber}" } ?: "${receipt.orderNumber}"
     val dateRow = if (dateText.isNotBlank()) "<p>تاريخ الفاتورة: $dateText</p>" else ""
 
     val html = """<!DOCTYPE html>
 <html dir="rtl" lang="ar"><head><meta charset="UTF-8">
-<title>فاتورة رقم ${receipt.orderNumber}</title>
+<title>فاتورة رقم $receiptRef</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -54,11 +55,10 @@ td{padding:7px 6px;text-align:center;border-bottom:.5px solid #ddd}
 <div class="hdr">
   <h1>مكتبة المتميز</h1>
   <p>فرع الشيخ زايد  |  فاتورة طلب</p>
-  <p>رقم الفاتورة: ${receipt.orderNumber}</p>
+  <p>رقم المرجع: $receiptRef</p>
 </div>
 <div class="info">
   <div>
-    <p>رقم الفاتورة: ${receipt.orderNumber}</p>
     $dateRow
     <p>طريقة الدفع: ${receipt.paymentMethod}</p>
   </div>

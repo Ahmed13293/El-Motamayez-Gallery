@@ -23,6 +23,7 @@ private val DKGREY = DeviceRgb(80,  80,  80)    // secondary text
 
 actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
     try {
+        val receiptRef = receipt.createdAt?.take(10)?.replace("-", "")?.let { "${it}${receipt.orderNumber}" } ?: "${receipt.orderNumber}"
         val outputFile = File(System.getProperty("user.home"), fileName)
         val pdfDoc     = PdfDocument(PdfWriter(outputFile))
         val document   = Document(pdfDoc, PageSize.A4).apply {
@@ -42,7 +43,7 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
             .add(Paragraph("فرع الشيخ زايد  |  فاتورة طلب")
                 .setFontSize(12f).setFontColor(BLACK)
                 .setTextAlignment(TextAlignment.CENTER).setMarginBottom(2f))
-            .add(Paragraph("رقم الفاتورة: ${receipt.orderNumber}")
+            .add(Paragraph("رقم المرجع: $receiptRef")
                 .setFontSize(10f).setFontColor(DKGREY)
                 .setTextAlignment(TextAlignment.CENTER))
         headerTable.addCell(headerCell)
@@ -76,7 +77,6 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
         val rightCell = Cell().setBorder(com.itextpdf.layout.borders.Border.NO_BORDER)
             .setVerticalAlignment(VerticalAlignment.TOP)
         buildList {
-            add("رقم الفاتورة: ${receipt.orderNumber}")
             if (dateText != null) add("تاريخ الفاتورة: $dateText")
             add("طريقة الدفع: ${receipt.paymentMethod}")
         }.forEach { line ->
