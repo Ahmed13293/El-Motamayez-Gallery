@@ -147,21 +147,6 @@ class ReceiptScreen : Screen {
                             if (orderNumber != null) "${d.replace("-", "")}$orderNumber" else null
                         }
                         if (refNo != null) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer
-                            ) {
-                                Text(
-                                    refNo,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                        if (refNo != null) {
                             Text(
                                 "رقم الفاتورة: $refNo",
                                 style = MaterialTheme.typography.bodySmall,
