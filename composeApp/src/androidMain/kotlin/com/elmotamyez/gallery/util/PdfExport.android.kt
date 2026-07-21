@@ -25,6 +25,10 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
         Paint().apply { color = col; textSize = size; isFakeBoldText = bold; isAntiAlias = true; textAlign = align }
     fun line(col: Int = Color.BLACK, w: Float = 0.8f) = Paint().apply { color = col; strokeWidth = w }
 
+    val receiptRef = receipt.createdAt?.take(10)?.replace("-", "")?.let { d ->
+        "$d${receipt.orderNumber.toString().padStart(4, '0')}"
+    } ?: receipt.orderNumber.toString().padStart(4, '0')
+
     // ── Header ────────────────────────────────────────────────────────────────
     // Bottom border line under header instead of filled band
     c.drawLine(left, 90f, right, 90f, line(Color.BLACK, 1.5f))
@@ -33,7 +37,7 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
         txt(22f, bold = true, col = Color.BLACK, align = Paint.Align.CENTER))
     c.drawText("فرع الشيخ زايد  |  فاتورة طلب", cx, 58f,
         txt(12f, col = Color.BLACK, align = Paint.Align.CENTER))
-    c.drawText("رقم الفاتورة: #${receipt.orderNumber.toString().padStart(4, '0')}", cx, 78f,
+    c.drawText("رقم المرجع: $receiptRef", cx, 78f,
         txt(10f, col = Color.DKGRAY, align = Paint.Align.CENTER))
 
     var y = 108f
@@ -49,7 +53,7 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
     val infoL = txt(10.5f, col = Color.DKGRAY, align = Paint.Align.LEFT)
 
     var ry = y
-    c.drawText("رقم الفاتورة: #${receipt.orderNumber.toString().padStart(4, '0')}", right, ry, infoR);  ry += 16f
+    c.drawText("رقم المرجع: $receiptRef", right, ry, infoR);  ry += 16f
     if (dateText != null) { c.drawText("تاريخ الفاتورة: $dateText", right, ry, infoR); ry += 16f }
     c.drawText("طريقة الدفع: ${receipt.paymentMethod}", right, ry, infoR); ry += 16f
 

@@ -143,7 +143,9 @@ class ReceiptScreen : Screen {
                             style = MaterialTheme.typography.titleMedium,
                             textAlign = TextAlign.Center
                         )
-                        val refNo = if (orderNumber != null) "#${orderNumber.toString().padStart(4, '0')}" else null
+                        val refNo = receipt?.createdAt?.take(10)?.let { d ->
+                            if (orderNumber != null) "${d.replace("-", "")}${orderNumber.toString().padStart(4, '0')}" else null
+                        }
                         if (refNo != null) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
