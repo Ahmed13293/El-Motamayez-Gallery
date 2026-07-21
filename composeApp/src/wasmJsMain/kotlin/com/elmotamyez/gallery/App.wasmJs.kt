@@ -1916,7 +1916,7 @@ internal fun WebReceiptCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "فاتورة #$dayIndex",
+                            receipt.createdAt?.take(10)?.replace("-", "")?.let { "${it}${receipt.orderNumber}" } ?: "${receipt.orderNumber}",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -1940,7 +1940,7 @@ internal fun WebReceiptCard(
                         "${d.replace("-", "")}${receipt.orderNumber}"
                     } ?: "${receipt.orderNumber}"
                     val metaParts = buildList {
-                        if (refNo != null) add(refNo)
+                        add(refNo)
                         add("${receipt.items.size} منتج")
                         if (time.isNotEmpty()) add(time)
                     }.joinToString(" • ")

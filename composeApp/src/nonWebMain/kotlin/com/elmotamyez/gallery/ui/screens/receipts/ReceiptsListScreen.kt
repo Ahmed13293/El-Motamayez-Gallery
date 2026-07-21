@@ -362,7 +362,7 @@ private fun ReceiptCard(receipt: Receipt, dayIndex: Int, onClick: () -> Unit) {
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
                     Text(
-                        "فاتورة #$dayIndex",
+                        receipt.createdAt?.take(10)?.replace("-", "")?.let { "${it}${receipt.orderNumber}" } ?: "${receipt.orderNumber}",
                         style      = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color      = MaterialTheme.colorScheme.primary
