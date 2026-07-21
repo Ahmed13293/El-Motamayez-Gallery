@@ -26,8 +26,8 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
     fun line(col: Int = Color.BLACK, w: Float = 0.8f) = Paint().apply { color = col; strokeWidth = w }
 
     val receiptRef = receipt.createdAt?.take(10)?.replace("-", "")?.let { d ->
-        "$d${receipt.orderNumber.toString().padStart(4, '0')}"
-    } ?: receipt.orderNumber.toString().padStart(4, '0')
+        "$d${receipt.orderNumber}"
+    } ?: "${receipt.orderNumber}"
 
     // ── Header ────────────────────────────────────────────────────────────────
     // Bottom border line under header instead of filled band

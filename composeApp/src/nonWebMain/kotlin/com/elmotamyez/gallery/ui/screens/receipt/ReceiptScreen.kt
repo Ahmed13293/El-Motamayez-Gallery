@@ -144,7 +144,7 @@ class ReceiptScreen : Screen {
                             textAlign = TextAlign.Center
                         )
                         val refNo = receipt?.createdAt?.take(10)?.let { d ->
-                            if (orderNumber != null) "${d.replace("-", "")}${orderNumber.toString().padStart(4, '0')}" else null
+                            if (orderNumber != null) "${d.replace("-", "")}$orderNumber" else null
                         }
                         if (refNo != null) {
                             Surface(
