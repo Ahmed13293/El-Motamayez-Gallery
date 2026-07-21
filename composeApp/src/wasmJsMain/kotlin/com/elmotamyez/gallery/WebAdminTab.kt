@@ -54,108 +54,76 @@ import org.koin.compose.viewmodel.koinViewModel
 @JsFun("() => { setTimeout(function(){ var el = document.activeElement; if(el && typeof el.select === 'function') el.select(); }, 0); }")
 private external fun selectAllInFocusedInput()
 
-private enum class AdminSection(val label: String, val icon: ImageVector) {
-    PROFILE(   "الحساب",       Icons.Default.Person),
-    CATEGORIES("الأقسام",     Icons.Default.Category),
-    BRANDS(    "الفئات",      Icons.Default.SubdirectoryArrowRight),
-    PRODUCTS(  "المنتجات",    Icons.Default.Inventory),
-    REPORT(    "التقارير",    Icons.Default.BarChart),
-    EXPENSES(  "المصاريف",    Icons.Default.Payments),
-    ANALYSIS(  "تحليل المبيعات", Icons.Default.TrendingUp),
+private enum class AdminSection {
+    HUB, CATEGORIES, BRANDS, PRODUCTS, REPORT, EXPENSES, ANALYSIS
+}
+
+private fun AdminSection.sectionTitle() = when (this) {
+    AdminSection.CATEGORIES -> "إدارة الأقسام"
+    AdminSection.BRANDS     -> "إدارة الفئات الفرعية"
+    AdminSection.PRODUCTS   -> "إدارة المنتجات"
+    AdminSection.REPORT     -> "تقرير المبيعات"
+    AdminSection.EXPENSES   -> "المصاريف"
+    AdminSection.ANALYSIS   -> "تحليل المبيعات"
+    AdminSection.HUB        -> ""
 }
 
 @Composable
 internal fun WebAdminTab(user: User, onLogout: () -> Unit) {
     val adminVm: AdminViewModel = koinViewModel()
     val state by adminVm.state.collectAsState()
-    var section by remember { mutableStateOf(AdminSection.PROFILE) }
+    var section by remember { mutableStateOf(AdminSection.HUB) }
 
     state.toast?.let { msg -> LaunchedEffect(msg) { adminVm.clearToast() } }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val isMobile = maxWidth < 600.dp
 
-        if (isMobile) {
-            // ── Mobile: chips row at top, content below ───────────────────────
-            Column(Modifier.fillMaxSize()) {
-                Surface(tonalElevation = 1.dp) {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(AdminSection.entries) { s ->
-                            FilterChip(
-                                selected = section == s,
-                                onClick = { section = s },
-                                label = { Text(s.label) },
-                                leadingIcon = { Icon(s.icon, null, modifier = Modifier.size(16.dp)) }
-                            )
-                        }
-                    }
-                }
-                state.toast?.let { msg ->
-                    Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
-                        Text(msg, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer)
-                    }
-                }
-                Box(Modifier.fillMaxSize()) {
-                    if (state.isLoading) CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                    when (section) {
-                        AdminSection.PROFILE    -> AdminProfileSection(user, onLogout, isMobile = true)
-                        AdminSection.CATEGORIES -> AdminCategoriesSection(state.categories, adminVm)
-                        AdminSection.BRANDS     -> AdminBrandsSection(state.brands, state.categories, adminVm)
-                        AdminSection.PRODUCTS   -> AdminProductsSection(state.products, state.categories, state.brands, adminVm, isMobile = true)
-                        AdminSection.REPORT     -> AdminReportSection(isMobile = true)
-                        AdminSection.EXPENSES   -> AdminExpensesSection(isMobile = true)
-                        AdminSection.ANALYSIS   -> AdminSalesAnalysisSection(isMobile = true)
-                    }
+        Column(Modifier.fillMaxSize()) {
+            state.toast?.let { msg ->
+                Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        msg,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 }
             }
-        } else {
-            // ── Desktop: sidebar + content ─────────────────────────────────────
-            Row(Modifier.fillMaxSize()) {
-                Surface(modifier = Modifier.width(190.dp).fillMaxHeight(), tonalElevation = 1.dp) {
-                    Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("لوحة الإدارة", style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp))
-                        AdminSection.entries.forEach { s ->
-                            val selected = section == s
-                            Surface(onClick = { section = s }, shape = RoundedCornerShape(10.dp),
-                                color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                                modifier = Modifier.fillMaxWidth()) {
-                                Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Icon(s.icon, null, modifier = Modifier.size(18.dp),
-                                        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(s.label, style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                                }
-                            }
+
+            if (section == AdminSection.HUB) {
+                AdminHubPage(
+                    user = user,
+                    onLogout = onLogout,
+                    isMobile = isMobile,
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                ) { section = it }
+            } else {
+                Surface(tonalElevation = 2.dp, shadowElevation = 2.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { section = AdminSection.HUB }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "رجوع")
                         }
-                        Spacer(Modifier.weight(1f))
-                        state.toast?.let { msg ->
-                            Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-                                Text(msg, modifier = Modifier.padding(10.dp), style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer)
-                            }
-                        }
+                        Text(
+                            section.sectionTitle(),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
-                Box(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (state.isLoading) CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     when (section) {
-                        AdminSection.PROFILE    -> AdminProfileSection(user, onLogout)
                         AdminSection.CATEGORIES -> AdminCategoriesSection(state.categories, adminVm)
                         AdminSection.BRANDS     -> AdminBrandsSection(state.brands, state.categories, adminVm)
-                        AdminSection.PRODUCTS   -> AdminProductsSection(state.products, state.categories, state.brands, adminVm)
-                        AdminSection.REPORT     -> AdminReportSection()
-                        AdminSection.EXPENSES   -> AdminExpensesSection()
-                        AdminSection.ANALYSIS   -> AdminSalesAnalysisSection()
+                        AdminSection.PRODUCTS   -> AdminProductsSection(state.products, state.categories, state.brands, adminVm, isMobile)
+                        AdminSection.REPORT     -> AdminReportSection(isMobile)
+                        AdminSection.EXPENSES   -> AdminExpensesSection(isMobile)
+                        AdminSection.ANALYSIS   -> AdminSalesAnalysisSection(isMobile)
+                        AdminSection.HUB        -> Unit
                     }
                 }
             }
@@ -163,54 +131,137 @@ internal fun WebAdminTab(user: User, onLogout: () -> Unit) {
     }
 }
 
-// ── Profile Section ───────────────────────────────────────────────────────────
+// ── Admin Hub Page ────────────────────────────────────────────────────────────
 
 @Composable
-private fun AdminProfileSection(user: User, onLogout: () -> Unit, isMobile: Boolean = false) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(if (isMobile) 16.dp else 32.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text("معلومات الحساب", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+private fun AdminHubPage(
+    user: User,
+    onLogout: () -> Unit,
+    isMobile: Boolean,
+    modifier: Modifier = Modifier,
+    onNavigate: (AdminSection) -> Unit
+) {
+    BoxWithConstraints(modifier) {
+        val hPadding = if (isMobile) 16.dp
+                       else ((maxWidth - 700.dp).coerceAtLeast(0.dp) / 2).coerceAtLeast(24.dp)
 
-        Card(shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(2.dp)) {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Avatar
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Surface(modifier = Modifier.size(64.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = hPadding, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Avatar header
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(modifier = Modifier.size(80.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.AdminPanelSettings, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
+                            Icon(Icons.Default.AdminPanelSettings, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(44.dp))
                         }
                     }
-                    Column {
-                        Text(user.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                            Text(
-                                if (user.role == UserRole.ADMIN) "مدير" else "مستخدم",
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                    Text(user.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                        Text(
+                            if (user.role == UserRole.ADMIN) "مدير" else "مستخدم",
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
-                HorizontalDivider()
-                InfoRow("اسم المستخدم", user.username)
-                InfoRow("الاسم الكامل", user.name)
-                InfoRow("الصلاحية", if (user.role == UserRole.ADMIN) "مدير النظام" else "مستخدم عادي")
             }
-        }
 
-        Button(
-            onClick = onLogout,
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-            shape = RoundedCornerShape(12.dp),
-            modifier = if (isMobile) Modifier.fillMaxWidth().height(48.dp) else Modifier.width(240.dp).height(48.dp)
+            item { HorizontalDivider() }
+            item { HubSectionLabel("إدارة البيانات") }
+            item { HubManageCard(Icons.Default.Category,               "إدارة الأقسام",        "إضافة وتعديل وحذف الأقسام الرئيسية")  { onNavigate(AdminSection.CATEGORIES) } }
+            item { HubManageCard(Icons.Default.SubdirectoryArrowRight, "إدارة الفئات الفرعية", "إضافة وتعديل وحذف الفئات الفرعية")    { onNavigate(AdminSection.BRANDS) } }
+            item { HubManageCard(Icons.Default.Inventory,              "إدارة المنتجات",        "إضافة وتعديل وحذف المنتجات")          { onNavigate(AdminSection.PRODUCTS) } }
+
+            item { HorizontalDivider() }
+            item { HubSectionLabel("التقارير") }
+            item { HubManageCard(Icons.Default.BarChart,   "تقرير المبيعات",  "عرض إجمالي الفواتير والإيرادات")          { onNavigate(AdminSection.REPORT) } }
+            item { HubManageCard(Icons.Default.TrendingUp, "تحليل المبيعات",  "تحليل تفصيلي حسب القسم أو المنتج")       { onNavigate(AdminSection.ANALYSIS) } }
+
+            item { HorizontalDivider() }
+            item { HubSectionLabel("المصاريف") }
+            item { HubManageCard(Icons.Default.Payments, "المصاريف", "تسجيل ومتابعة المصاريف اليومية") { onNavigate(AdminSection.EXPENSES) } }
+
+            item { HorizontalDivider() }
+
+            // Account info card
+            item {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        InfoRow("اسم المستخدم", user.username)
+                        InfoRow("الاسم الكامل", user.name)
+                        InfoRow("الصلاحية", if (user.role == UserRole.ADMIN) "مدير النظام" else "مستخدم عادي")
+                    }
+                }
+            }
+
+            // Logout
+            item {
+                Button(
+                    onClick = onLogout,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                ) {
+                    Icon(Icons.Default.Logout, null, tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("تسجيل الخروج", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+
+            item { Spacer(Modifier.height(16.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun HubSectionLabel(title: String) {
+    Text(
+        title,
+        modifier = Modifier.padding(top = 4.dp),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold
+    )
+}
+
+@Composable
+private fun HubManageCard(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(Icons.Default.Logout, null, tint = Color.White)
-            Spacer(Modifier.width(8.dp))
-            Text("تسجيل الخروج", fontWeight = FontWeight.Bold, color = Color.White)
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
