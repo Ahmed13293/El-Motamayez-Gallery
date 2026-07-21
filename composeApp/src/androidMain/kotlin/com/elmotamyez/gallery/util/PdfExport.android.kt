@@ -53,7 +53,6 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
     val infoL = txt(10.5f, col = Color.DKGRAY, align = Paint.Align.LEFT)
 
     var ry = y
-    c.drawText("رقم المرجع: $receiptRef", right, ry, infoR);  ry += 16f
     if (dateText != null) { c.drawText("تاريخ الفاتورة: $dateText", right, ry, infoR); ry += 16f }
     c.drawText("طريقة الدفع: ${receipt.paymentMethod}", right, ry, infoR); ry += 16f
 
