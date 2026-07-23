@@ -865,6 +865,26 @@ private fun AdminExpensesSection(isMobile: Boolean = false) {
     var editTarget   by remember { mutableStateOf<Expense?>(null) }
     var deleteTarget by remember { mutableStateOf<Expense?>(null) }
 
+    val today = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
+    var filter by remember { mutableStateOf("all") }
+    val filteredExpenses = remember(expenses, filter) {
+        when (filter) {
+            "month" -> {
+                val prefix = "${today.year}-${today.monthNumber.toString().padStart(2, '0')}"
+                expenses.filter { it.createdAt?.startsWith(prefix) == true }
+            }
+            "week" -> {
+                val weekAgo = today.minus(7, DateTimeUnit.DAY)
+                expenses.filter { expense ->
+                    expense.createdAt?.take(10)?.let {
+                        runCatching { LocalDate.parse(it) >= weekAgo }.getOrDefault(false)
+                    } == true
+                }
+            }
+            else -> expenses
+        }
+    }
+
     if (showAdd) {
         ExpenseDialog(title = "إضافة مصروف", initial = null, isSaving = isSaving,
             onConfirm = { type, amount, note, isoDate -> vm.addExpense(type, amount, note, isoDate) {}; showAdd = false },
@@ -895,8 +915,15 @@ private fun AdminExpensesSection(isMobile: Boolean = false) {
             }
         }
 
+        // Filter chips
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("all" to "الكل", "month" to "الشهر", "week" to "الأسبوع").forEach { (key, label) ->
+                FilterChip(selected = filter == key, onClick = { filter = key }, label = { Text(label) })
+            }
+        }
+
         if (expenses.isNotEmpty()) {
-            val total = expenses.sumOf { it.amount }
+            val total = filteredExpenses.sumOf { it.amount }
             Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("إجمالي المصاريف", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -909,9 +936,13 @@ private fun AdminExpensesSection(isMobile: Boolean = false) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("لا توجد مصاريف مسجّلة", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        } else if (filteredExpenses.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("لا توجد مصاريف في هذه الفترة", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(expenses, key = { it.id }) { expense ->
+                items(filteredExpenses, key = { it.id }) { expense ->
                     val dateText = expense.createdAt?.let { raw ->
                         try { "${raw.substring(8,10)}/${raw.substring(5,7)}/${raw.substring(0,4)}" } catch (_: Exception) { null }
                     }

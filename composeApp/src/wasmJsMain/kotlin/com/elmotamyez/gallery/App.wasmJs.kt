@@ -587,6 +587,12 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    item {
+                        FilterChip(
+                            selected = state.selectedCategoryId == null,
+                            onClick = { productsVm.selectAllCategories() },
+                            label = { Text("الكل", maxLines = 1) })
+                    }
                     items(state.categories) { cat ->
                         val selected = state.selectedCategoryId == cat.id
                         FilterChip(
@@ -640,6 +646,23 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                             )
+                        }
+                        item {
+                            val allSelected = state.selectedCategoryId == null
+                            Surface(
+                                onClick = { productsVm.selectAllCategories() },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (allSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    "الكل",
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (allSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (allSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                         items(state.categories) { cat ->
                             val selected = state.selectedCategoryId == cat.id
