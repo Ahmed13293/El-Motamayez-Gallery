@@ -7,6 +7,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -21,7 +23,9 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.elmotamyez.gallery.data.model.Expense
 import com.elmotamyez.gallery.ui.components.ExpensesSheet
 import com.elmotamyez.gallery.util.formatPrice
-import kotlinx.datetime.*
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.koinInject
 
 class ExpensesScreen : Screen {
@@ -48,24 +52,55 @@ class ExpensesScreen : Screen {
         var editTarget    by remember { mutableStateOf<Expense?>(null) }
         var deleteTarget  by remember { mutableStateOf<Expense?>(null) }
 
-        val today = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
-        var filter by remember { mutableStateOf("all") }
+        var showDatePicker by remember { mutableStateOf(false) }
+        val dateRangeState = rememberDateRangePickerState()
+        val fromMillis = dateRangeState.selectedStartDateMillis
+        val toMillis   = dateRangeState.selectedEndDateMillis
+        val fromIso = fromMillis?.let {
+            Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+        }
+        val toIso = toMillis?.let {
+            Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+        }
 
-        val filteredExpenses = remember(expenses, filter) {
-            when (filter) {
-                "month" -> {
-                    val prefix = "${today.year}-${today.monthNumber.toString().padStart(2, '0')}"
-                    expenses.filter { it.createdAt?.startsWith(prefix) == true }
-                }
-                "week" -> {
-                    val weekAgo = today.minus(7, DateTimeUnit.DAY)
-                    expenses.filter { expense ->
-                        expense.createdAt?.take(10)?.let {
-                            runCatching { LocalDate.parse(it) >= weekAgo }.getOrDefault(false)
-                        } == true
+        val filteredExpenses = remember(expenses, fromIso, toIso) {
+            expenses.filter { expense ->
+                val d = expense.createdAt?.take(10) ?: return@filter true
+                val fromOk = fromIso == null || d >= fromIso
+                val toOk   = toIso   == null || d <= toIso
+                fromOk && toOk
+            }
+        }
+
+        // ── Date range picker dialog ──────────────────────────────────────────
+        if (showDatePicker) {
+            DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = { showDatePicker = false }) {
+                        Text("تأكيد", fontWeight = FontWeight.Bold)
                     }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDatePicker = false }) { Text("إلغاء") }
                 }
-                else -> expenses
+            ) {
+                DateRangePicker(
+                    state = dateRangeState,
+                    title = { Text("اختر الفترة الزمنية", modifier = Modifier.padding(16.dp)) },
+                    headline = {
+                        val from = fromMillis?.let {
+                            val d = Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.currentSystemDefault()).date
+                            "${d.dayOfMonth.toString().padStart(2,'0')}/${d.monthNumber.toString().padStart(2,'0')}/${d.year}"
+                        } ?: "من"
+                        val to = toMillis?.let {
+                            val d = Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.currentSystemDefault()).date
+                            "${d.dayOfMonth.toString().padStart(2,'0')}/${d.monthNumber.toString().padStart(2,'0')}/${d.year}"
+                        } ?: "إلى"
+                        Text("$from  ←  $to", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontWeight = FontWeight.SemiBold)
+                    },
+                    modifier = Modifier.heightIn(max = 520.dp)
+                )
             }
         }
 
@@ -121,15 +156,36 @@ class ExpensesScreen : Screen {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // ── Filter chips ──────────────────────────────────────────────
+                // ── Date range selector ───────────────────────────────────────
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("all" to "الكل", "month" to "الشهر", "week" to "الأسبوع").forEach { (key, label) ->
-                            FilterChip(
-                                selected = filter == key,
-                                onClick = { filter = key },
-                                label = { Text(label) }
-                            )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showDatePicker = true },
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.DateRange, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            if (fromMillis != null) {
+                                val from = Instant.fromEpochMilliseconds(fromMillis).toLocalDateTime(TimeZone.currentSystemDefault()).date.let {
+                                    "${it.dayOfMonth.toString().padStart(2,'0')}/${it.monthNumber.toString().padStart(2,'0')}/${it.year}"
+                                }
+                                val to = (toMillis ?: fromMillis).let {
+                                    Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.currentSystemDefault()).date.let { d ->
+                                        "${d.dayOfMonth.toString().padStart(2,'0')}/${d.monthNumber.toString().padStart(2,'0')}/${d.year}"
+                                    }
+                                }
+                                Text("$from – $to")
+                            } else {
+                                Text("تحديد الفترة")
+                            }
+                        }
+                        if (fromMillis != null) {
+                            IconButton(onClick = { dateRangeState.setSelection(null, null) }) {
+                                Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
                 }
