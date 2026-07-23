@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -92,6 +93,10 @@ class CategoriesHomeScreen : Screen {
 
         // Global search query (local — doesn't affect category filter)
         var searchQuery by remember { mutableStateOf("") }
+        var selectedCategory by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Category?>(null) }
+
+        // Reset category selection when search is cleared
+        LaunchedEffect(searchQuery) { if (searchQuery.isBlank()) selectedCategory = null }
 
         // Compute best-sellers from receipt history
         val bestSellers: List<Product> = remember(receipts, state.allProducts) {
@@ -106,10 +111,14 @@ class CategoriesHomeScreen : Screen {
                 .take(12)
         }
 
-        // Search results across all products
-        val searchResults: List<Product> = remember(searchQuery, state.allProducts) {
+        // Search results — filtered by query and optionally by selected category
+        val searchResults: List<Product> = remember(searchQuery, state.allProducts, selectedCategory) {
             if (searchQuery.isBlank()) emptyList()
-            else state.allProducts.filter { it.name.contains(searchQuery, ignoreCase = true) }
+            else {
+                val byName = state.allProducts.filter { it.name.contains(searchQuery, ignoreCase = true) }
+                if (selectedCategory == null) byName
+                else byName.filter { it.categoryId == selectedCategory!!.id }
+            }
         }
 
         Scaffold(
@@ -177,6 +186,29 @@ class CategoriesHomeScreen : Screen {
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         )
+                        if (searchQuery.isNotBlank() && state.categories.isNotEmpty()) {
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                item {
+                                    FilterChip(
+                                        selected = selectedCategory == null,
+                                        onClick = { selectedCategory = null },
+                                        label = { Text("الكل") }
+                                    )
+                                }
+                                items(state.categories) { category ->
+                                    FilterChip(
+                                        selected = selectedCategory?.id == category.id,
+                                        onClick = {
+                                            selectedCategory = if (selectedCategory?.id == category.id) null else category
+                                        },
+                                        label = { Text(category.name) }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -222,7 +254,8 @@ class CategoriesHomeScreen : Screen {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    "لا توجد نتائج لـ \"$searchQuery\"",
+                                    if (selectedCategory != null) "لا توجد نتائج لـ \"$searchQuery\" في ${selectedCategory!!.name}"
+                                    else "لا توجد نتائج لـ \"$searchQuery\"",
                                     color = MaterialTheme.colorScheme.outline
                                 )
                             }

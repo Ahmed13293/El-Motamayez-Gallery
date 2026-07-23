@@ -21,6 +21,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.elmotamyez.gallery.data.model.Expense
 import com.elmotamyez.gallery.ui.components.ExpensesSheet
 import com.elmotamyez.gallery.util.formatPrice
+import kotlinx.datetime.*
 import org.koin.compose.koinInject
 
 class ExpensesScreen : Screen {
@@ -46,6 +47,27 @@ class ExpensesScreen : Screen {
         var showAddSheet  by remember { mutableStateOf(false) }
         var editTarget    by remember { mutableStateOf<Expense?>(null) }
         var deleteTarget  by remember { mutableStateOf<Expense?>(null) }
+
+        val today = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
+        var filter by remember { mutableStateOf("all") }
+
+        val filteredExpenses = remember(expenses, filter) {
+            when (filter) {
+                "month" -> {
+                    val prefix = "${today.year}-${today.monthNumber.toString().padStart(2, '0')}"
+                    expenses.filter { it.createdAt?.startsWith(prefix) == true }
+                }
+                "week" -> {
+                    val weekAgo = today.minus(7, DateTimeUnit.DAY)
+                    expenses.filter { expense ->
+                        expense.createdAt?.take(10)?.let {
+                            runCatching { LocalDate.parse(it) >= weekAgo }.getOrDefault(false)
+                        } == true
+                    }
+                }
+                else -> expenses
+            }
+        }
 
         // ── Add sheet ─────────────────────────────────────────────────────────
         if (showAddSheet) {
@@ -94,28 +116,43 @@ class ExpensesScreen : Screen {
                 )
             }
         ) { padding ->
-            if (expenses.isEmpty()) {
-                Box(
-                    Modifier.fillMaxSize().padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("💸", style = MaterialTheme.typography.displayMedium)
-                        Text("لا توجد مصاريف مسجّلة",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.outline)
+            LazyColumn(
+                modifier = Modifier.padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // ── Filter chips ──────────────────────────────────────────────
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("all" to "الكل", "month" to "الشهر", "week" to "الأسبوع").forEach { (key, label) ->
+                            FilterChip(
+                                selected = filter == key,
+                                onClick = { filter = key },
+                                label = { Text(label) }
+                            )
+                        }
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.padding(padding),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+
+                if (expenses.isEmpty()) {
+                    item {
+                        Box(
+                            Modifier.fillParentMaxWidth().padding(top = 40.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("💸", style = MaterialTheme.typography.displayMedium)
+                                Text("لا توجد مصاريف مسجّلة",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    }
+                } else {
                     // ── Summary card ──────────────────────────────────────────
                     item {
-                        val total = expenses.sumOf { it.amount }
+                        val total = filteredExpenses.sumOf { it.amount }
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = MaterialTheme.colorScheme.primaryContainer,
@@ -138,13 +175,26 @@ class ExpensesScreen : Screen {
                         }
                     }
 
-                    // ── Expense rows ──────────────────────────────────────────
-                    items(expenses, key = { it.id }) { expense ->
-                        ExpenseRow(
-                            expense   = expense,
-                            onEdit    = { editTarget = expense },
-                            onDelete  = { deleteTarget = expense }
-                        )
+                    if (filteredExpenses.isEmpty()) {
+                        item {
+                            Box(
+                                Modifier.fillParentMaxWidth().padding(top = 32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("لا توجد مصاريف في هذه الفترة",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    } else {
+                        // ── Expense rows ──────────────────────────────────────
+                        items(filteredExpenses, key = { it.id }) { expense ->
+                            ExpenseRow(
+                                expense   = expense,
+                                onEdit    = { editTarget = expense },
+                                onDelete  = { deleteTarget = expense }
+                            )
+                        }
                     }
                 }
             }
