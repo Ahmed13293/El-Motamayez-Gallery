@@ -46,12 +46,7 @@ import org.koin.compose.koinInject
 
 // ── Contact ───────────────────────────────────────────────────────────────────
 
-private const val PRL_WA  = "201121064222"   // update to pirlanta's WA
-private const val PRL_IG  = "https://ig.me/m/almotamayz.gallery"
-private const val PRL_FB  = "https://m.me/almotamiz.bookstore"
-
-@JsFun("(num, msg) => { window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank'); }")
-private external fun prlOpenWhatsApp(number: String, message: String)
+private const val PRL_IG = "https://www.instagram.com/the.pirlanta/"
 
 @JsFun("""(text) => {
     if (navigator.clipboard && window.isSecureContext) {
@@ -65,6 +60,20 @@ private external fun prlOpenWhatsApp(number: String, message: String)
     }
 }""")
 private external fun prlCopyToClipboard(text: String)
+
+@JsFun("(t) => { document.title = t; }")
+private external fun setPageTitle(title: String)
+
+@JsFun("""(e) => {
+    try {
+        var c = document.createElement('canvas'); c.width = 32; c.height = 32;
+        var x = c.getContext('2d'); x.font = '28px serif'; x.fillText(e, 2, 26);
+        var l = document.querySelector("link[rel*='icon']") || document.createElement('link');
+        l.rel = 'icon'; l.href = c.toDataURL();
+        if (!l.parentNode) document.head.appendChild(l);
+    } catch(e) {}
+}""")
+private external fun setPirlantaFavicon(emoji: String)
 
 // ── Color scheme — extracted from pirlanta logo ───────────────────────────────
 
@@ -101,6 +110,10 @@ private data class PrlCopyOpen(val platformName: String, val platformColor: Colo
 
 @Composable
 fun PirlantaCatalogScreen(onLoginClick: () -> Unit) {
+    LaunchedEffect(Unit) {
+        setPageTitle("بيرلانتا")
+        setPirlantaFavicon("🩷")
+    }
     MaterialTheme(
         colorScheme = PirlantaColorScheme,
         typography  = MaterialTheme.typography,
@@ -225,14 +238,16 @@ private fun PirlantaContent(onLoginClick: () -> Unit) {
                     }
                     if (!canSend) Text("* الاسم والهاتف والعنوان مطلوبة", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                     HorizontalDivider()
-                    Text("اختر طريقة الإرسال", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Button(onClick = { saveAndSend { prlOpenWhatsApp(PRL_WA, fullMsg()) } }, enabled = canSend, modifier = Modifier.weight(1f).height(44.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)), shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
-                            Icon(Icons.Default.Phone, null, Modifier.size(14.dp)); Spacer(Modifier.width(4.dp)); Text("واتساب", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-                        Button(onClick = { prlCopyToClipboard(fullMsg()); saveAndSend { copyOpenState = PrlCopyOpen("انستغرام", Color(0xFFE1306C), PRL_IG) } }, enabled = canSend, modifier = Modifier.weight(1f).height(44.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)), shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
-                            Icon(Icons.Default.Favorite, null, Modifier.size(14.dp)); Spacer(Modifier.width(4.dp)); Text("انستغرام", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
+                    Button(
+                        onClick = { prlCopyToClipboard(fullMsg()); saveAndSend { copyOpenState = PrlCopyOpen("انستغرام", Color(0xFFE1306C), PRL_IG) } },
+                        enabled = canSend,
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Favorite, null, Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("إرسال عبر انستغرام", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             },
@@ -358,9 +373,6 @@ private fun PirlantaContent(onLoginClick: () -> Unit) {
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color.White.copy(alpha = 0.8f))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    PrlSocialButton("واتساب", Color(0xFF25D366)) {
-                                        prlOpenWhatsApp(PRL_WA, "مرحباً، أريد الاستفسار عن منتجات بيرلانتا 🎀")
-                                    }
                                     PrlSocialButton("انستغرام", Color(0xFFE1306C)) { openUrl(PRL_IG) }
                                 }
                             }
