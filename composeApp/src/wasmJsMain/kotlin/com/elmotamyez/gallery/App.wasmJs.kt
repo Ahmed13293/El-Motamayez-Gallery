@@ -242,13 +242,21 @@ actual fun App() {
                 KoinContext {
                     val authVm: AuthViewModel = koinInject()
                     val authState by authVm.uiState.collectAsState()
+                    val locationSuffix = remember { getLocationSuffix() }
                     var showPublicCatalog by remember {
-                        mutableStateOf(getLocationSuffix().contains("catalog", ignoreCase = true))
+                        mutableStateOf(locationSuffix.contains("catalog", ignoreCase = true))
+                    }
+                    var showPirlanta by remember {
+                        mutableStateOf(locationSuffix.contains("pirlanta", ignoreCase = true))
                     }
                     when {
                         authState.user != null -> WebApp(
                             user = authState.user!!,
                             onLogout = { authVm.logout() })
+
+                        showPirlanta -> PirlantaCatalogScreen(onLoginClick = {
+                            showPirlanta = false
+                        })
 
                         showPublicCatalog -> PublicCatalogScreen(onLoginClick = {
                             showPublicCatalog = false
