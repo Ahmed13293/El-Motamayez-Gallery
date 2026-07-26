@@ -145,6 +145,9 @@ private external fun openWhatsApp(number: String, message: String)
 @JsFun("() => window.location.search + window.location.hash")
 private external fun getLocationSuffix(): String
 
+@JsFun("() => window.location.hostname")
+private external fun getHostname(): String
+
 @JsFun("() => window._fcmToken || ''")
 private external fun getWebFcmToken(): String
 
@@ -243,11 +246,15 @@ actual fun App() {
                     val authVm: AuthViewModel = koinInject()
                     val authState by authVm.uiState.collectAsState()
                     val locationSuffix = remember { getLocationSuffix() }
+                    val hostname       = remember { getHostname() }
                     var showPublicCatalog by remember {
                         mutableStateOf(locationSuffix.contains("catalog", ignoreCase = true))
                     }
                     var showPirlanta by remember {
-                        mutableStateOf(locationSuffix.contains("pirlanta", ignoreCase = true))
+                        mutableStateOf(
+                            locationSuffix.contains("pirlanta", ignoreCase = true) ||
+                            hostname.contains("pirlanta", ignoreCase = true)
+                        )
                     }
                     when {
                         authState.user != null -> WebApp(
