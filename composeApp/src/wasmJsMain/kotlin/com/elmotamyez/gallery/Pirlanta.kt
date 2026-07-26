@@ -64,16 +64,19 @@ private external fun prlCopyToClipboard(text: String)
 @JsFun("(t) => { document.title = t; }")
 private external fun setPageTitle(title: String)
 
-@JsFun("""(e) => {
+@JsFun("""() => {
     try {
-        var c = document.createElement('canvas'); c.width = 32; c.height = 32;
-        var x = c.getContext('2d'); x.font = '28px serif'; x.fillText(e, 2, 26);
-        var l = document.querySelector("link[rel*='icon']") || document.createElement('link');
-        l.rel = 'icon'; l.href = c.toDataURL();
-        if (!l.parentNode) document.head.appendChild(l);
+        var links = document.querySelectorAll("link[rel*='icon']");
+        if (links.length > 0) {
+            links.forEach(function(l) { l.href = 'pirlanta-favicon.svg'; l.type = 'image/svg+xml'; });
+        } else {
+            var l = document.createElement('link');
+            l.rel = 'icon'; l.type = 'image/svg+xml'; l.href = 'pirlanta-favicon.svg';
+            document.head.appendChild(l);
+        }
     } catch(e) {}
 }""")
-private external fun setPirlantaFavicon(emoji: String)
+private external fun setPirlantaFavicon()
 
 // ── Color scheme — extracted from pirlanta logo ───────────────────────────────
 
@@ -111,8 +114,8 @@ private data class PrlCopyOpen(val platformName: String, val platformColor: Colo
 @Composable
 fun PirlantaCatalogScreen(onLoginClick: () -> Unit) {
     LaunchedEffect(Unit) {
-        setPageTitle("بيرلانتا")
-        setPirlantaFavicon("🩷")
+        setPageTitle("Pirlanta")
+        setPirlantaFavicon()
     }
     MaterialTheme(
         colorScheme = PirlantaColorScheme,
@@ -188,7 +191,7 @@ private fun PirlantaContent(onLoginClick: () -> Unit) {
         val lines = cartProducts.entries.joinToString("\n") { (p, qty) ->
             "• ${p.name} × $qty = ${(p.price * qty).formatPrice()} ج"
         }
-        return "مرحباً، أريد طلب من بيرلانتا 🎀\n\n$lines\n\nالإجمالي: ${cartTotal.formatPrice()} ج"
+        return "مرحباً، أريد طلب من Pirlanta 🎀\n\n$lines\n\nالإجمالي: ${cartTotal.formatPrice()} ج"
     }
 
     // ── Order dialog ──────────────────────────────────────────────────────────
@@ -366,7 +369,7 @@ private fun PirlantaContent(onLoginClick: () -> Unit) {
                         ) {
                             Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("بيرلانتا",
+                                Text("Pirlanta",
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.ExtraBold, color = Color.White)
                                 Text("أدوات تجميل واكسسوارات",

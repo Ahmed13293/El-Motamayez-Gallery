@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Soft pink background -->
+  <rect width="100" height="100" rx="12" fill="#FBD5DC"/>
+  <!-- Vertical stripes -->
+  <rect x="8"  y="0" width="7" height="100" fill="#F7C5CF" rx="0"/>
+  <rect x="22" y="0" width="7" height="100" fill="#F7C5CF" rx="0"/>
+  <rect x="36" y="0" width="7" height="100" fill="#F7C5CF" rx="0"/>
+  <rect x="50" y="0" width="7" height="100" fill="#F7C5CF" rx="0"/>
+  <rect x="64" y="0" width="7" height="100" fill="#F7C5CF" rx="0"/>
+  <rect x="78" y="0" width="7" height="100" fill="#F7C5CF" rx="0"/>
+  <rect x="92" y="0" width="8" height="100" fill="#F7C5CF" rx="0"/>
+  <!-- Scalloped ornate frame -->
+  <path d="
+    M50,8 C56,5 60,8 60,12 C64,8 70,8 72,12 C76,8 82,10 82,15
+    C88,13 92,17 90,22 C95,22 97,27 94,30 C98,32 98,38 94,39
+    C97,42 96,48 92,48 C95,52 93,57 89,57 C91,62 88,67 84,66
+    C85,71 81,75 77,73 C76,78 71,81 67,78 C64,83 58,84 55,80
+    C52,84 46,84 43,80 C40,84 34,83 31,78 C27,81 22,78 21,73
+    C17,75 13,71 14,66 C10,67 7,62 9,57 C5,57 3,52 6,48
+    C2,48 1,42 4,39 C0,38 0,32 4,30 C1,27 3,22 8,22
+    C6,17 10,13 16,15 C16,10 22,8 26,12 C28,8 34,8 38,12
+    C38,8 44,5 50,8 Z"
+    fill="none" stroke="#E8A4B2" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- Lowercase italic serif "p" in dark rose -->
+  <text x="50" y="71" text-anchor="middle"
+        font-family="Georgia,'Times New Roman',serif"
+        font-size="56" font-style="italic" font-weight="400"
+        fill="#8B1C42">p</text>
+  <!-- Small bow at top-right of frame -->
+  <g transform="translate(74,18) rotate(-10)">
+    <!-- Left wing -->
+    <ellipse cx="-5" cy="0" rx="6" ry="4" fill="#E8A4B2" opacity="0.9"/>
+    <!-- Right wing -->
+    <ellipse cx="5" cy="0" rx="6" ry="4" fill="#E8A4B2" opacity="0.9"/>
+    <!-- Center knot -->
+    <ellipse cx="0" cy="0" rx="2.5" ry="2" fill="#D4849A"/>
+    <!-- Tail left -->
+    <path d="M-2,1 Q-7,7 -5,10" stroke="#E8A4B2" stroke-width="1.5" fill="none"/>
+    <!-- Tail right -->
+    <path d="M2,1 Q7,7 5,10" stroke="#E8A4B2" stroke-width="1.5" fill="none"/>
+  </g>
+</svg>
