@@ -304,7 +304,7 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
                             Button(
                                 onClick = {
                                     when {
-                                        promoInput.trim() != "TOYS10" ->
+                                        promoInput.trim() != "GOSUMMER10" ->
                                             promoError = "الكود غير صحيح"
                                         cartTotal < 200 ->
                                             promoError = "الحد الأدنى 200 ج"
@@ -548,6 +548,69 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
                     item {
                         Box(Modifier.fillMaxWidth().padding(12.dp)) {
                             BannerSlider()
+                        }
+                    }
+
+                    // Promo code banner — toys page only
+                    if (defaultCategoryKeyword != null) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1976D2))
+                                        )
+                                    )
+                                    .drawBehind {
+                                        drawCircle(color = Color(0x20FFFFFF), radius = size.height * 1.4f,
+                                            center = androidx.compose.ui.geometry.Offset(size.width + size.height * 0.3f, size.height * 0.5f))
+                                        drawCircle(color = Color(0x15FFFFFF), radius = size.height * 0.7f,
+                                            center = androidx.compose.ui.geometry.Offset(-size.height * 0.1f, -size.height * 0.2f))
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+                                        Text("عرض الصيف",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFBBDEFB),
+                                            fontWeight = FontWeight.SemiBold,
+                                            letterSpacing = 1.sp)
+                                        Text("خصم 10% على جميع الطلبات",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.ExtraBold)
+                                        Text("بحد أدنى 200 جنيه",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFBBDEFB))
+                                    }
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text("كود الخصم",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFBBDEFB))
+                                        Surface(
+                                            color = Color.White,
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text("GOSUMMER10",
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = Color(0xFF0D47A1),
+                                                letterSpacing = 0.5.sp)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
