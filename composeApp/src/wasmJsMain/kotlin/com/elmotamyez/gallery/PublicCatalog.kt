@@ -949,7 +949,11 @@ private fun BannerPromo() {
             .fillMaxSize()
             .background(Brush.horizontalGradient(listOf(Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1976D2))))
             .drawBehind {
-                bannerDecor()
+                bannerDecor(
+                    circleColor1 = Color(0x181976D2),
+                    circleColor2 = Color(0x141565C0),
+                    accentColor  = Color(0x0CFFFFFF)
+                )
                 val p = androidx.compose.ui.graphics.Path().apply {
                     moveTo(size.width * 0.68f, 0f); lineTo(size.width * 0.74f, 0f)
                     lineTo(size.width * 0.51f, size.height); lineTo(size.width * 0.45f, size.height); close()
