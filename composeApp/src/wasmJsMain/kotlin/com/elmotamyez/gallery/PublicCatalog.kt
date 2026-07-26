@@ -547,70 +547,7 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
                     // Banner — standalone with margin on all sides, no dot indicator
                     item {
                         Box(Modifier.fillMaxWidth().padding(12.dp)) {
-                            BannerSlider()
-                        }
-                    }
-
-                    // Promo code banner — toys page only
-                    if (defaultCategoryKeyword != null) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1976D2))
-                                        )
-                                    )
-                                    .drawBehind {
-                                        drawCircle(color = Color(0x20FFFFFF), radius = size.height * 1.4f,
-                                            center = androidx.compose.ui.geometry.Offset(size.width + size.height * 0.3f, size.height * 0.5f))
-                                        drawCircle(color = Color(0x15FFFFFF), radius = size.height * 0.7f,
-                                            center = androidx.compose.ui.geometry.Offset(-size.height * 0.1f, -size.height * 0.2f))
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-                                        Text("عرض الصيف",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFFBBDEFB),
-                                            fontWeight = FontWeight.SemiBold,
-                                            letterSpacing = 1.sp)
-                                        Text("خصم 10% على جميع الطلبات",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.ExtraBold)
-                                        Text("بحد أدنى 200 جنيه",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFFBBDEFB))
-                                    }
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                                    ) {
-                                        Text("كود الخصم",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFFBBDEFB))
-                                        Surface(
-                                            color = Color.White,
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Text("GOSUMMER10",
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = Color(0xFF0D47A1),
-                                                letterSpacing = 0.5.sp)
-                                        }
-                                    }
-                                }
-                            }
+                            BannerSlider(showPromo = defaultCategoryKeyword != null)
                         }
                     }
 
@@ -981,15 +918,14 @@ private fun SocialButton(label: String, color: Color, onClick: () -> Unit) {
 
 // ── Banner slider ─────────────────────────────────────────────────────────────
 
-private val BANNER_COUNT = 4
-
 @Composable
-private fun BannerSlider() {
-    val pagerState = rememberPagerState(pageCount = { BANNER_COUNT })
+private fun BannerSlider(showPromo: Boolean = false) {
+    val count = if (showPromo) 5 else 4
+    val pagerState = rememberPagerState(pageCount = { count })
     LaunchedEffect(Unit) {
         while (true) {
             delay(7000)
-            pagerState.animateScrollToPage((pagerState.currentPage + 1) % BANNER_COUNT)
+            pagerState.animateScrollToPage((pagerState.currentPage + 1) % count)
         }
     }
     HorizontalPager(
@@ -1000,7 +936,63 @@ private fun BannerSlider() {
             0 -> BannerStore()
             1 -> BannerDelivery()
             2 -> BannerPricing()
-            else -> BannerBackToSchool()
+            3 -> BannerBackToSchool()
+            else -> BannerPromo()
+        }
+    }
+}
+
+@Composable
+private fun BannerPromo() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.horizontalGradient(listOf(Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1976D2))))
+            .drawBehind {
+                bannerDecor()
+                val p = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(size.width * 0.68f, 0f); lineTo(size.width * 0.74f, 0f)
+                    lineTo(size.width * 0.51f, size.height); lineTo(size.width * 0.45f, size.height); close()
+                }
+                drawPath(p, color = Color(0x10FFFFFF))
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Surface(shape = RoundedCornerShape(20.dp), color = Color(0xFFBBDEFB).copy(alpha = 0.25f)) {
+                    Text("عرض الصيف", modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFBBDEFB), fontWeight = FontWeight.Bold)
+                }
+                Text("خصم 10%\nعلى ألعاب الأطفال",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White, lineHeight = 26.sp)
+                Text("بحد أدنى 200 جنيه",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFBBDEFB))
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text("كود الخصم",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFBBDEFB))
+                Surface(color = Color.White, shape = RoundedCornerShape(10.dp)) {
+                    Text("GOSUMMER10",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF0D47A1),
+                        letterSpacing = 0.3.sp)
+                }
+            }
         }
     }
 }
