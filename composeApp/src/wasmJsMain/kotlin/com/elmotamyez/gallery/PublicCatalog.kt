@@ -172,20 +172,33 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
         var customerNotes   by remember { mutableStateOf("") }
         var paymentMethod   by remember { mutableStateOf("كاش") }
 
+        // Promo code (toys page only)
+        val showPromo = defaultCategoryKeyword != null
+        var promoInput   by remember { mutableStateOf("") }
+        var promoApplied by remember { mutableStateOf(false) }
+        var promoError   by remember { mutableStateOf<String?>(null) }
+
+        val discountAmount = if (promoApplied) cartTotal * 0.10 else 0.0
+        val finalTotal     = cartTotal - discountAmount
+
         val canSend = customerName.isNotBlank() && customerPhone.isNotBlank() && customerAddress.isNotBlank()
 
-        fun buildFullMsg(): String = buildCartMsg(cartProducts) +
-            "\n\nالاسم: ${customerName.trim()}" +
-            "\nالهاتف: ${customerPhone.trim()}" +
-            "\nالعنوان: ${customerAddress.trim()}" +
-            (if (customerNotes.isNotBlank()) "\nملاحظات: ${customerNotes.trim()}" else "") +
-            "\nطريقة الدفع: $paymentMethod"
+        fun buildFullMsg(): String {
+            val base = buildCartMsg(cartProducts)
+            val discountLine = if (promoApplied) "\nخصم 10%: -${discountAmount.formatPrice()} ج\nالإجمالي بعد الخصم: ${finalTotal.formatPrice()} ج" else ""
+            return base + discountLine +
+                "\n\nالاسم: ${customerName.trim()}" +
+                "\nالهاتف: ${customerPhone.trim()}" +
+                "\nالعنوان: ${customerAddress.trim()}" +
+                (if (customerNotes.isNotBlank()) "\nملاحظات: ${customerNotes.trim()}" else "") +
+                "\nطريقة الدفع: $paymentMethod"
+        }
 
         fun saveAndSend(openPlatform: () -> Unit) {
             val items = cartProducts.map { (p, qty) -> CartItem(p, qty) }
             orderVm.createOrder(
                 items           = items,
-                total           = cartTotal,
+                total           = finalTotal,
                 paymentMethod   = paymentMethod,
                 customerName    = customerName.trim(),
                 customerPhone   = customerPhone.trim(),
@@ -205,9 +218,19 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
             },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("$cartCount منتج  •  ${cartTotal.formatPrice()} ج",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("$cartCount منتج  •  ${cartTotal.formatPrice()} ج",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (promoApplied) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                            textDecoration = if (promoApplied) androidx.compose.ui.text.style.TextDecoration.LineThrough else null)
+                        if (promoApplied) {
+                            Text("${finalTotal.formatPrice()} ج",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1B5E20))
+                        }
+                    }
 
                     HorizontalDivider()
 
@@ -254,6 +277,72 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
                                 onClick  = { paymentMethod = method },
                                 label    = { Text(method, fontSize = 11.sp) }
                             )
+                        }
+                    }
+
+                    // Promo code field — toys page only
+                    if (showPromo) {
+                        HorizontalDivider()
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = promoInput,
+                                onValueChange = {
+                                    promoInput = it.uppercase()
+                                    promoApplied = false
+                                    promoError = null
+                                },
+                                label = { Text("كود الخصم", fontSize = 11.sp) },
+                                placeholder = { Text("أدخل الكود", fontSize = 11.sp) },
+                                singleLine = true,
+                                isError = promoError != null,
+                                textStyle = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f).height(52.dp)
+                            )
+                            Button(
+                                onClick = {
+                                    when {
+                                        promoInput.trim() != "TOYS10" ->
+                                            promoError = "الكود غير صحيح"
+                                        cartTotal < 200 ->
+                                            promoError = "الحد الأدنى 200 ج"
+                                        else -> { promoApplied = true; promoError = null }
+                                    }
+                                },
+                                enabled = promoInput.isNotBlank() && !promoApplied,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.height(52.dp)
+                            ) {
+                                Text(if (promoApplied) "✓" else "تطبيق", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        if (promoError != null) {
+                            Text(promoError!!,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error)
+                        }
+                        if (promoApplied) {
+                            Surface(
+                                color = Color(0xFF1B5E20).copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("خصم 10% مطبّق",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF2E7D32),
+                                        fontWeight = FontWeight.SemiBold)
+                                    Text("- ${discountAmount.formatPrice()} ج",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF2E7D32),
+                                        fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
 
