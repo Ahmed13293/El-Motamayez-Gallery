@@ -93,7 +93,7 @@ private data class CopyOpenState(val platformName: String, val platformColor: Co
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PublicCatalogScreen(onLoginClick: () -> Unit) {
+fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String? = null) {
     val vm: ProductsViewModel = koinInject()
     val orderVm: OrderViewModel = koinInject()
     val state by vm.uiState.collectAsState()
@@ -116,6 +116,17 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit) {
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
     var selectedBrand    by remember { mutableStateOf<Brand?>(null) }
     var catalogView      by remember { mutableStateOf(CatalogView.ALL_PRODUCTS) }
+
+    // Auto-select default category once categories load
+    LaunchedEffect(categories) {
+        if (defaultCategoryKeyword != null && selectedCategory == null && categories.isNotEmpty()) {
+            val match = categories.firstOrNull { it.name.contains(defaultCategoryKeyword, ignoreCase = true) }
+            if (match != null) {
+                selectedCategory = match
+                catalogView = CatalogView.SUBCATEGORIES
+            }
+        }
+    }
 
     // Global search (active when no brand selected)
     var searchQuery by remember { mutableStateOf("") }

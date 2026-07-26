@@ -247,8 +247,12 @@ actual fun App() {
                     val authState by authVm.uiState.collectAsState()
                     val locationSuffix = remember { getLocationSuffix() }
                     val hostname       = remember { getHostname() }
+                    val isToys = remember { locationSuffix.contains("toys", ignoreCase = true) }
+                    val catalogDefaultCategory = remember { if (isToys) "العاب" else null }
                     var showPublicCatalog by remember {
-                        mutableStateOf(locationSuffix.contains("catalog", ignoreCase = true))
+                        mutableStateOf(
+                            locationSuffix.contains("catalog", ignoreCase = true) || isToys
+                        )
                     }
                     var showPirlanta by remember {
                         mutableStateOf(
@@ -265,9 +269,10 @@ actual fun App() {
                             showPirlanta = false
                         })
 
-                        showPublicCatalog -> PublicCatalogScreen(onLoginClick = {
-                            showPublicCatalog = false
-                        })
+                        showPublicCatalog -> PublicCatalogScreen(
+                            onLoginClick = { showPublicCatalog = false },
+                            defaultCategoryKeyword = catalogDefaultCategory
+                        )
 
                         else -> WebLoginScreen(
                             isLoading = authState.isLoading,
