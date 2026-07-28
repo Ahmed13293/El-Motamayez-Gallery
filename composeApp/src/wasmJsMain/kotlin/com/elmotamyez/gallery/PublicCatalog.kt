@@ -199,6 +199,7 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
             orderVm.createOrder(
                 items           = items,
                 total           = finalTotal,
+                discount        = discountAmount,
                 paymentMethod   = paymentMethod,
                 customerName    = customerName.trim(),
                 customerPhone   = customerPhone.trim(),
