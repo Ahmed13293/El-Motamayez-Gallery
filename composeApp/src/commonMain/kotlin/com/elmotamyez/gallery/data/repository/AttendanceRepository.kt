@@ -4,6 +4,7 @@ import com.elmotamyez.gallery.data.model.Attendance
 import com.elmotamyez.gallery.data.remote.supabaseClient
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order as SbOrder
+import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 import kotlinx.datetime.Clock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -45,7 +46,7 @@ class AttendanceRepository {
             .update(CheckOutUpdate(checkOut = now)) {
                 filter {
                     eq("user_id", userId)
-                    isNull("check_out")
+                    filter("check_out", FilterOperator.IS, null)
                 }
             }
     }

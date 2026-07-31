@@ -31,6 +31,8 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.elmotamyez.gallery.data.model.Receipt
+import com.elmotamyez.gallery.data.model.UserRole
+import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptScreen
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.dateString
@@ -92,8 +94,11 @@ class ReceiptsListScreen : Screen {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val vm: ReceiptViewModel = koinInject()
-        val receipts  by vm.receipts.collectAsState()
-        val isLoading by vm.isLoading.collectAsState()
+        val authVm: AuthViewModel = koinInject()
+        val receipts   by vm.receipts.collectAsState()
+        val isLoading  by vm.isLoading.collectAsState()
+        val authState  by authVm.uiState.collectAsState()
+        val isAdmin    = authState.user?.role == UserRole.ADMIN
 
         // Current month key e.g. "2026-07"
         val currentMonthKey = remember {
@@ -197,36 +202,38 @@ class ReceiptsListScreen : Screen {
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // ── Monthly summary card ──────────────────────────────
-                        item(key = "month_summary") {
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                        // ── Monthly summary card (admin only) ─────────────────
+                        if (isAdmin) {
+                            item(key = "month_summary") {
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Column {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(
+                                                selectedMonth.toArabicMonth(),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                            )
+                                            Text(
+                                                "$monthCount فاتورة",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                            )
+                                        }
                                         Text(
-                                            selectedMonth.toArabicMonth(),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                        )
-                                        Text(
-                                            "$monthCount فاتورة",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                            "${monthTotal.formatPrice()} ج",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.primary
                                         )
                                     }
-                                    Text(
-                                        "${monthTotal.formatPrice()} ج",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
                                 }
                             }
                         }
