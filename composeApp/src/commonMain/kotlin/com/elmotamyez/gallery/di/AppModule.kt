@@ -1,12 +1,14 @@
 package com.elmotamyez.gallery.di
 
 import com.elmotamyez.gallery.NavigationController
+import com.elmotamyez.gallery.data.repository.AttendanceRepository
 import com.elmotamyez.gallery.data.repository.AuthRepository
 import com.elmotamyez.gallery.data.repository.ExpenseRepository
 import com.elmotamyez.gallery.data.repository.OrderRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
 import com.elmotamyez.gallery.data.repository.ReceiptRepository
 import com.elmotamyez.gallery.ui.screens.admin.AdminViewModel
+import com.elmotamyez.gallery.ui.screens.admin.AttendanceViewModel
 import com.elmotamyez.gallery.ui.screens.admin.ExpenseViewModel
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
 import com.elmotamyez.gallery.ui.screens.cart.CartViewModel
@@ -26,6 +28,7 @@ val appModule = module {
     single { OrderRepository() }
     single { ExpenseRepository() }
     single { AuthRepository() }
+    single { AttendanceRepository() }
 
     // Singletons — shared state across all tabs
     singleOf(::CartViewModel)
@@ -33,6 +36,7 @@ val appModule = module {
     single { OrderViewModel(get(), get(), get()) }
     singleOf(::AuthViewModel)
     singleOf(::ExpenseViewModel)
+    singleOf(::AttendanceViewModel)
 
     // Per-screen ViewModels
     viewModelOf(::ProductsViewModel)

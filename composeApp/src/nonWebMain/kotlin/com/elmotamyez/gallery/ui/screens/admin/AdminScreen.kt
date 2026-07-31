@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MoneyOff
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -122,6 +123,12 @@ class AdminScreen : Screen {
                 title = "تحليل المبيعات",
                 subtitle = "مبيعات حسب القسم أو الفئة أو المنتج",
                 onClick = { navigator.push(SalesAnalysisScreen()) }
+            )
+            ManageCard(
+                icon = Icons.Default.Schedule,
+                title = "تقرير الحضور",
+                subtitle = "سجل دخول وخروج الموظفين وساعات العمل",
+                onClick = { navigator.push(AttendanceScreen()) }
             )
 
             HorizontalDivider()

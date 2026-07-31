@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elmotamyez.gallery.data.model.User
 import com.elmotamyez.gallery.data.model.UserRole
+import com.elmotamyez.gallery.data.repository.AttendanceRepository
 import com.elmotamyez.gallery.data.repository.AuthRepository
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,8 @@ data class AuthUiState(
 )
 
 class AuthViewModel(
-    private val repo: AuthRepository
+    private val repo: AuthRepository,
+    private val attendanceRepo: AttendanceRepository
 ) : ViewModel() {
 
     private val settings = Settings()
@@ -34,7 +36,6 @@ class AuthViewModel(
     val currentUser: User? get() = _uiState.value.user
 
     init {
-        // Restore session from local storage on every app start
         val savedId = settings.getStringOrNull(KEY_USER_ID)
         if (savedId != null) {
             val user = User(
@@ -59,6 +60,9 @@ class AuthViewModel(
                 val user = repo.login(username.trim(), password.trim())
                 if (user != null) {
                     saveSession(user)
+                    if (user.role == UserRole.USER) {
+                        runCatching { attendanceRepo.recordSignIn(user.id, user.name) }
+                    }
                     _uiState.value = _uiState.value.copy(isLoading = false, user = user)
                 } else {
                     _uiState.value = _uiState.value.copy(
@@ -76,8 +80,14 @@ class AuthViewModel(
     }
 
     fun logout() {
-        clearSession()
-        _uiState.value = AuthUiState()
+        viewModelScope.launch {
+            val user = _uiState.value.user
+            if (user != null && user.role == UserRole.USER) {
+                runCatching { attendanceRepo.recordSignOut(user.id) }
+            }
+            clearSession()
+            _uiState.value = AuthUiState()
+        }
     }
 
     private fun saveSession(user: User) {

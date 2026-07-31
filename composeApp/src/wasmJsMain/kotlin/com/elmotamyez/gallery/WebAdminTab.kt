@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.elmotamyez.gallery.data.model.Attendance
 import com.elmotamyez.gallery.data.model.Brand
 import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Category
@@ -36,6 +37,7 @@ import com.elmotamyez.gallery.data.model.User
 import com.elmotamyez.gallery.data.model.UserRole
 import com.elmotamyez.gallery.data.repository.ProductRepository
 import com.elmotamyez.gallery.ui.screens.admin.AdminViewModel
+import com.elmotamyez.gallery.ui.screens.admin.AttendanceViewModel
 import com.elmotamyez.gallery.ui.screens.admin.ExpenseViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.buildBrandPath
@@ -56,7 +58,7 @@ import org.koin.compose.viewmodel.koinViewModel
 private external fun selectAllInFocusedInput()
 
 private enum class AdminSection {
-    HUB, CATEGORIES, BRANDS, PRODUCTS, REPORT, EXPENSES, ANALYSIS
+    HUB, CATEGORIES, BRANDS, PRODUCTS, REPORT, EXPENSES, ANALYSIS, ATTENDANCE
 }
 
 private fun AdminSection.sectionTitle() = when (this) {
@@ -66,6 +68,7 @@ private fun AdminSection.sectionTitle() = when (this) {
     AdminSection.REPORT     -> "تقرير المبيعات"
     AdminSection.EXPENSES   -> "المصاريف"
     AdminSection.ANALYSIS   -> "تحليل المبيعات"
+    AdminSection.ATTENDANCE -> "تقرير الحضور"
     AdminSection.HUB        -> ""
 }
 
@@ -124,6 +127,7 @@ internal fun WebAdminTab(user: User, onLogout: () -> Unit) {
                         AdminSection.REPORT     -> AdminReportSection(isMobile)
                         AdminSection.EXPENSES   -> AdminExpensesSection(isMobile)
                         AdminSection.ANALYSIS   -> AdminSalesAnalysisSection(isMobile)
+                        AdminSection.ATTENDANCE -> AdminAttendanceSection(isMobile)
                         AdminSection.HUB        -> Unit
                     }
                 }
@@ -186,6 +190,7 @@ private fun AdminHubPage(
             item { HubSectionLabel("التقارير") }
             item { HubManageCard(Icons.Default.BarChart,   "تقرير المبيعات",  "عرض إجمالي الفواتير والإيرادات")          { onNavigate(AdminSection.REPORT) } }
             item { HubManageCard(Icons.Default.TrendingUp, "تحليل المبيعات",  "تحليل تفصيلي حسب القسم أو المنتج")       { onNavigate(AdminSection.ANALYSIS) } }
+            item { HubManageCard(Icons.Default.Schedule,   "تقرير الحضور",    "سجل دخول وخروج الموظفين وساعات العمل")   { onNavigate(AdminSection.ATTENDANCE) } }
 
             item { HorizontalDivider() }
             item { HubSectionLabel("المصاريف") }
@@ -1103,6 +1108,131 @@ private fun ExpenseDialog(title: String, initial: Expense?, isSaving: Boolean, o
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
     )
+}
+
+// ── Attendance Section ────────────────────────────────────────────────────────
+
+private fun attendanceFormatHours(h: Double): String {
+    val hours = h.toInt()
+    val mins  = ((h - hours) * 60).toInt()
+    return when {
+        hours > 0 && mins > 0 -> "$hours س $mins د"
+        hours > 0              -> "$hours ساعة"
+        else                   -> "$mins دقيقة"
+    }
+}
+
+@Composable
+private fun AdminAttendanceSection(isMobile: Boolean = false) {
+    val vm: AttendanceViewModel = koinInject()
+    val records   by vm.records.collectAsState()
+    val isLoading by vm.isLoading.collectAsState()
+
+    LaunchedEffect(Unit) { vm.load() }
+
+    val tz = TimeZone.currentSystemDefault()
+
+    fun fmt2(n: Int) = n.toString().padStart(2, '0')
+    fun timeStr(iso: String?) = iso?.let {
+        runCatching {
+            Instant.fromEpochMilliseconds(Instant.parse(it).toEpochMilliseconds())
+                .toLocalDateTime(tz).let { dt -> "${fmt2(dt.hour)}:${fmt2(dt.minute)}" }
+        }.getOrElse { "--:--" }
+    } ?: "--:--"
+    fun dateStr(iso: String) = runCatching {
+        Instant.parse(iso).toLocalDateTime(tz).let { dt ->
+            "${fmt2(dt.dayOfMonth)}/${fmt2(dt.monthNumber)}/${dt.year}"
+        }
+    }.getOrElse { iso.take(10) }
+
+    Column(
+        Modifier.fillMaxSize().padding(if (isMobile) 12.dp else 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            "تقرير الحضور",
+            style = if (isMobile) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+
+        if (isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return@Column
+        }
+
+        if (records.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("لا توجد سجلات حضور", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            return@Column
+        }
+
+        val activeCount = records.count { it.checkOut == null }
+        val totalHours  = records.mapNotNull { it.hoursWorked }.sum()
+
+        // Summary chips
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SummaryCard("حاضر الآن", "$activeCount موظف", Icons.Default.Schedule, Modifier.weight(1f))
+            SummaryCard("إجمالي الساعات", attendanceFormatHours(totalHours), Icons.Default.BarChart, Modifier.weight(1f))
+            SummaryCard("إجمالي السجلات", "${records.size} سجل", Icons.Default.CalendarMonth, Modifier.weight(1f))
+        }
+
+        HorizontalDivider()
+
+        // Column headers
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("الموظف",   style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(1.5f))
+            Text("التاريخ",  style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(1f))
+            Text("دخول",     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(0.8f))
+            Text("خروج",     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(0.8f))
+            Text("الساعات",  style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(0.8f))
+        }
+
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(records, key = { it.id }) { record ->
+                val isActive = record.checkOut == null
+                Card(
+                    shape = RoundedCornerShape(10.dp),
+                    elevation = CardDefaults.cardElevation(1.dp),
+                    modifier  = Modifier.fillMaxWidth(),
+                    colors = if (isActive)
+                        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                    else CardDefaults.cardColors()
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(Modifier.weight(1.5f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(record.userName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            if (isActive) {
+                                Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary) {
+                                    Text("حاضر", modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        Text(dateStr(record.checkIn),       style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                        Text(timeStr(record.checkIn),        style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(0.8f))
+                        Text(timeStr(record.checkOut),       style = MaterialTheme.typography.bodySmall, color = if (isActive) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(0.8f))
+                        Text(
+                            record.hoursWorked?.let { attendanceFormatHours(it) } ?: "—",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (!isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.weight(0.8f)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ── Sales Analysis Section ────────────────────────────────────────────────────
