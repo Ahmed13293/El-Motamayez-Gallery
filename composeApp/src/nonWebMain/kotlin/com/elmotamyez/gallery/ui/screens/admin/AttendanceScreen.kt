@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -196,14 +197,26 @@ private fun isoToDateStr(iso: String): String = runCatching {
     "${fmt2(dt.dayOfMonth)}/${fmt2(dt.monthNumber)}/${dt.year}"
 }.getOrDefault(todayDateStr())
 
-private fun isoToTimeStr(iso: String): String = runCatching {
+private fun isoToTime12Str(iso: String): String = runCatching {
     val dt = Instant.parse(iso).toLocalDateTime(TimeZone.currentSystemDefault())
-    "${fmt2(dt.hour)}:${fmt2(dt.minute)}"
+    val h = when { dt.hour == 0 -> 12; dt.hour > 12 -> dt.hour - 12; else -> dt.hour }
+    "$h:${fmt2(dt.minute)}"
 }.getOrDefault("")
 
-private fun buildIso(dateStr: String, timeStr: String): String? = runCatching {
+private fun isoToPeriod(iso: String): String = runCatching {
+    val dt = Instant.parse(iso).toLocalDateTime(TimeZone.currentSystemDefault())
+    if (dt.hour < 12) "ص" else "م"
+}.getOrDefault("ص")
+
+private fun buildIso12(dateStr: String, timeStr: String, period: String): String? = runCatching {
     val (day, month, year) = dateStr.trim().split("/").map { it.toInt() }
-    val (hour, minute)     = timeStr.trim().split(":").map { it.toInt() }
+    val (h12, minute)      = timeStr.trim().split(":").map { it.toInt() }
+    val hour = when {
+        period == "ص" && h12 == 12 -> 0
+        period == "ص"               -> h12
+        period == "م" && h12 == 12 -> 12
+        else                        -> h12 + 12
+    }
     LocalDateTime(year = year, monthNumber = month, dayOfMonth = day,
         hour = hour, minute = minute, second = 0, nanosecond = 0)
         .toInstant(TimeZone.currentSystemDefault()).toString()
@@ -223,14 +236,16 @@ private fun AddEditAttendanceDialog(
 ) {
     val isEdit = record != null
 
-    var selectedUser  by remember { mutableStateOf(users.firstOrNull()) }
-    var showUserMenu  by remember { mutableStateOf(false) }
-    var dateStr       by remember { mutableStateOf(if (isEdit) isoToDateStr(record!!.checkIn) else todayDateStr()) }
-    var checkInTime   by remember { mutableStateOf(if (isEdit) isoToTimeStr(record!!.checkIn) else "") }
-    var checkOutTime  by remember { mutableStateOf(if (isEdit && record!!.checkOut != null) isoToTimeStr(record.checkOut!!) else "") }
+    var selectedUser    by remember { mutableStateOf(users.firstOrNull()) }
+    var showUserMenu    by remember { mutableStateOf(false) }
+    var dateStr         by remember { mutableStateOf(if (isEdit) isoToDateStr(record!!.checkIn) else todayDateStr()) }
+    var checkInTime     by remember { mutableStateOf(if (isEdit) isoToTime12Str(record!!.checkIn) else "") }
+    var checkInPeriod   by remember { mutableStateOf(if (isEdit) isoToPeriod(record!!.checkIn) else "ص") }
+    var checkOutTime    by remember { mutableStateOf(if (isEdit && record!!.checkOut != null) isoToTime12Str(record.checkOut!!) else "") }
+    var checkOutPeriod  by remember { mutableStateOf(if (isEdit && record!!.checkOut != null) isoToPeriod(record.checkOut!!) else "م") }
 
     val canSave = dateStr.isNotBlank() && checkInTime.isNotBlank() &&
-        buildIso(dateStr, checkInTime) != null &&
+        buildIso12(dateStr, checkInTime, checkInPeriod) != null &&
         (isEdit || selectedUser != null)
 
     AlertDialog(
@@ -281,33 +296,45 @@ private fun AddEditAttendanceDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
-                    value = checkInTime,
-                    onValueChange = { checkInTime = it },
-                    label = { Text("وقت الدخول") },
-                    placeholder = { Text("مثال: 09:00") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = checkInTime,
+                        onValueChange = { checkInTime = it },
+                        label = { Text("وقت الدخول") },
+                        placeholder = { Text("مثال: 2:30") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    AmPmToggle(selected = checkInPeriod, onSelect = { checkInPeriod = it })
+                }
 
-                OutlinedTextField(
-                    value = checkOutTime,
-                    onValueChange = { checkOutTime = it },
-                    label = { Text("وقت الخروج (اختياري)") },
-                    placeholder = { Text("مثال: 17:00") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = checkOutTime,
+                        onValueChange = { checkOutTime = it },
+                        label = { Text("وقت الخروج (اختياري)") },
+                        placeholder = { Text("مثال: 5:00") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    AmPmToggle(selected = checkOutPeriod, onSelect = { checkOutPeriod = it })
+                }
             }
         },
         confirmButton = {
             Button(
                 enabled = canSave,
                 onClick = {
-                    val checkIn  = buildIso(dateStr, checkInTime) ?: return@Button
-                    val checkOut = checkOutTime.trim().takeIf { it.isNotBlank() }?.let { buildIso(dateStr, it) }
+                    val checkIn  = buildIso12(dateStr, checkInTime, checkInPeriod) ?: return@Button
+                    val checkOut = checkOutTime.trim().takeIf { it.isNotBlank() }?.let { buildIso12(dateStr, it, checkOutPeriod) }
                     val userId   = if (isEdit) record!!.userId   else selectedUser?.id   ?: return@Button
                     val userName = if (isEdit) record!!.userName else selectedUser?.name ?: return@Button
                     onSave(userId, userName, checkIn, checkOut)
@@ -318,6 +345,29 @@ private fun AddEditAttendanceDialog(
             TextButton(onClick = onDismiss) { Text("إلغاء") }
         }
     )
+}
+
+// ─── AM / PM toggle ──────────────────────────────────────────────────────────
+
+@Composable
+private fun AmPmToggle(selected: String, onSelect: (String) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        listOf("ص", "م").forEach { period ->
+            if (selected == period) {
+                Button(
+                    onClick = { onSelect(period) },
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                    modifier = Modifier.height(56.dp)
+                ) { Text(period, fontWeight = FontWeight.Bold) }
+            } else {
+                OutlinedButton(
+                    onClick = { onSelect(period) },
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                    modifier = Modifier.height(56.dp)
+                ) { Text(period) }
+            }
+        }
+    }
 }
 
 // ─── Summary chip ────────────────────────────────────────────────────────────
