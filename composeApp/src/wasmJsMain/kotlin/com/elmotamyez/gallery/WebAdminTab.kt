@@ -22,10 +22,13 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.elmotamyez.gallery.data.model.Attendance
 import com.elmotamyez.gallery.data.model.Brand
 import com.elmotamyez.gallery.data.model.CartItem
@@ -519,7 +522,8 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
                         onEdit = { editTarget = product },
-                        onDelete = { deleteTarget = product }
+                        onDelete = { deleteTarget = product },
+                        thumbnailUrl = product.displayImages.firstOrNull()
                     )
                 }
             }
@@ -693,9 +697,18 @@ private fun SummaryCard(label: String, value: String, icon: ImageVector, modifie
 // ── Shared CRUD Components ────────────────────────────────────────────────────
 
 @Composable
-private fun CrudItemRow(title: String, subtitle: String, onEdit: () -> Unit, onDelete: () -> Unit, subtitleColor: Color? = null) {
+private fun CrudItemRow(title: String, subtitle: String, onEdit: () -> Unit, onDelete: () -> Unit, subtitleColor: Color? = null, thumbnailUrl: String? = null) {
     Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp), modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            if (thumbnailUrl != null) {
+                AsyncImage(
+                    model = thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+                )
+                Spacer(Modifier.width(10.dp))
+            }
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = subtitleColor ?: MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
