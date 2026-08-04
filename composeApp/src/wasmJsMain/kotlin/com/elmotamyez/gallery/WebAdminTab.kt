@@ -1143,8 +1143,11 @@ private fun AdminAttendanceSection(isMobile: Boolean = false) {
     fun fmt2(n: Int) = n.toString().padStart(2, '0')
     fun timeStr(iso: String?) = iso?.let {
         runCatching {
-            Instant.fromEpochMilliseconds(Instant.parse(it).toEpochMilliseconds())
-                .toLocalDateTime(tz).let { dt -> "${fmt2(dt.hour)}:${fmt2(dt.minute)}" }
+            Instant.parse(it).toLocalDateTime(tz).let { dt ->
+                val amPm = if (dt.hour < 12) "ص" else "م"
+                val h = when { dt.hour == 0 -> 12; dt.hour > 12 -> dt.hour - 12; else -> dt.hour }
+                "$h:${fmt2(dt.minute)} $amPm"
+            }
         }.getOrElse { "--:--" }
     } ?: "--:--"
     fun dateStr(iso: String) = runCatching {

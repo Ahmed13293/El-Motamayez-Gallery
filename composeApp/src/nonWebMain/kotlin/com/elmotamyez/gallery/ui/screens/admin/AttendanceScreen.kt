@@ -349,7 +349,12 @@ private fun AttendanceRecordCard(record: Attendance, onEdit: () -> Unit) {
     val checkInDt  = runCatching { Instant.parse(record.checkIn).toLocalDateTime(tz) }.getOrNull()
     val checkOutDt = record.checkOut?.let { runCatching { Instant.parse(it).toLocalDateTime(tz) }.getOrNull() }
 
-    fun timeStr(dt: kotlinx.datetime.LocalDateTime?) = dt?.let { "${fmt2(it.hour)}:${fmt2(it.minute)}" } ?: "--:--"
+    fun timeStr(dt: kotlinx.datetime.LocalDateTime?): String {
+        dt ?: return "--:--"
+        val amPm = if (dt.hour < 12) "ص" else "م"
+        val h = when { dt.hour == 0 -> 12; dt.hour > 12 -> dt.hour - 12; else -> dt.hour }
+        return "$h:${fmt2(dt.minute)} $amPm"
+    }
     fun dateStr(dt: kotlinx.datetime.LocalDateTime?) = dt?.let { "${fmt2(it.dayOfMonth)}/${fmt2(it.monthNumber)}/${it.year}" } ?: ""
 
     Card(
