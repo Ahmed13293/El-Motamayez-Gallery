@@ -303,12 +303,14 @@ private fun AddEditAttendanceDialog(
 // ─── Summary chip ────────────────────────────────────────────────────────────
 
 private fun formatHoursShort(h: Double): String {
-    val hours = h.toInt()
-    val mins  = ((h - hours) * 60).toInt()
+    val sign  = if (h < 0) "-" else ""
+    val total = kotlin.math.abs(h)
+    val hours = total.toInt()
+    val mins  = ((total - hours) * 60).toInt()
     return when {
-        hours > 0 && mins > 0 -> "$hours س $mins د"
-        hours > 0              -> "$hours ساعة"
-        else                   -> "$mins دقيقة"
+        hours > 0 && mins > 0 -> "$sign$hours س $mins د"
+        hours > 0              -> "$sign$hours ساعة"
+        else                   -> "$sign$mins دقيقة"
     }
 }
 

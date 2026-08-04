@@ -43,6 +43,7 @@ import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.ui.screens.orders.OrderViewModel
 import com.elmotamyez.gallery.ui.screens.products.ProductsViewModel
+import com.elmotamyez.gallery.ui.components.ProductImageSlider
 import com.elmotamyez.gallery.util.buildProductPath
 import com.elmotamyez.gallery.util.formatPrice
 import org.koin.compose.koinInject
@@ -834,6 +835,10 @@ private fun PublicProductCard(
     ) {
         Column(modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ProductImageSlider(
+                images = product.displayImages,
+                modifier = Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(10.dp))
+            )
             Text(product.name,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
