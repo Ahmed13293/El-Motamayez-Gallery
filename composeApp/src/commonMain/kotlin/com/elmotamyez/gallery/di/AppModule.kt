@@ -3,6 +3,7 @@ package com.elmotamyez.gallery.di
 import com.elmotamyez.gallery.NavigationController
 import com.elmotamyez.gallery.data.repository.AttendanceRepository
 import com.elmotamyez.gallery.data.repository.AuthRepository
+import com.elmotamyez.gallery.data.repository.ImageUploadRepository
 import com.elmotamyez.gallery.data.repository.ExpenseRepository
 import com.elmotamyez.gallery.data.repository.OrderRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
@@ -29,6 +30,7 @@ val appModule = module {
     single { ExpenseRepository() }
     single { AuthRepository() }
     single { AttendanceRepository() }
+    single { ImageUploadRepository() }
 
     // Singletons — shared state across all tabs
     singleOf(::CartViewModel)

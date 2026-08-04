@@ -532,8 +532,8 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
             initial = null,
             categories = categories,
             brands = brands,
-            onConfirm = { name, price, wholesale, stock, brandId, catId ->
-                adminVm.addProduct(name, price, wholesale, stock, brandId, catId)
+            onConfirm = { name, price, wholesale, stock, brandId, catId, imageUrls ->
+                adminVm.addProduct(name, price, wholesale, stock, brandId, catId, imageUrls)
                 showAdd = false
             },
             onDismiss = { showAdd = false }
@@ -546,8 +546,8 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
             initial = product,
             categories = categories,
             brands = brands,
-            onConfirm = { name, price, wholesale, stock, brandId, catId ->
-                adminVm.editProduct(product.id, name, price, wholesale, stock, brandId, catId)
+            onConfirm = { name, price, wholesale, stock, brandId, catId, imageUrls ->
+                adminVm.editProduct(product.id, name, price, wholesale, stock, brandId, catId, imageUrls)
                 editTarget = null
             },
             onDismiss = { editTarget = null }
@@ -767,12 +767,13 @@ private fun BrandDialog(title: String, nameValue: String, onNameChange: (String)
 }
 
 @Composable
-private fun ProductDialog(title: String, initial: Product?, categories: List<Category>, brands: List<Brand>, onConfirm: (String, Double, Double?, Int, String, String) -> Unit, onDismiss: () -> Unit) {
+private fun ProductDialog(title: String, initial: Product?, categories: List<Category>, brands: List<Brand>, onConfirm: (String, Double, Double?, Int, String, String, List<String>) -> Unit, onDismiss: () -> Unit) {
     fun tfv(s: String) = TextFieldValue(s, TextRange(s.length))
     var name         by remember { mutableStateOf(tfv(initial?.name ?: "")) }
     var price        by remember { mutableStateOf(tfv(initial?.price?.toString() ?: "")) }
     var wholesale    by remember { mutableStateOf(tfv(initial?.wholesalePrice?.toString() ?: "")) }
     var stock        by remember { mutableStateOf(tfv(initial?.stock?.toString() ?: "")) }
+    var imageUrl     by remember { mutableStateOf(tfv(initial?.displayImages?.firstOrNull() ?: "")) }
     var catId        by remember { mutableStateOf(initial?.categoryId ?: categories.firstOrNull()?.id ?: "") }
     var brandId      by remember { mutableStateOf(initial?.brandId ?: brands.firstOrNull()?.id ?: "") }
     var catExpanded  by remember { mutableStateOf(false) }
@@ -808,6 +809,10 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) { stock = stock.selectAll(); selectAllInFocusedInput() } })
+                OutlinedTextField(value = imageUrl, onValueChange = { imageUrl = it },
+                    label = { Text("رابط الصورة (اختياري)") }, placeholder = { Text("https://...") }, singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) selectAllInFocusedInput() })
                 // Category dropdown
                 Box {
                     OutlinedTextField(value = catName, onValueChange = {}, readOnly = true, label = { Text("القسم") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
@@ -848,7 +853,8 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
                     val p = price.text.toDoubleOrNull() ?: return@Button
                     val w = wholesale.text.toDoubleOrNull()
                     val s = stock.text.toIntOrNull() ?: 0
-                    onConfirm(name.text, p, w, s, brandId, catId)
+                    val imgs = listOfNotNull(imageUrl.text.trim().ifBlank { null })
+                    onConfirm(name.text, p, w, s, brandId, catId, imgs)
                 },
                 enabled = name.text.isNotBlank() && price.text.isNotBlank() && catId.isNotBlank() && brandId.isNotBlank()
             ) { Text("حفظ") }

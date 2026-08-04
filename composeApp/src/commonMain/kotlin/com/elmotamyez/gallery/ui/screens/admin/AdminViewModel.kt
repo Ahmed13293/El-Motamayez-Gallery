@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.elmotamyez.gallery.data.model.Brand
 import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
+import com.elmotamyez.gallery.data.repository.ImageUploadRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,15 +15,19 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 data class AdminUiState(
-    val categories: List<Category> = emptyList(),
-    val brands:     List<Brand>    = emptyList(),
-    val products:   List<Product>  = emptyList(),
-    val isLoading:  Boolean        = false,
-    val error:      String?        = null,
-    val toast:      String?        = null
+    val categories:       List<Category> = emptyList(),
+    val brands:           List<Brand>    = emptyList(),
+    val products:         List<Product>  = emptyList(),
+    val isLoading:        Boolean        = false,
+    val isUploadingImage: Boolean        = false,
+    val error:            String?        = null,
+    val toast:            String?        = null
 )
 
-class AdminViewModel(private val repository: ProductRepository) : ViewModel() {
+class AdminViewModel(
+    private val repository: ProductRepository,
+    private val imageRepo: ImageUploadRepository
+) : ViewModel() {
 
     private val _state = MutableStateFlow(AdminUiState())
     val state: StateFlow<AdminUiState> = _state.asStateFlow()
@@ -100,14 +105,14 @@ class AdminViewModel(private val repository: ProductRepository) : ViewModel() {
 
     // ── Products ──────────────────────────────────────────────────────────────
 
-    fun addProduct(name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String) = viewModelScope.launch {
-        runCatching { repository.insertProduct(newId(), name.trim(), price, wholesalePrice, stock, brandId, categoryId) }
+    fun addProduct(name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList()) = viewModelScope.launch {
+        runCatching { repository.insertProduct(newId(), name.trim(), price, wholesalePrice, stock, brandId, categoryId, imageUrls) }
             .onSuccess { loadAll(); toast("تم إضافة المنتج") }
             .onFailure { _state.update { s -> s.copy(error = it.message) } }
     }
 
-    fun editProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String) = viewModelScope.launch {
-        runCatching { repository.updateProduct(id, name.trim(), price, wholesalePrice, stock, brandId, categoryId) }
+    fun editProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList()) = viewModelScope.launch {
+        runCatching { repository.updateProduct(id, name.trim(), price, wholesalePrice, stock, brandId, categoryId, imageUrls) }
             .onSuccess { loadAll(); toast("تم تعديل المنتج") }
             .onFailure { _state.update { s -> s.copy(error = it.message) } }
     }
@@ -116,6 +121,16 @@ class AdminViewModel(private val repository: ProductRepository) : ViewModel() {
         runCatching { repository.deleteProduct(id) }
             .onSuccess { loadAll(); toast("تم حذف المنتج") }
             .onFailure { _state.update { s -> s.copy(error = it.message) } }
+    }
+
+    fun uploadImage(bytes: ByteArray, onUrl: (String) -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(isUploadingImage = true) }
+            runCatching { imageRepo.uploadProductImage(bytes) }
+                .onSuccess { url -> onUrl(url) }
+                .onFailure { _state.update { s -> s.copy(error = "فشل رفع الصورة: ${it.message}") } }
+            _state.update { it.copy(isUploadingImage = false) }
+        }
     }
 
     private fun toast(msg: String) = _state.update { it.copy(toast = msg) }

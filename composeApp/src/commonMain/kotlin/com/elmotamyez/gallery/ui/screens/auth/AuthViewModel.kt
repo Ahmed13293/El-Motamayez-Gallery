@@ -62,6 +62,7 @@ class AuthViewModel(
                     saveSession(user)
                     if (user.role == UserRole.USER) {
                         runCatching { attendanceRepo.recordSignIn(user.id, user.name) }
+                            .onFailure { println("ATTENDANCE_ERROR: sign-in record failed: ${it.message}") }
                     }
                     _uiState.value = _uiState.value.copy(isLoading = false, user = user)
                 } else {

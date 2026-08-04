@@ -9,10 +9,13 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,11 +23,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.util.formatPrice
 
@@ -48,6 +53,55 @@ private val StockState.label get() = when (this) {
     StockState.OUT -> "نفذ"
     StockState.LOW -> "قليل"
     StockState.OK  -> "متوفر"
+}
+
+// ── ProductImageSlider ────────────────────────────────────────────────────────
+
+@Composable
+fun ProductImageSlider(
+    images: List<String>,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier) {
+        when {
+            images.isEmpty() -> Box(
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Image, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                    modifier = Modifier.size(36.dp))
+            }
+
+            images.size == 1 -> AsyncImage(
+                model = images[0], contentDescription = null,
+                modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
+            )
+
+            else -> {
+                val pagerState = rememberPagerState(pageCount = { images.size })
+                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                    AsyncImage(model = images[page], contentDescription = null,
+                        modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                }
+                Row(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    repeat(images.size) { i ->
+                        val selected = pagerState.currentPage == i
+                        Box(
+                            Modifier
+                                .size(if (selected) 6.dp else 4.dp)
+                                .clip(CircleShape)
+                                .background(if (selected) Color.White else Color.White.copy(alpha = 0.5f))
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ── ProductCard ───────────────────────────────────────────────────────────────
@@ -79,6 +133,15 @@ fun ProductCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+
+            // ── Product image ─────────────────────────────────────────────────
+            ProductImageSlider(
+                images = product.displayImages,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+            )
 
             // ── Name + price + stock ──────────────────────────────────────────
             Column(

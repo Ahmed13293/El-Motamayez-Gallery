@@ -114,7 +114,7 @@ class MainScreen : Screen {
             val pendingTab by navController.pendingTab.collectAsState()
 
             LaunchedEffect(pendingTab) {
-                if (pendingTab == "orders" && isAdmin) {
+                if (pendingTab == "orders") {
                     tabNavigator.current = OrdersTab
                     navController.consume()
                     orderVm.loadOrders()
@@ -130,9 +130,9 @@ class MainScreen : Screen {
                         NavItem(ReceiptsTab,   Icons.Default.Receipt,    tabNavigator,
                                 badgeCount = newReceiptsCount,
                                 onSelected = { seenReceiptsCount = receipts.size })
+                        NavItem(OrdersTab, Icons.Default.ListAlt, tabNavigator, badgeCount = pendingOrders)
                         if (isAdmin) {
-                            NavItem(OrdersTab, Icons.Default.ListAlt, tabNavigator, badgeCount = pendingOrders)
-                            NavItem(AdminTab,  Icons.Default.Person,  tabNavigator)
+                            NavItem(AdminTab, Icons.Default.Person, tabNavigator)
                         }
                     }
                 }

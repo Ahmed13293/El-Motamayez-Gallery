@@ -9,9 +9,17 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+data class UserSummary(val id: String, val name: String)
+
+@Serializable
+private data class AppUserRow(
+    @SerialName("id")   val id: String,
+    @SerialName("name") val name: String
+)
+
 @Serializable
 private data class AttendanceRow(
-    val id: String,
+    @SerialName("id")         val id: String,
     @SerialName("user_id")    val userId: String,
     @SerialName("user_name")  val userName: String,
     @SerialName("check_in")   val checkIn: String,
@@ -27,11 +35,31 @@ private data class AttendanceInsert(
 )
 
 @Serializable
+private data class AttendanceManualInsert(
+    @SerialName("user_id")   val userId: String,
+    @SerialName("user_name") val userName: String,
+    @SerialName("check_in")  val checkIn: String,
+    @SerialName("check_out") val checkOut: String? = null
+)
+
+@Serializable
 private data class CheckOutUpdate(
     @SerialName("check_out") val checkOut: String
 )
 
+@Serializable
+private data class AttendanceFullUpdate(
+    @SerialName("check_in")  val checkIn: String,
+    @SerialName("check_out") val checkOut: String? = null
+)
+
 class AttendanceRepository {
+
+    suspend fun getUsers(): List<UserSummary> =
+        supabaseClient.from("app_users")
+            .select()
+            .decodeList<AppUserRow>()
+            .map { UserSummary(it.id, it.name) }
 
     suspend fun recordSignIn(userId: String, userName: String) {
         val now = Clock.System.now().toString()
@@ -48,6 +76,19 @@ class AttendanceRepository {
                     eq("user_id", userId)
                     filter("check_out", FilterOperator.IS, null)
                 }
+            }
+    }
+
+    suspend fun insertManual(userId: String, userName: String, checkIn: String, checkOut: String?) {
+        supabaseClient.from("attendance").insert(
+            AttendanceManualInsert(userId = userId, userName = userName, checkIn = checkIn, checkOut = checkOut)
+        )
+    }
+
+    suspend fun updateRecord(id: String, checkIn: String, checkOut: String?) {
+        supabaseClient.from("attendance")
+            .update(AttendanceFullUpdate(checkIn = checkIn, checkOut = checkOut)) {
+                filter { eq("id", id) }
             }
     }
 

@@ -1,18 +1,28 @@
 package com.elmotamyez.gallery.ui.screens.admin
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import com.elmotamyez.gallery.util.rememberImagePickerLauncher
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +57,8 @@ class ManageProductsScreen : Screen {
         var nameError          by remember { mutableStateOf(false) }
         var lastAddedName      by remember { mutableStateOf("") }
         var wholesalePriceField by remember { mutableStateOf("") }
+        var imageUrlsList by remember { mutableStateOf<List<String>>(emptyList()) }
+        var addUrlField   by remember { mutableStateOf("") }
         var selectedCatId by remember { mutableStateOf("") }
         var selectedBrandId by remember { mutableStateOf("") }
         var catExpanded   by remember { mutableStateOf(false) }
@@ -54,6 +66,12 @@ class ManageProductsScreen : Screen {
         var deleteTarget  by remember { mutableStateOf<Product?>(null) }
         var searchQuery   by remember { mutableStateOf("") }
         var stockFilter   by remember { mutableStateOf("all") } // "all" | "0" | "1" | "2"
+
+        val isUploadingImage = state.isUploadingImage
+
+        val launchPicker = rememberImagePickerLauncher { bytes ->
+            vm.uploadImage(bytes) { url -> imageUrlsList = imageUrlsList + url }
+        }
 
         val snackbarHost = remember { SnackbarHostState() }
         LaunchedEffect(state.toast) {
@@ -80,7 +98,8 @@ class ManageProductsScreen : Screen {
 
         fun openAdd() {
             editTarget = null; nameField = ""; priceField = ""; stockField = ""
-            wholesalePriceField = ""; stockError = false; nameError = false
+            wholesalePriceField = ""; imageUrlsList = emptyList(); addUrlField = ""
+            stockError = false; nameError = false
             selectedCatId = state.categories.firstOrNull()?.id ?: ""
             selectedBrandId = state.brands.firstOrNull { it.categoryId == selectedCatId }?.id ?: ""
             showDialog = true
@@ -90,6 +109,7 @@ class ManageProductsScreen : Screen {
             editTarget = p; nameField = p.name; priceField = p.price.toString()
             stockField = p.stock.toString(); stockError = false; nameError = false
             wholesalePriceField = p.wholesalePrice?.toString() ?: ""
+            imageUrlsList = p.displayImages; addUrlField = ""
             selectedCatId = p.categoryId; selectedBrandId = p.brandId
             showDialog = true
         }
@@ -282,6 +302,79 @@ class ManageProductsScreen : Screen {
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth()
                         )
+                        // Images
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (imageUrlsList.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    imageUrlsList.forEachIndexed { idx, url ->
+                                        Box(
+                                            modifier = Modifier
+                                                .size(80.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                        ) {
+                                            AsyncImage(
+                                                model = url, contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(20.dp)
+                                                    .align(Alignment.TopEnd)
+                                                    .background(Color.Black.copy(alpha = 0.55f), CircleShape)
+                                                    .clickable { imageUrlsList = imageUrlsList.toMutableList().also { it.removeAt(idx) } },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Default.Close, null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(12.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = { launchPicker() },
+                                enabled = !isUploadingImage,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                if (isUploadingImage) {
+                                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.Image, null, modifier = Modifier.size(18.dp))
+                                }
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (isUploadingImage) "جاري الرفع..." else "أضف صورة من الجهاز")
+                            }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = addUrlField,
+                                    onValueChange = { addUrlField = it },
+                                    label = { Text("رابط صورة") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = {
+                                        val url = addUrlField.trim()
+                                        if (url.isNotBlank()) {
+                                            imageUrlsList = imageUrlsList + url
+                                            addUrlField = ""
+                                        }
+                                    }
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "إضافة رابط")
+                                }
+                            }
+                        }
                         // Category
                         ExposedDropdownMenuBox(
                             expanded = catExpanded,
@@ -357,10 +450,10 @@ class ManageProductsScreen : Screen {
                         if (trimmedName.isNotBlank() && price != null &&
                             selectedCatId.isNotBlank() && selectedBrandId.isNotBlank()) {
                             if (editTarget == null) {
-                                vm.addProduct(trimmedName, price, wholesalePrice, stock, selectedBrandId, selectedCatId)
+                                vm.addProduct(trimmedName, price, wholesalePrice, stock, selectedBrandId, selectedCatId, imageUrlsList)
                                 lastAddedName = trimmedName
                             } else {
-                                vm.editProduct(editTarget!!.id, trimmedName, price, wholesalePrice, stock, selectedBrandId, selectedCatId)
+                                vm.editProduct(editTarget!!.id, trimmedName, price, wholesalePrice, stock, selectedBrandId, selectedCatId, imageUrlsList)
                             }
                             showDialog = false
                         }

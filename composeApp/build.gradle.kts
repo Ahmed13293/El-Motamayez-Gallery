@@ -87,9 +87,11 @@ kotlin {
             implementation(libs.multiplatform.settings)
             implementation(libs.multiplatform.settings.no.arg)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.coil.compose)
         }
 
         nonWebMain.dependencies {
+            implementation(libs.coil.network.ktor)
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.tab)
             implementation(libs.voyager.koin)

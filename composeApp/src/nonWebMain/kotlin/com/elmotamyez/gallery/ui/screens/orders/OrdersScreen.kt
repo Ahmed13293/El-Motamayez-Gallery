@@ -97,6 +97,7 @@ class OrdersScreen : Screen {
         val error by vm.error.collectAsState()
         val authState by authVm.uiState.collectAsState()
         val username = authState.user?.username
+        val isAdmin = authState.user?.role == com.elmotamyez.gallery.data.model.UserRole.ADMIN
 
         var editingOrder by remember { mutableStateOf<Order?>(null) }
         var deletingOrder by remember { mutableStateOf<Order?>(null) }
@@ -151,6 +152,7 @@ class OrdersScreen : Screen {
                         OrderCard(
                             order = order,
                             isSaving = isSaving,
+                            isAdmin = isAdmin,
                             onAdvance = { vm.advanceStatus(order, username) },
                             onEdit = { editingOrder = order },
                             onDelete = { deletingOrder = order })
@@ -213,7 +215,7 @@ class OrdersScreen : Screen {
 
 @Composable
 private fun OrderCard(
-    order: Order, isSaving: Boolean, onAdvance: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit
+    order: Order, isSaving: Boolean, isAdmin: Boolean, onAdvance: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(true) }
     val status = OrderStatus.fromKey(order.status)
@@ -283,21 +285,23 @@ private fun OrderCard(
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            Icons.Default.Edit,
-                            null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            Icons.Default.Delete,
-                            null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
+                    if (isAdmin) {
+                        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Default.Edit,
+                                null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Default.Delete,
+                                null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                     Icon(
                         if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,

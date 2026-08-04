@@ -3,6 +3,8 @@ package com.elmotamyez.gallery.ui.screens.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -14,6 +16,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -28,6 +32,12 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import com.elmotamyez.gallery.data.model.UserRole
+import com.elmotamyez.gallery.ui.screens.admin.ExpenseViewModel
+import com.elmotamyez.gallery.util.dateTimeString
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,6 +51,7 @@ import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.ui.components.CartBottomBar
 import com.elmotamyez.gallery.ui.components.PrintingButton
+import com.elmotamyez.gallery.ui.components.ProductImageSlider
 import com.elmotamyez.gallery.ui.components.StockBadge
 import com.elmotamyez.gallery.util.buildProductPath
 import com.elmotamyez.gallery.ui.screens.cart.CartViewModel
@@ -78,7 +89,10 @@ class CategoriesHomeScreen : Screen {
         val cartVm: CartViewModel = koinInject()
         val receiptVm: ReceiptViewModel = koinInject()
         val authVm: AuthViewModel = koinInject()
+        val expenseVm: ExpenseViewModel = koinInject()
         val authState by authVm.uiState.collectAsState()
+        val isNormalUser = authState.user?.role == UserRole.USER
+        var showExpenseSheet by remember { mutableStateOf(false) }
         val keyboard = LocalSoftwareKeyboardController.current
 
         val state by vm.uiState.collectAsState()
@@ -212,6 +226,15 @@ class CategoriesHomeScreen : Screen {
                     }
                 }
             },
+            floatingActionButton = {
+                if (isNormalUser) {
+                    ExtendedFloatingActionButton(
+                        onClick = { showExpenseSheet = true },
+                        icon    = { Icon(Icons.Default.AttachMoney, null) },
+                        text    = { Text("إضافة مصروف", fontWeight = FontWeight.Bold) }
+                    )
+                }
+            },
             bottomBar = {
                 CartBottomBar(
                     totalPrice = cartVm.totalPrice,
@@ -220,6 +243,15 @@ class CategoriesHomeScreen : Screen {
                 )
             }
         ) { padding ->
+            if (showExpenseSheet) {
+                QuickExpenseSheet(
+                    onDismiss = { showExpenseSheet = false },
+                    onSave    = { type, amount, note ->
+                        expenseVm.addExpense(type, amount, note) {}
+                        showExpenseSheet = false
+                    }
+                )
+            }
             when {
                 state.isLoading -> Box(
                     Modifier.fillMaxSize().padding(padding),
@@ -703,6 +735,117 @@ private fun OtherProductSheet(
     }
 }
 
+// ── Quick expense bottom sheet (for normal users) ────────────────────────────
+
+private val EXPENSE_TYPES_HOME = listOf("الإيجار", "مرتبات", "النت", "الكهرباء", "بضاعه", "مصاريف عامة")
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuickExpenseSheet(
+    onDismiss: () -> Unit,
+    onSave: (type: String, amount: Double, note: String?) -> Unit
+) {
+    var selectedType  by remember { mutableStateOf<String?>(null) }
+    var amountInput   by remember { mutableStateOf("") }
+    var noteInput     by remember { mutableStateOf("") }
+    var amountError   by remember { mutableStateOf(false) }
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                if (selectedType == null) "اختر نوع المصروف" else "إضافة مصروف",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+            )
+
+            HorizontalDivider()
+
+            if (selectedType == null) {
+                // Step 1 — pick type
+                EXPENSE_TYPES_HOME.forEach { type ->
+                    Surface(
+                        onClick = { selectedType = type },
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            type,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            } else {
+                // Step 2 — enter amount & note
+                Text(
+                    "النوع: $selectedType",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+
+                OutlinedTextField(
+                    value = amountInput,
+                    onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) { amountInput = it; amountError = false } },
+                    label = { Text("القيمة (جنيه)") },
+                    suffix = { Text("ج") },
+                    singleLine = true,
+                    isError = amountError,
+                    supportingText = if (amountError) {{ Text("يرجى إدخال قيمة صحيحة") }} else null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = noteInput,
+                    onValueChange = { noteInput = it },
+                    label = { Text("ملاحظة (اختياري)") },
+                    minLines = 2,
+                    maxLines = 3,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { selectedType = null; amountInput = ""; noteInput = "" },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) { Text("تغيير النوع") }
+
+                    Button(
+                        onClick = {
+                            val amount = amountInput.toDoubleOrNull()
+                            if (amount == null || amount <= 0) { amountError = true; return@Button }
+                            onSave(selectedType!!, amount, noteInput.ifBlank { null })
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("حفظ", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ── Best-seller card (pager) ──────────────────────────────────────────────────
 
 @Composable
@@ -728,6 +871,16 @@ private fun BestSellerCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+
+            // ── Product image ─────────────────────────────────────────────────
+            ProductImageSlider(
+                images = product.displayImages,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+            )
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()

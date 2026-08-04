@@ -12,6 +12,10 @@ data class Product(
     val stock: Int = 0,
     @SerialName("brand_id") val brandId: String,
     @SerialName("category_id") val categoryId: String,
-    @SerialName("image_url") val imageUrl: String? = null,
+    @SerialName("image_url")  val imageUrl: String? = null,
+    @SerialName("image_urls") val imageUrls: List<String>? = null,
     @SerialName("created_at") val createdAt: String? = null
-)
+) {
+    val displayImages: List<String>
+        get() = imageUrls.orEmpty().ifEmpty { listOfNotNull(imageUrl) }
+}

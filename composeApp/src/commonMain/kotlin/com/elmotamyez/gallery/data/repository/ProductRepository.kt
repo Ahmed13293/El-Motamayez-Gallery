@@ -7,6 +7,8 @@ import com.elmotamyez.gallery.data.remote.supabaseClient
 import io.github.jan.supabase.postgrest.from
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -29,7 +31,9 @@ private data class ProductUpdate(
     @SerialName("wholesale_price") val wholesalePrice: Double?,
     val stock: Int,
     @SerialName("brand_id")    val brandId: String,
-    @SerialName("category_id") val categoryId: String
+    @SerialName("category_id") val categoryId: String,
+    @SerialName("image_url")   val imageUrl: String?,
+    @SerialName("image_urls")  val imageUrls: List<String>
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,18 +111,21 @@ class ProductRepository {
 
     // ── PRODUCTS ──────────────────────────────────────────────────────────────
 
-    suspend fun insertProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String) {
+    suspend fun insertProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList()) {
         supabaseClient.from("products").insert(buildJsonObject {
             put("id", id); put("name", name); put("price", price); put("stock", stock)
             put("brand_id", brandId); put("category_id", categoryId)
             if (wholesalePrice != null) put("wholesale_price", wholesalePrice)
+            put("image_url", imageUrls.firstOrNull())
+            put("image_urls", JsonArray(imageUrls.map { JsonPrimitive(it) }))
         })
         clearCache()
     }
 
-    suspend fun updateProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String) {
+    suspend fun updateProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList()) {
         supabaseClient.from("products")
-            .update(ProductUpdate(name, price, wholesalePrice, stock, brandId, categoryId)) { filter { eq("id", id) } }
+            .update(ProductUpdate(name, price, wholesalePrice, stock, brandId, categoryId,
+                imageUrls.firstOrNull(), imageUrls)) { filter { eq("id", id) } }
         clearCache()
     }
 
