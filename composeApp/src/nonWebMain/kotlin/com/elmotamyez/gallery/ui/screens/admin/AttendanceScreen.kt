@@ -257,7 +257,6 @@ private fun AddEditAttendanceDialog(
                     onValueChange = { dateStr = it },
                     label = { Text("التاريخ") },
                     placeholder = { Text("يوم/شهر/سنة — مثال: 15/01/2024") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -267,7 +266,7 @@ private fun AddEditAttendanceDialog(
                     onValueChange = { checkInTime = it },
                     label = { Text("وقت الدخول") },
                     placeholder = { Text("مثال: 09:00") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -277,7 +276,7 @@ private fun AddEditAttendanceDialog(
                     onValueChange = { checkOutTime = it },
                     label = { Text("وقت الخروج (اختياري)") },
                     placeholder = { Text("مثال: 17:00") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
