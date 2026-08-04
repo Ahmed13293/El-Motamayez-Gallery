@@ -14,10 +14,13 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,10 +83,42 @@ fun ProductImageSlider(
 
             else -> {
                 val pagerState = rememberPagerState(pageCount = { images.size })
+                val scope = androidx.compose.runtime.rememberCoroutineScope()
                 HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                     AsyncImage(model = images[page], contentDescription = null,
                         modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 }
+                // Prev arrow
+                if (pagerState.currentPage > 0) {
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 4.dp)
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.35f))
+                            .clickable { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                }
+                // Next arrow
+                if (pagerState.currentPage < images.size - 1) {
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 4.dp)
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.35f))
+                            .clickable { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                }
+                // Dot indicators (clickable)
                 Row(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 5.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -93,9 +128,10 @@ fun ProductImageSlider(
                         val selected = pagerState.currentPage == i
                         Box(
                             Modifier
-                                .size(if (selected) 6.dp else 4.dp)
+                                .size(if (selected) 8.dp else 5.dp)
                                 .clip(CircleShape)
                                 .background(if (selected) Color.White else Color.White.copy(alpha = 0.5f))
+                                .clickable { scope.launch { pagerState.animateScrollToPage(i) } }
                         )
                     }
                 }
