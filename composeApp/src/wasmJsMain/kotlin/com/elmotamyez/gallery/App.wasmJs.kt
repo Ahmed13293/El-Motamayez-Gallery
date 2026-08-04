@@ -114,6 +114,7 @@ import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.model.Receipt
 import com.elmotamyez.gallery.data.model.User
 import com.elmotamyez.gallery.data.model.UserRole
+import com.elmotamyez.gallery.ui.components.ProductImageSlider
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
 import com.elmotamyez.gallery.ui.screens.cart.CartViewModel
 import com.elmotamyez.gallery.ui.screens.orders.OrderViewModel
@@ -782,6 +783,13 @@ private fun WebProductCard(
             Modifier.padding(if (isMobile) 8.dp else 12.dp),
             verticalArrangement = Arrangement.spacedBy(if (isMobile) 6.dp else 8.dp)
         ) {
+            ProductImageSlider(
+                images = product.displayImages,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isMobile) 110.dp else 140.dp)
+                    .clip(RoundedCornerShape(10.dp))
+            )
             Text(
                 product.name,
                 style = if (isMobile) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
