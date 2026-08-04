@@ -1148,8 +1148,17 @@ private fun AdminAttendanceSection(isMobile: Boolean = false) {
     val vm: AttendanceViewModel = koinInject()
     val records   by vm.records.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
+    var deleteTarget by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Attendance?>(null) }
 
     LaunchedEffect(Unit) { vm.load() }
+
+    deleteTarget?.let { rec ->
+        ConfirmDeleteDialog(
+            message = "هل تريد حذف سجل حضور ${rec.userName}؟ لا يمكن التراجع.",
+            onConfirm = { vm.deleteRecord(rec.id); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
+        )
+    }
 
     val tz = TimeZone.currentSystemDefault()
 
@@ -1252,6 +1261,14 @@ private fun AdminAttendanceSection(isMobile: Boolean = false) {
                             color = if (!isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                             modifier = Modifier.weight(0.8f)
                         )
+                        IconButton(
+                            onClick = { deleteTarget = record },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Default.Delete, null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp))
+                        }
                     }
                 }
             }

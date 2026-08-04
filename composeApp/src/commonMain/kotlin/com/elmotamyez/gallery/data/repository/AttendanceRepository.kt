@@ -92,6 +92,10 @@ class AttendanceRepository {
             }
     }
 
+    suspend fun deleteRecord(id: String) {
+        supabaseClient.from("attendance").delete { filter { eq("id", id) } }
+    }
+
     suspend fun getAll(): List<Attendance> =
         supabaseClient.from("attendance")
             .select { order("check_in", SbOrder.DESCENDING) }

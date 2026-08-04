@@ -59,6 +59,18 @@ class AttendanceViewModel(private val repo: AttendanceRepository) : ViewModel() 
         }
     }
 
+    fun deleteRecord(id: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            runCatching {
+                repo.deleteRecord(id)
+                _records.value = repo.getAll()
+            }.onFailure { _error.value = "خطأ في الحذف: ${it.message}" }
+            _isLoading.value = false
+        }
+    }
+
     fun testInsert() {
         viewModelScope.launch {
             _isLoading.value = true

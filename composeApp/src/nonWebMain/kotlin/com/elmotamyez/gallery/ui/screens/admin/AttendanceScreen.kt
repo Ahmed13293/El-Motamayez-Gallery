@@ -40,10 +40,26 @@ class AttendanceScreen : Screen {
         val isLoading by vm.isLoading.collectAsState()
         val error     by vm.error.collectAsState()
 
-        var showAddDialog  by remember { mutableStateOf(false) }
-        var editingRecord  by remember { mutableStateOf<Attendance?>(null) }
+        var showAddDialog   by remember { mutableStateOf(false) }
+        var editingRecord   by remember { mutableStateOf<Attendance?>(null) }
+        var deletingRecord  by remember { mutableStateOf<Attendance?>(null) }
 
         LaunchedEffect(Unit) { vm.load() }
+
+        deletingRecord?.let { rec ->
+            AlertDialog(
+                onDismissRequest = { deletingRecord = null },
+                title = { Text("حذف السجل") },
+                text  = { Text("هل تريد حذف سجل حضور ${rec.userName}؟ لا يمكن التراجع عن هذا الإجراء.") },
+                confirmButton = {
+                    Button(
+                        onClick = { vm.deleteRecord(rec.id); deletingRecord = null },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) { Text("حذف") }
+                },
+                dismissButton = { TextButton(onClick = { deletingRecord = null }) { Text("إلغاء") } }
+            )
+        }
 
         if (showAddDialog) {
             AddEditAttendanceDialog(
@@ -155,7 +171,11 @@ class AttendanceScreen : Screen {
                         }
 
                         items(records, key = { it.id }) { record ->
-                            AttendanceRecordCard(record, onEdit = { editingRecord = record })
+                            AttendanceRecordCard(
+                                record = record,
+                                onEdit = { editingRecord = record },
+                                onDelete = { deletingRecord = record }
+                            )
                         }
                     }
                 }
@@ -344,7 +364,7 @@ private fun AttendanceSummaryChip(label: String, value: String, modifier: Modifi
 // ─── Record card ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun AttendanceRecordCard(record: Attendance, onEdit: () -> Unit) {
+private fun AttendanceRecordCard(record: Attendance, onEdit: () -> Unit, onDelete: () -> Unit) {
     val tz         = TimeZone.currentSystemDefault()
     val checkInDt  = runCatching { Instant.parse(record.checkIn).toLocalDateTime(tz) }.getOrNull()
     val checkOutDt = record.checkOut?.let { runCatching { Instant.parse(it).toLocalDateTime(tz) }.getOrNull() }
@@ -407,6 +427,17 @@ private fun AttendanceRecordCard(record: Attendance, onEdit: () -> Unit) {
                             contentDescription = "تعديل",
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "حذف",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }
