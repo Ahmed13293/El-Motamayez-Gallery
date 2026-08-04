@@ -120,6 +120,7 @@ kotlin {
 
         wasmJsMain.dependencies {
             implementation(libs.ktor.client.js)
+            implementation(libs.coil.network.ktor)
         }
     }
 }
