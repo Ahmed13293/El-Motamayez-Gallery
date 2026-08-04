@@ -14,9 +14,9 @@ actual fun rememberImagePickerLauncher(onImagePicked: (ByteArray) -> Unit): () -
     val scope   = rememberCoroutineScope()
 
     val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let { u ->
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        uris.forEach { u ->
             scope.launch(Dispatchers.IO) {
                 val bytes = context.contentResolver.openInputStream(u)?.use { it.readBytes() }
                 bytes?.let { onImagePicked(it) }

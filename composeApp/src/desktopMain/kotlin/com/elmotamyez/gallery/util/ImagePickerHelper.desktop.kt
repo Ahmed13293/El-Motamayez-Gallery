@@ -14,8 +14,9 @@ actual fun rememberImagePickerLauncher(onImagePicked: (ByteArray) -> Unit): () -
         scope.launch(Dispatchers.IO) {
             val chooser = JFileChooser()
             chooser.fileFilter = FileNameExtensionFilter("Images", "jpg", "jpeg", "png", "webp")
+            chooser.isMultiSelectionEnabled = true
             if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                onImagePicked(chooser.selectedFile.readBytes())
+                chooser.selectedFiles.forEach { file -> onImagePicked(file.readBytes()) }
             }
         }
     }
