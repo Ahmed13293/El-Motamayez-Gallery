@@ -80,8 +80,8 @@ private external fun selectAllInFocusedInput()
             var buf = await input.files[i].arrayBuffer();
             var bytes = new Uint8Array(buf);
             var b64 = '';
-            for (var j = 0; j < bytes.length; j += 8192) {
-                b64 += btoa(String.fromCharCode.apply(null, bytes.subarray(j, Math.min(j + 8192, bytes.length))));
+            for (var j = 0; j < bytes.length; j += 8190) {
+                b64 += btoa(String.fromCharCode.apply(null, bytes.subarray(j, Math.min(j + 8190, bytes.length))));
             }
             results.push(b64);
         }
