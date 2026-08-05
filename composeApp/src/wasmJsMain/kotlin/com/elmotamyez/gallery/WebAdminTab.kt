@@ -51,6 +51,7 @@ import com.elmotamyez.gallery.util.fmt2f
 import com.elmotamyez.gallery.util.formatPrice
 import com.elmotamyez.gallery.util.dateTimeString
 import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
@@ -814,6 +815,7 @@ private fun BrandDialog(title: String, nameValue: String, onNameChange: (String)
     )
 }
 
+@OptIn(ExperimentalEncodingApi::class)
 @Composable
 private fun ProductDialog(title: String, initial: Product?, categories: List<Category>, brands: List<Brand>, onConfirm: (String, Double, Double?, Int, String, String, List<String>) -> Unit, onDismiss: () -> Unit) {
     fun tfv(s: String) = TextFieldValue(s, TextRange(s.length))
