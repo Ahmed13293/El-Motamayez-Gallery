@@ -2,6 +2,8 @@ package com.elmotamyez.gallery
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -38,6 +40,7 @@ import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.model.Receipt
 import com.elmotamyez.gallery.data.model.User
 import com.elmotamyez.gallery.data.model.UserRole
+import com.elmotamyez.gallery.data.repository.ImageUploadRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
 import com.elmotamyez.gallery.ui.screens.admin.AdminViewModel
 import com.elmotamyez.gallery.ui.screens.admin.AttendanceViewModel
@@ -47,11 +50,15 @@ import com.elmotamyez.gallery.util.buildBrandPath
 import com.elmotamyez.gallery.util.fmt2f
 import com.elmotamyez.gallery.util.formatPrice
 import com.elmotamyez.gallery.util.dateTimeString
+import kotlin.io.encoding.Base64
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -59,6 +66,34 @@ import org.koin.compose.viewmodel.koinViewModel
 // Safari requires setTimeout(0) before .select() — works on all browsers
 @JsFun("() => { setTimeout(function(){ var el = document.activeElement; if(el && typeof el.select === 'function') el.select(); }, 0); }")
 private external fun selectAllInFocusedInput()
+
+@JsFun("""() => {
+    window.__webPickedImages = null;
+    var input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
+    input.style.cssText = 'position:fixed;top:-9999px;opacity:0;pointer-events:none';
+    document.body.appendChild(input);
+    input.addEventListener('change', async function() {
+        var results = [];
+        for (var i = 0; i < input.files.length; i++) {
+            var buf = await input.files[i].arrayBuffer();
+            var bytes = new Uint8Array(buf);
+            var b64 = '';
+            for (var j = 0; j < bytes.length; j += 8192) {
+                b64 += btoa(String.fromCharCode.apply(null, bytes.subarray(j, Math.min(j + 8192, bytes.length))));
+            }
+            results.push(b64);
+        }
+        window.__webPickedImages = results.join('|||');
+        document.body.removeChild(input);
+    });
+    input.addEventListener('cancel', function() { window.__webPickedImages = ''; document.body.removeChild(input); });
+    input.click();
+}""")
+private external fun jsOpenWebImagePicker()
+
+@JsFun("() => { var v = window.__webPickedImages; return (v === undefined || v === null) ? null : v; }")
+private external fun jsGetWebPickedImages(): JsAny?
 
 private enum class AdminSection {
     HUB, CATEGORIES, BRANDS, PRODUCTS, REPORT, EXPENSES, ANALYSIS, ATTENDANCE
@@ -786,7 +821,11 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
     var price        by remember { mutableStateOf(tfv(initial?.price?.toString() ?: "")) }
     var wholesale    by remember { mutableStateOf(tfv(initial?.wholesalePrice?.toString() ?: "")) }
     var stock        by remember { mutableStateOf(tfv(initial?.stock?.toString() ?: "")) }
-    var imageUrl     by remember { mutableStateOf(tfv(initial?.displayImages?.firstOrNull() ?: "")) }
+    var imageUrls    by remember { mutableStateOf(initial?.displayImages ?: emptyList()) }
+    var urlInput     by remember { mutableStateOf(TextFieldValue("")) }
+    var isUploading  by remember { mutableStateOf(false) }
+    val scope        = rememberCoroutineScope()
+    val imageRepo: ImageUploadRepository = koinInject()
     var catId        by remember { mutableStateOf(initial?.categoryId ?: categories.firstOrNull()?.id ?: "") }
     var brandId      by remember { mutableStateOf(initial?.brandId ?: brands.firstOrNull()?.id ?: "") }
     var catExpanded  by remember { mutableStateOf(false) }
@@ -801,7 +840,7 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
         onDismissRequest = onDismiss,
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it },
                     label = { Text("اسم المنتج") }, singleLine = true, shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) { name = name.selectAll(); selectAllInFocusedInput() } })
@@ -822,10 +861,83 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) { stock = stock.selectAll(); selectAllInFocusedInput() } })
-                OutlinedTextField(value = imageUrl, onValueChange = { imageUrl = it },
-                    label = { Text("رابط الصورة (اختياري)") }, placeholder = { Text("https://...") }, singleLine = true,
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) selectAllInFocusedInput() })
+                // Images section
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (imageUrls.isNotEmpty()) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            itemsIndexed(imageUrls) { idx, url ->
+                                Box(Modifier.size(64.dp)) {
+                                    AsyncImage(
+                                        model = url, contentDescription = null,
+                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    IconButton(
+                                        onClick = { imageUrls = imageUrls.toMutableList().also { it.removeAt(idx) } },
+                                        modifier = Modifier.size(22.dp).align(Alignment.TopEnd)
+                                    ) {
+                                        Icon(Icons.Default.Close, null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = urlInput, onValueChange = { urlInput = it },
+                            label = { Text("رابط صورة") }, placeholder = { Text("https://...") },
+                            singleLine = true, shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = {
+                            val u = urlInput.text.trim()
+                            if (u.isNotBlank()) { imageUrls = imageUrls + u; urlInput = TextFieldValue("") }
+                        }) { Icon(Icons.Default.Add, "إضافة") }
+                    }
+                    if (isUploading) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Text("جاري رفع الصور...", style = MaterialTheme.typography.bodySmall)
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    isUploading = true
+                                    jsOpenWebImagePicker()
+                                    var resultStr: String? = null
+                                    var ticks = 0
+                                    while (ticks < 600 && resultStr == null) {
+                                        delay(100)
+                                        val res = jsGetWebPickedImages()
+                                        if (res != null) resultStr = res.toString()
+                                        ticks++
+                                    }
+                                    if (!resultStr.isNullOrBlank()) {
+                                        resultStr.split("|||").forEach { b64 ->
+                                            runCatching {
+                                                val bytes = Base64.Default.decode(b64)
+                                                val url = imageRepo.uploadProductImage(bytes)
+                                                imageUrls = imageUrls + url
+                                            }
+                                        }
+                                    }
+                                    isUploading = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Image, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("رفع صور من الجهاز")
+                        }
+                    }
+                }
                 // Category dropdown
                 Box {
                     OutlinedTextField(value = catName, onValueChange = {}, readOnly = true, label = { Text("القسم") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
@@ -866,8 +978,7 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
                     val p = price.text.toDoubleOrNull() ?: return@Button
                     val w = wholesale.text.toDoubleOrNull()
                     val s = stock.text.toIntOrNull() ?: 0
-                    val imgs = listOfNotNull(imageUrl.text.trim().ifBlank { null })
-                    onConfirm(name.text, p, w, s, brandId, catId, imgs)
+                    onConfirm(name.text, p, w, s, brandId, catId, imageUrls)
                 },
                 enabled = name.text.isNotBlank() && price.text.isNotBlank() && catId.isNotBlank() && brandId.isNotBlank()
             ) { Text("حفظ") }
@@ -1129,6 +1240,105 @@ private fun ExpenseDialog(title: String, initial: Expense?, isSaving: Boolean, o
     )
 }
 
+// ── Attendance helpers ────────────────────────────────────────────────────────
+
+@Composable
+private fun WebAmPmToggle(selected: String, onSelect: (String) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        listOf("ص", "م").forEach { period ->
+            if (selected == period) {
+                Button(
+                    onClick = { onSelect(period) },
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                    modifier = Modifier.height(56.dp)
+                ) { Text(period, fontWeight = FontWeight.Bold) }
+            } else {
+                OutlinedButton(
+                    onClick = { onSelect(period) },
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                    modifier = Modifier.height(56.dp)
+                ) { Text(period) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttendanceEditDialog(
+    record: Attendance,
+    onConfirm: (checkIn: String, checkOut: String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val tz = TimeZone.currentSystemDefault()
+    fun fmt2(n: Int) = n.toString().padStart(2, '0')
+    fun time12(iso: String) = runCatching {
+        Instant.parse(iso).toLocalDateTime(tz).let { dt ->
+            val h = when { dt.hour == 0 -> 12; dt.hour > 12 -> dt.hour - 12; else -> dt.hour }
+            "$h:${fmt2(dt.minute)}"
+        }
+    }.getOrDefault("")
+    fun period(iso: String) = runCatching {
+        if (Instant.parse(iso).toLocalDateTime(tz).hour < 12) "ص" else "م"
+    }.getOrDefault("ص")
+    fun buildIso(baseIso: String, time12Str: String, p: String): String? = runCatching {
+        val base = Instant.parse(baseIso).toLocalDateTime(tz)
+        val parts = time12Str.trim().split(":")
+        val h12 = parts[0].toInt(); val min = parts[1].toInt()
+        val hour = when {
+            p == "ص" && h12 == 12 -> 0
+            p == "ص"               -> h12
+            p == "م" && h12 == 12 -> 12
+            else                   -> h12 + 12
+        }
+        LocalDateTime(base.year, base.monthNumber, base.dayOfMonth, hour, min, 0, 0)
+            .toInstant(tz).toString()
+    }.getOrNull()
+
+    var checkInTime   by remember { mutableStateOf(time12(record.checkIn)) }
+    var checkInPeriod by remember { mutableStateOf(period(record.checkIn)) }
+    var checkOutTime  by remember { mutableStateOf(record.checkOut?.let { time12(it) } ?: "") }
+    var checkOutPeriod by remember { mutableStateOf(record.checkOut?.let { period(it) } ?: "م") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تعديل حضور ${record.userName}", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("وقت الدخول", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = checkInTime, onValueChange = { checkInTime = it },
+                        label = { Text("الوقت") }, placeholder = { Text("8:30") }, singleLine = true,
+                        shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f),
+                    )
+                    WebAmPmToggle(selected = checkInPeriod, onSelect = { checkInPeriod = it })
+                }
+                Text("وقت الخروج (اختياري)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = checkOutTime, onValueChange = { checkOutTime = it },
+                        label = { Text("الوقت") }, placeholder = { Text("5:00") }, singleLine = true,
+                        shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f)
+                    )
+                    WebAmPmToggle(selected = checkOutPeriod, onSelect = { checkOutPeriod = it })
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val newIn = buildIso(record.checkIn, checkInTime, checkInPeriod) ?: return@Button
+                val newOut = if (checkOutTime.isNotBlank())
+                    buildIso(record.checkOut ?: record.checkIn, checkOutTime, checkOutPeriod)
+                else null
+                onConfirm(newIn, newOut)
+            }) { Text("حفظ") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
+    )
+}
+
 // ── Attendance Section ────────────────────────────────────────────────────────
 
 private fun attendanceFormatHours(h: Double): String {
@@ -1149,6 +1359,7 @@ private fun AdminAttendanceSection(isMobile: Boolean = false) {
     val records   by vm.records.collectAsState()
     val isLoading by vm.isLoading.collectAsState()
     var deleteTarget by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Attendance?>(null) }
+    var editTarget   by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Attendance?>(null) }
 
     LaunchedEffect(Unit) { vm.load() }
 
@@ -1157,6 +1368,14 @@ private fun AdminAttendanceSection(isMobile: Boolean = false) {
             message = "هل تريد حذف سجل حضور ${rec.userName}؟ لا يمكن التراجع.",
             onConfirm = { vm.deleteRecord(rec.id); deleteTarget = null },
             onDismiss = { deleteTarget = null }
+        )
+    }
+
+    editTarget?.let { rec ->
+        AttendanceEditDialog(
+            record = rec,
+            onConfirm = { checkIn, checkOut -> vm.updateRecord(rec.id, checkIn, checkOut); editTarget = null },
+            onDismiss = { editTarget = null }
         )
     }
 
@@ -1214,60 +1433,122 @@ private fun AdminAttendanceSection(isMobile: Boolean = false) {
 
         HorizontalDivider()
 
-        // Column headers
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("الموظف",   style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(1.5f))
-            Text("التاريخ",  style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(1f))
-            Text("دخول",     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(0.8f))
-            Text("خروج",     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(0.8f))
-            Text("الساعات",  style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(0.8f))
-        }
-
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(records, key = { it.id }) { record ->
-                val isActive = record.checkOut == null
-                Card(
-                    shape = RoundedCornerShape(10.dp),
-                    elevation = CardDefaults.cardElevation(1.dp),
-                    modifier  = Modifier.fillMaxWidth(),
-                    colors = if (isActive)
-                        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
-                    else CardDefaults.cardColors()
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+        if (isMobile) {
+            // ── Mobile: card layout ───────────────────────────────────────────
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(records, key = { it.id }) { record ->
+                    val isActive = record.checkOut == null
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = CardDefaults.cardElevation(1.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = if (isActive)
+                            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                        else CardDefaults.cardColors()
                     ) {
-                        Row(Modifier.weight(1.5f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(record.userName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            if (isActive) {
-                                Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary) {
-                                    Text("حاضر", modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-                                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(record.userName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    if (isActive) {
+                                        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary) {
+                                            Text("حاضر", modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                                Row {
+                                    IconButton(onClick = { editTarget = record }, modifier = Modifier.size(32.dp)) {
+                                        Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
+                                    }
+                                    IconButton(onClick = { deleteTarget = record }, modifier = Modifier.size(32.dp)) {
+                                        Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                            HorizontalDivider()
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("التاريخ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                    Text(dateStr(record.checkIn), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("دخول", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                    Text(timeStr(record.checkIn), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("خروج", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                    Text(timeStr(record.checkOut), style = MaterialTheme.typography.bodySmall,
+                                        color = if (isActive) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("الساعات", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                    Text(
+                                        record.hoursWorked?.let { attendanceFormatHours(it) } ?: "—",
+                                        style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold,
+                                        color = if (!isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                    )
                                 }
                             }
                         }
-                        Text(dateStr(record.checkIn),       style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                        Text(timeStr(record.checkIn),        style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(0.8f))
-                        Text(timeStr(record.checkOut),       style = MaterialTheme.typography.bodySmall, color = if (isActive) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(0.8f))
-                        Text(
-                            record.hoursWorked?.let { attendanceFormatHours(it) } ?: "—",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (!isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.weight(0.8f)
-                        )
-                        IconButton(
-                            onClick = { deleteTarget = record },
-                            modifier = Modifier.size(32.dp)
+                    }
+                }
+            }
+        } else {
+            // ── Desktop: table layout ─────────────────────────────────────────
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("الموظف",  style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(1.5f))
+                Text("التاريخ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(1f))
+                Text("دخول",    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(0.8f))
+                Text("خروج",    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(0.8f))
+                Text("الساعات", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.weight(0.8f))
+            }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(records, key = { it.id }) { record ->
+                    val isActive = record.checkOut == null
+                    Card(
+                        shape = RoundedCornerShape(10.dp),
+                        elevation = CardDefaults.cardElevation(1.dp),
+                        modifier  = Modifier.fillMaxWidth(),
+                        colors = if (isActive)
+                            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                        else CardDefaults.cardColors()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(Icons.Default.Delete, null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(16.dp))
+                            Row(Modifier.weight(1.5f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(record.userName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                if (isActive) {
+                                    Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary) {
+                                        Text("حاضر", modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                            Text(dateStr(record.checkIn),  style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                            Text(timeStr(record.checkIn),  style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(0.8f))
+                            Text(timeStr(record.checkOut), style = MaterialTheme.typography.bodySmall,
+                                color = if (isActive) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(0.8f))
+                            Text(
+                                record.hoursWorked?.let { attendanceFormatHours(it) } ?: "—",
+                                style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold,
+                                color = if (!isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.weight(0.8f)
+                            )
+                            IconButton(onClick = { editTarget = record }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
+                            }
+                            IconButton(onClick = { deleteTarget = record }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                 }

@@ -30,7 +30,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
@@ -555,6 +558,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
     val state by productsVm.uiState.collectAsState()
     val cartItems by cartVm.cartItems.collectAsState()
     var showOtherDialog by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
 
     if (showOtherDialog) {
         OtherProductDialog(
@@ -600,6 +604,8 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                     },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
                 )
                 // Category chips row
@@ -611,14 +617,14 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                     item {
                         FilterChip(
                             selected = state.selectedCategoryId == null,
-                            onClick = { productsVm.selectAllCategories() },
+                            onClick = { focusManager.clearFocus(); productsVm.selectAllCategories() },
                             label = { Text("الكل", maxLines = 1) })
                     }
                     items(state.categories) { cat ->
                         val selected = state.selectedCategoryId == cat.id
                         FilterChip(
                             selected = selected,
-                            onClick = { productsVm.selectCategory(cat.id) },
+                            onClick = { focusManager.clearFocus(); productsVm.selectCategory(cat.id) },
                             label = { Text(cat.name, maxLines = 1) })
                     }
                 }
@@ -641,12 +647,12 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                 product = product,
                                 quantity = qty,
                                 isMobile = true,
-                                onAdd = { cartVm.addToCart(product) },
-                                onIncrease = { cartVm.increaseQuantity(product.id) },
-                                onDecrease = { cartVm.decreaseQuantity(product.id) })
+                                onAdd = { focusManager.clearFocus(); cartVm.addToCart(product) },
+                                onIncrease = { focusManager.clearFocus(); cartVm.increaseQuantity(product.id) },
+                                onDecrease = { focusManager.clearFocus(); cartVm.decreaseQuantity(product.id) })
                         }
                         item {
-                            OtherProductGridCard(onClick = { showOtherDialog = true })
+                            OtherProductGridCard(onClick = { focusManager.clearFocus(); showOtherDialog = true })
                         }
                     }
                 }
