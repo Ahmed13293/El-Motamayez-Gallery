@@ -93,8 +93,8 @@ private external fun selectAllInFocusedInput()
 }""")
 private external fun jsOpenWebImagePicker()
 
-@JsFun("() => { var v = window.__webPickedImages; return (v === undefined || v === null) ? null : v; }")
-private external fun jsGetWebPickedImages(): JsAny?
+@JsFun("() => { var v = window.__webPickedImages; return (v === undefined || v === null) ? null : String(v); }")
+private external fun jsGetWebPickedImages(): String?
 
 private enum class AdminSection {
     HUB, CATEGORIES, BRANDS, PRODUCTS, REPORT, EXPENSES, ANALYSIS, ATTENDANCE
@@ -826,6 +826,7 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
     var imageUrls    by remember { mutableStateOf(initial?.displayImages ?: emptyList()) }
     var urlInput     by remember { mutableStateOf(TextFieldValue("")) }
     var isUploading  by remember { mutableStateOf(false) }
+    var uploadError  by remember { mutableStateOf<String?>(null) }
     val scope        = rememberCoroutineScope()
     val imageRepo: ImageUploadRepository = koinInject()
     var catId        by remember { mutableStateOf(initial?.categoryId ?: categories.firstOrNull()?.id ?: "") }
@@ -907,25 +908,33 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
                             Text("جاري رفع الصور...", style = MaterialTheme.typography.bodySmall)
                         }
                     } else {
+                        if (uploadError != null) {
+                            Text(uploadError!!, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error)
+                        }
                         OutlinedButton(
                             onClick = {
                                 scope.launch {
                                     isUploading = true
+                                    uploadError = null
                                     jsOpenWebImagePicker()
                                     var resultStr: String? = null
                                     var ticks = 0
                                     while (ticks < 600 && resultStr == null) {
                                         delay(100)
-                                        val res = jsGetWebPickedImages()
-                                        if (res != null) resultStr = res.toString()
+                                        resultStr = jsGetWebPickedImages() // String? directly
                                         ticks++
                                     }
                                     if (!resultStr.isNullOrBlank()) {
+                                        var uploadedCount = 0
                                         resultStr.split("|||").forEach { b64 ->
                                             runCatching {
                                                 val bytes = Base64.Default.decode(b64)
                                                 val url = imageRepo.uploadProductImage(bytes)
                                                 imageUrls = imageUrls + url
+                                                uploadedCount++
+                                            }.onFailure { e ->
+                                                uploadError = "خطأ في الرفع: ${e.message?.take(80)}"
                                             }
                                         }
                                     }
