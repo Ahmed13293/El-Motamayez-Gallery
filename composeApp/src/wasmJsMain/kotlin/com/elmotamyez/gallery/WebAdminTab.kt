@@ -829,8 +829,9 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
     var uploadError  by remember { mutableStateOf<String?>(null) }
     val scope        = rememberCoroutineScope()
     val imageRepo: ImageUploadRepository = koinInject()
-    var catId        by remember { mutableStateOf(initial?.categoryId ?: categories.firstOrNull()?.id ?: "") }
-    var brandId      by remember { mutableStateOf(initial?.brandId ?: brands.firstOrNull()?.id ?: "") }
+    val defaultCatId = initial?.categoryId ?: categories.firstOrNull()?.id ?: ""
+    var catId        by remember { mutableStateOf(defaultCatId) }
+    var brandId      by remember { mutableStateOf(initial?.brandId ?: brands.firstOrNull { it.categoryId == defaultCatId }?.id ?: "") }
     var catExpanded  by remember { mutableStateOf(false) }
     var brandExpanded by remember { mutableStateOf(false) }
     fun TextFieldValue.selectAll() = copy(selection = TextRange(0, text.length))
