@@ -178,7 +178,7 @@ private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
                 .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ServiceType.entries.forEach { type ->
                 val selected = serviceType == type
