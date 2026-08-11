@@ -117,6 +117,7 @@ import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.model.Receipt
 import com.elmotamyez.gallery.data.model.User
 import com.elmotamyez.gallery.data.model.UserRole
+import com.elmotamyez.gallery.ui.components.PrintingButton
 import com.elmotamyez.gallery.ui.components.ProductImageSlider
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
 import com.elmotamyez.gallery.ui.screens.cart.CartViewModel
@@ -628,7 +629,12 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             label = { Text(cat.name, maxLines = 1) })
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
+                PrintingButton(
+                    onAddToCart = { product -> cartVm.addToCart(product) },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+                )
+                Spacer(Modifier.height(4.dp))
                 // Products grid
                 if (state.products.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -731,6 +737,10 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                         },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    PrintingButton(
+                        onAddToCart = { product -> cartVm.addToCart(product) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     if (state.products.isEmpty()) {
