@@ -5,8 +5,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -126,6 +130,22 @@ class ManageProductsScreen : Screen {
             showDialog = true
         }
 
+        val listState = rememberLazyListState()
+        var headerExpanded by remember { mutableStateOf(true) }
+        var prevIndex by remember { mutableIntStateOf(0) }
+        var prevOffset by remember { mutableIntStateOf(0) }
+        LaunchedEffect(listState) {
+            snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+                .collect { (index, offset) ->
+                    val scrollingDown = index > prevIndex || (index == prevIndex && offset > prevOffset + 8)
+                    val scrollingUp   = index < prevIndex || (index == prevIndex && offset < prevOffset - 8)
+                    if (scrollingDown) headerExpanded = false
+                    else if (scrollingUp) headerExpanded = true
+                    prevIndex  = index
+                    prevOffset = offset
+                }
+        }
+
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHost) },
             topBar = {
@@ -141,82 +161,90 @@ class ManageProductsScreen : Screen {
                             Text("إدارة المنتجات", style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold, color = Color.Black)
                         }
-                        OutlinedTextField(
-                            value = searchQuery, onValueChange = { searchQuery = it },
-                            placeholder = { Text("بحث عن منتج…") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 12.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        AnimatedVisibility(
+                            visible = headerExpanded,
+                            enter   = expandVertically(),
+                            exit    = shrinkVertically()
                         ) {
-                            listOf(
-                                "all" to "الكل",
-                                "0"   to "نفد المخزون",
-                                "12"  to "مخزون 1 و 2"
-                            ).forEach { (key, label) ->
-                                FilterChip(
-                                    selected = stockFilter == key,
-                                    onClick  = { stockFilter = key },
-                                    label    = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                                    colors   = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = if (key == "0")
-                                            MaterialTheme.colorScheme.errorContainer
-                                        else
-                                            MaterialTheme.colorScheme.primaryContainer
-                                    )
+                            Column {
+                                OutlinedTextField(
+                                    value = searchQuery, onValueChange = { searchQuery = it },
+                                    placeholder = { Text("بحث عن منتج…") },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
                                 )
-                            }
-                        }
-                        // Category filter row
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 12.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            FilterChip(
-                                selected = filterCategoryId == null,
-                                onClick  = { filterCategoryId = null; filterBrandId = null },
-                                label    = { Text("كل الأقسام", style = MaterialTheme.typography.labelMedium) }
-                            )
-                            state.categories.forEach { cat ->
-                                FilterChip(
-                                    selected = filterCategoryId == cat.id,
-                                    onClick  = {
-                                        filterCategoryId = if (filterCategoryId == cat.id) null else cat.id
-                                        filterBrandId = null
-                                    },
-                                    label    = { Text(cat.name, style = MaterialTheme.typography.labelMedium) }
-                                )
-                            }
-                        }
-                        // Brand filter row — only when category selected and has brands
-                        if (filterCategoryId != null && brandsForFilter.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState())
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = filterBrandId == null,
-                                    onClick  = { filterBrandId = null },
-                                    label    = { Text("كل الفئات", style = MaterialTheme.typography.labelMedium) }
-                                )
-                                brandsForFilter.forEach { brand ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState())
+                                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    listOf(
+                                        "all" to "الكل",
+                                        "0"   to "نفد المخزون",
+                                        "12"  to "مخزون 1 و 2"
+                                    ).forEach { (key, label) ->
+                                        FilterChip(
+                                            selected = stockFilter == key,
+                                            onClick  = { stockFilter = key },
+                                            label    = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                                            colors   = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = if (key == "0")
+                                                    MaterialTheme.colorScheme.errorContainer
+                                                else
+                                                    MaterialTheme.colorScheme.primaryContainer
+                                            )
+                                        )
+                                    }
+                                }
+                                // Category filter row
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState())
+                                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
                                     FilterChip(
-                                        selected = filterBrandId == brand.id,
-                                        onClick  = { filterBrandId = if (filterBrandId == brand.id) null else brand.id },
-                                        label    = { Text(brand.name, style = MaterialTheme.typography.labelMedium) }
+                                        selected = filterCategoryId == null,
+                                        onClick  = { filterCategoryId = null; filterBrandId = null },
+                                        label    = { Text("كل الأقسام", style = MaterialTheme.typography.labelMedium) }
                                     )
+                                    state.categories.forEach { cat ->
+                                        FilterChip(
+                                            selected = filterCategoryId == cat.id,
+                                            onClick  = {
+                                                filterCategoryId = if (filterCategoryId == cat.id) null else cat.id
+                                                filterBrandId = null
+                                            },
+                                            label    = { Text(cat.name, style = MaterialTheme.typography.labelMedium) }
+                                        )
+                                    }
+                                }
+                                // Brand filter row — only when category selected and has brands
+                                if (filterCategoryId != null && brandsForFilter.isNotEmpty()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState())
+                                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        FilterChip(
+                                            selected = filterBrandId == null,
+                                            onClick  = { filterBrandId = null },
+                                            label    = { Text("كل الفئات", style = MaterialTheme.typography.labelMedium) }
+                                        )
+                                        brandsForFilter.forEach { brand ->
+                                            FilterChip(
+                                                selected = filterBrandId == brand.id,
+                                                onClick  = { filterBrandId = if (filterBrandId == brand.id) null else brand.id },
+                                                label    = { Text(brand.name, style = MaterialTheme.typography.labelMedium) }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -235,6 +263,7 @@ class ManageProductsScreen : Screen {
                     contentAlignment = Alignment.Center) { CircularProgressIndicator() }
 
                 else -> LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize().padding(padding),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
