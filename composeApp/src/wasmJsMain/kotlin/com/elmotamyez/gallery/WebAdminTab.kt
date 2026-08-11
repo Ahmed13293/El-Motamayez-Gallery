@@ -473,9 +473,21 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
     var deleteTarget by remember { mutableStateOf<Product?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var stockFilter by remember { mutableStateOf("all") }
+    var selectedCategoryId by remember { mutableStateOf<String?>(null) }
+    var selectedBrandId by remember { mutableStateOf<String?>(null) }
+
+    val brandsForCategory = remember(selectedCategoryId, brands) {
+        if (selectedCategoryId == null) emptyList()
+        else brands.filter { it.categoryId == selectedCategoryId && it.parentId == null }
+    }
 
     val filtered = products
-        .filter { if (searchQuery.isBlank()) true else it.name.contains(searchQuery, ignoreCase = true) }
+        .filter {
+            if (searchQuery.isBlank()) true
+            else searchQuery.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) }
+        }
+        .filter { selectedCategoryId == null || it.categoryId == selectedCategoryId }
+        .filter { selectedBrandId == null || it.brandId == selectedBrandId }
         .filter {
             when (stockFilter) {
                 "0"  -> it.stock == 0
@@ -515,6 +527,7 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
             }
         }
 
+        // Stock filter
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
                 listOf("all" to "الكل", "0" to "نفد المخزون", "12" to "مخزون 1 و 2").forEach { (key, label) ->
@@ -528,6 +541,47 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
                             else MaterialTheme.colorScheme.primaryContainer
                         ),
                         modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+        }
+
+        // Category filter
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                FilterChip(
+                    selected = selectedCategoryId == null,
+                    onClick  = { selectedCategoryId = null; selectedBrandId = null },
+                    label    = { Text("كل الأقسام", style = MaterialTheme.typography.labelMedium) }
+                )
+            }
+            items(categories) { cat ->
+                FilterChip(
+                    selected = selectedCategoryId == cat.id,
+                    onClick  = {
+                        selectedCategoryId = if (selectedCategoryId == cat.id) null else cat.id
+                        selectedBrandId = null
+                    },
+                    label    = { Text(cat.name, style = MaterialTheme.typography.labelMedium) }
+                )
+            }
+        }
+
+        // Subcategory (brand) filter — only when category selected and has brands
+        if (selectedCategoryId != null && brandsForCategory.isNotEmpty()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    FilterChip(
+                        selected = selectedBrandId == null,
+                        onClick  = { selectedBrandId = null },
+                        label    = { Text("كل الفئات", style = MaterialTheme.typography.labelMedium) }
+                    )
+                }
+                items(brandsForCategory) { brand ->
+                    FilterChip(
+                        selected = selectedBrandId == brand.id,
+                        onClick  = { selectedBrandId = if (selectedBrandId == brand.id) null else brand.id },
+                        label    = { Text(brand.name, style = MaterialTheme.typography.labelMedium) }
                     )
                 }
             }
