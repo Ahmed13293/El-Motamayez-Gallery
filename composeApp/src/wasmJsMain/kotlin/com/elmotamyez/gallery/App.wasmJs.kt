@@ -676,12 +676,33 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             Text("$catName ← $brandName", style = MaterialTheme.typography.labelMedium)
                         }
                     }
-                    Spacer(Modifier.height(4.dp))
-                    PrintingButton(
-                        onAddToCart = { product -> cartVm.addToCart(product) },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
-                    )
-                    Spacer(Modifier.height(4.dp))
+                    // 50/50 row: Other product | Printing
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFFFFEEDD))
+                                .clickable { focusManager.clearFocus(); showOtherDialog = true }
+                                .padding(horizontal = 12.dp, vertical = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.Add, null, tint = Color(0xFF08396C), modifier = Modifier.size(20.dp))
+                                Text("منتج اخر", color = Color(0xFF08396C), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            }
+                        }
+                        PrintingButton(
+                            onAddToCart = { product -> cartVm.addToCart(product) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     // Products grid
                     if (state.products.isEmpty()) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -703,9 +724,6 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                     onAdd = { focusManager.clearFocus(); cartVm.addToCart(product) },
                                     onIncrease = { focusManager.clearFocus(); cartVm.increaseQuantity(product.id) },
                                     onDecrease = { focusManager.clearFocus(); cartVm.decreaseQuantity(product.id) })
-                            }
-                            item {
-                                OtherProductGridCard(onClick = { focusManager.clearFocus(); showOtherDialog = true })
                             }
                         }
                     }
@@ -822,10 +840,33 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        PrintingButton(
-                            onAddToCart = { product -> cartVm.addToCart(product) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        // 50/50 row: Other product | Printing
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color(0xFFFFEEDD))
+                                    .clickable { showOtherDialog = true }
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, null, tint = Color(0xFF08396C), modifier = Modifier.size(22.dp))
+                                    Text("منتج اخر", color = Color(0xFF08396C), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                }
+                            }
+                            PrintingButton(
+                                onAddToCart = { product -> cartVm.addToCart(product) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                         if (state.products.isEmpty()) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text(
@@ -849,9 +890,6 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                         onAdd = { cartVm.addToCart(product) },
                                         onIncrease = { cartVm.increaseQuantity(product.id) },
                                         onDecrease = { cartVm.decreaseQuantity(product.id) })
-                                }
-                                item {
-                                    OtherProductGridCard(onClick = { showOtherDialog = true })
                                 }
                             }
                         }
