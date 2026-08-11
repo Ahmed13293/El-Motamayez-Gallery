@@ -174,10 +174,7 @@ private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
 
         // ── Service type toggle ───────────────────────────────────────────────
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
-                .padding(4.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ServiceType.entries.forEach { type ->
@@ -195,7 +192,7 @@ private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
                 Surface(
                     onClick = { serviceType = type },
                     shape = RoundedCornerShape(10.dp),
-                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.weight(1f).height(56.dp)
                 ) {
                     Column(
