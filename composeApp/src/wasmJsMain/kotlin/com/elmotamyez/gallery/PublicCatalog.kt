@@ -43,6 +43,7 @@ import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.ui.screens.orders.OrderViewModel
 import com.elmotamyez.gallery.ui.screens.products.ProductsViewModel
+import com.elmotamyez.gallery.ui.components.PrintingButton
 import com.elmotamyez.gallery.ui.components.ProductImageSlider
 import com.elmotamyez.gallery.util.buildProductPath
 import com.elmotamyez.gallery.util.formatPrice
@@ -74,12 +75,14 @@ external fun openUrl(url: String)
 }""")
 private external fun copyToClipboard(text: String)
 
-private fun buildCartMsg(items: Map<Product, Int>): String {
+private fun buildCartMsg(items: Map<Product, Int>, printItems: List<Product> = emptyList()): String {
     val lines = items.entries.joinToString("\n") { (p, qty) ->
         "• ${p.name} × $qty = ${(p.price * qty).formatPrice()} ج"
     }
-    val total = items.entries.sumOf { (p, qty) -> p.price * qty }
-    return "مرحباً، أريد طلب من مكتبة المتميز 🛒\n\n$lines\n\nالإجمالي: ${total.formatPrice()} ج"
+    val printLines = printItems.joinToString("\n") { p -> "• ${p.name} = ${p.price.formatPrice()} ج" }
+    val allLines = listOf(lines, printLines).filter { it.isNotBlank() }.joinToString("\n")
+    val total = items.entries.sumOf { (p, qty) -> p.price * qty } + printItems.sumOf { it.price }
+    return "مرحباً، أريد طلب من مكتبة المتميز 🛒\n\n$allLines\n\nالإجمالي: ${total.formatPrice()} ج"
 }
 
 // ── Right-panel view state ────────────────────────────────────────────────────
@@ -134,10 +137,11 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
 
     // Cart
     val cart = remember { mutableStateMapOf<String, Int>() }
+    val printItems = remember { mutableStateListOf<Product>() }
     val cartProducts = allProducts.filter { cart.containsKey(it.id) }
         .associateWith { cart[it.id] ?: 0 }
-    val cartCount = cart.values.sum()
-    val cartTotal = cartProducts.entries.sumOf { (p, q) -> p.price * q }
+    val cartCount = cart.values.sum() + printItems.size
+    val cartTotal = cartProducts.entries.sumOf { (p, q) -> p.price * q } + printItems.sumOf { it.price }
 
     // Dialog state
     var showOrderDialog  by remember { mutableStateOf(false) }
@@ -185,7 +189,7 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
         val canSend = customerName.isNotBlank() && customerPhone.isNotBlank() && customerAddress.isNotBlank()
 
         fun buildFullMsg(): String {
-            val base = buildCartMsg(cartProducts)
+            val base = buildCartMsg(cartProducts, printItems)
             val discountLine = if (promoApplied) "\nخصم 10%: -${discountAmount.formatPrice()} ج\nالإجمالي بعد الخصم: ${finalTotal.formatPrice()} ج" else ""
             return base + discountLine +
                 "\n\nالاسم: ${customerName.trim()}" +
@@ -196,7 +200,8 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
         }
 
         fun saveAndSend(openPlatform: () -> Unit) {
-            val items = cartProducts.map { (p, qty) -> CartItem(p, qty) }
+            val items = cartProducts.map { (p, qty) -> CartItem(p, qty) } +
+                        printItems.map { CartItem(it, 1) }
             orderVm.createOrder(
                 items           = items,
                 total           = finalTotal,
@@ -210,6 +215,7 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
             openPlatform()
             showOrderDialog = false
             cart.clear()
+            printItems.clear()
         }
 
         AlertDialog(
@@ -575,6 +581,12 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
                                 modifier = Modifier.fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 8.dp)
                             )
+                            PrintingButton(
+                                onAddToCart = { product -> printItems.add(product) },
+                                modifier = Modifier.fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                                    .padding(bottom = 8.dp)
+                            )
                             if (isMobile) {
                                 LazyRow(
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
@@ -752,7 +764,7 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
-                            onClick = { cart.clear() },
+                            onClick = { cart.clear(); printItems.clear() },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
                             shape = RoundedCornerShape(10.dp)
