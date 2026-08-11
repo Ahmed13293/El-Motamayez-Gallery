@@ -276,14 +276,42 @@ class ManageProductsScreen : Screen {
                     }
                     items(filteredProducts, key = { it.id }) { product ->
                         val path = buildProductPath(product, state.categories, state.brands)
+                        val thumbUrl = product.displayImages.firstOrNull()
                         Card(modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             elevation = CardDefaults.cardElevation(1.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                if (thumbUrl != null) {
+                                    AsyncImage(
+                                        model = thumbUrl,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Image,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.outline,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                }
                                 Column(modifier = Modifier.weight(1f),
                                     verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(product.name, fontWeight = FontWeight.SemiBold,
