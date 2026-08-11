@@ -179,6 +179,36 @@ internal fun WebAdminTab(user: User, onLogout: () -> Unit) {
     }
 }
 
+// ── Products tab for normal users ─────────────────────────────────────────────
+
+@Composable
+internal fun WebProductsManagementTab(isMobile: Boolean = false) {
+    val adminVm: AdminViewModel = koinViewModel()
+    val state by adminVm.state.collectAsState()
+
+    state.toast?.let { msg -> LaunchedEffect(msg) { adminVm.clearToast() } }
+
+    Column(Modifier.fillMaxSize()) {
+        state.toast?.let { msg ->
+            Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    msg,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+        if (state.isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            AdminProductsSection(state.products, state.categories, state.brands, adminVm, isMobile)
+        }
+    }
+}
+
 // ── Admin Hub Page ────────────────────────────────────────────────────────────
 
 @Composable

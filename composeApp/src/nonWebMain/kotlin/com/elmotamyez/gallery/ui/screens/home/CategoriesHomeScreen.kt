@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import com.elmotamyez.gallery.data.model.UserRole
 import com.elmotamyez.gallery.ui.screens.admin.ExpenseViewModel
+import com.elmotamyez.gallery.ui.screens.admin.ManageProductsScreen
 import com.elmotamyez.gallery.util.dateTimeString
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -333,6 +334,26 @@ class CategoriesHomeScreen : Screen {
                         .background(MaterialTheme.colorScheme.background),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
+                    // ── Manage products shortcut (normal users) ──────────────
+                    if (isNormalUser) {
+                        item {
+                            FilledTonalButton(
+                                onClick = { navigator.push(ManageProductsScreen()) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("إدارة المنتجات", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+
                     // ── Top Categories ───────────────────────────────────────
                     item {
                         SectionHeader(

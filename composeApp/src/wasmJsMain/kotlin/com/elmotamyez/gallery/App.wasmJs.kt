@@ -208,7 +208,7 @@ private fun Receipt.timeLabel(): String {
     return "${twoDigit(local.hour)}:${twoDigit(local.minute)}"
 }
 
-private enum class WebTab { HOME, CART, RECEIPTS, ORDERS, ADMIN }
+private enum class WebTab { HOME, CART, RECEIPTS, PRODUCTS, ORDERS, ADMIN }
 
 @Composable
 private fun cairoFontFamily(): FontFamily = FontFamily(
@@ -438,7 +438,11 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
 
             // Desktop: tab row at top
             if (!isMobile) {
-                val selectedIndex = currentTab.ordinal.coerceAtMost(if (isAdmin) 4 else 2)
+                val visibleTabs = if (isAdmin)
+                    listOf(WebTab.HOME, WebTab.CART, WebTab.RECEIPTS, WebTab.ORDERS, WebTab.ADMIN)
+                else
+                    listOf(WebTab.HOME, WebTab.CART, WebTab.RECEIPTS, WebTab.PRODUCTS)
+                val selectedIndex = visibleTabs.indexOf(currentTab).coerceAtLeast(0)
                 ScrollableTabRow(
                     selectedTabIndex = selectedIndex,
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -483,6 +487,13 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                             icon = { Icon(Icons.Default.AdminPanelSettings, null, modifier = Modifier.size(20.dp)) },
                             text = { Text("الإدارة") }
                         )
+                    } else {
+                        Tab(
+                            selected = currentTab == WebTab.PRODUCTS,
+                            onClick = { currentTab = WebTab.PRODUCTS },
+                            icon = { Icon(Icons.Default.Edit, null, modifier = Modifier.size(20.dp)) },
+                            text = { Text("إدارة المنتجات") }
+                        )
                     }
                 }
             }
@@ -497,9 +508,10 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                         isMobile = isMobile,
                         onOrderConfirmed = { currentTab = WebTab.RECEIPTS })
 
-                    WebTab.RECEIPTS -> WebReceiptsTab(isAdmin = isAdmin, isMobile = isMobile)
-                    WebTab.ORDERS  -> if (isAdmin) WebOrdersTab(user = user)
-                    WebTab.ADMIN   -> if (isAdmin) WebAdminTab(user = user, onLogout = onLogout)
+                    WebTab.RECEIPTS  -> WebReceiptsTab(isAdmin = isAdmin, isMobile = isMobile)
+                    WebTab.PRODUCTS  -> WebProductsManagementTab(isMobile = isMobile)
+                    WebTab.ORDERS    -> if (isAdmin) WebOrdersTab(user = user)
+                    WebTab.ADMIN     -> if (isAdmin) WebAdminTab(user = user, onLogout = onLogout)
                 }
             }
 
@@ -544,6 +556,13 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                             onClick  = { currentTab = WebTab.ADMIN },
                             icon     = { Icon(Icons.Default.AdminPanelSettings, null) },
                             label    = { Text("الإدارة", fontSize = 11.sp) }
+                        )
+                    } else {
+                        NavigationBarItem(
+                            selected = currentTab == WebTab.PRODUCTS,
+                            onClick  = { currentTab = WebTab.PRODUCTS },
+                            icon     = { Icon(Icons.Default.Edit, null) },
+                            label    = { Text("المنتجات", fontSize = 11.sp) }
                         )
                     }
                 }
