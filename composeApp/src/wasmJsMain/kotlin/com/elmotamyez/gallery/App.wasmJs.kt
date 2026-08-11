@@ -35,6 +35,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -561,6 +562,14 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
     var showOtherDialog by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
+    val subcategoriesForCategory = remember(state.selectedCategoryId, state.brands) {
+        state.brands.filter { it.categoryId == state.selectedCategoryId && it.parentId == null }
+    }
+    val showSubcategoryView = state.selectedCategoryId != null &&
+        subcategoriesForCategory.isNotEmpty() &&
+        state.selectedBrandId == null &&
+        state.searchQuery.isBlank()
+
     if (showOtherDialog) {
         OtherProductDialog(
             onDismiss = { showOtherDialog = false },
@@ -590,30 +599,30 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
         else -> if (isMobile) {
             // ── Mobile: categories as horizontal chips, products below ──────
             Column(Modifier.fillMaxSize()) {
-                // Search bar
-                OutlinedTextField(
-                    value = state.searchQuery,
-                    onValueChange = { productsVm.search(it) },
-                    placeholder = { Text("بحث عن منتج...") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    trailingIcon = {
-                        if (state.searchQuery.isNotEmpty()) IconButton(onClick = {
-                            productsVm.search(
-                                ""
-                            )
-                        }) { Icon(Icons.Default.Clear, null) }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
-                )
+                // Search bar (hidden in subcategory view to keep it clean)
+                if (!showSubcategoryView) {
+                    OutlinedTextField(
+                        value = state.searchQuery,
+                        onValueChange = { productsVm.search(it) },
+                        placeholder = { Text("بحث عن منتج...") },
+                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                        trailingIcon = {
+                            if (state.searchQuery.isNotEmpty()) IconButton(onClick = {
+                                productsVm.search("")
+                            }) { Icon(Icons.Default.Clear, null) }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
                 // Category chips row
                 androidx.compose.foundation.lazy.LazyRow(
                     contentPadding = PaddingValues(horizontal = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                 ) {
                     item {
                         FilterChip(
@@ -629,36 +638,75 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             label = { Text(cat.name, maxLines = 1) })
                     }
                 }
-                Spacer(Modifier.height(4.dp))
-                PrintingButton(
-                    onAddToCart = { product -> cartVm.addToCart(product) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
-                )
-                Spacer(Modifier.height(4.dp))
-                // Products grid
-                if (state.products.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("لا توجد منتجات", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (showSubcategoryView) {
+                    // ── Subcategory circles ──────────────────────────────────
+                    val catName = state.categories.find { it.id == state.selectedCategoryId }?.name ?: ""
+                    Text(
+                        catName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(subcategoriesForCategory) { brand ->
+                            WebBrandCircle(
+                                name = brand.name,
+                                onClick = { focusManager.clearFocus(); productsVm.selectBrand(brand.id) }
+                            )
+                        }
                     }
                 } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        items(state.products) { product ->
-                            val qty = cartItems.find { it.product.id == product.id }?.quantity ?: 0
-                            WebProductCard(
-                                product = product,
-                                quantity = qty,
-                                isMobile = true,
-                                onAdd = { focusManager.clearFocus(); cartVm.addToCart(product) },
-                                onIncrease = { focusManager.clearFocus(); cartVm.increaseQuantity(product.id) },
-                                onDecrease = { focusManager.clearFocus(); cartVm.decreaseQuantity(product.id) })
+                    // Back breadcrumb when brand selected
+                    if (state.selectedBrandId != null) {
+                        val catName = state.categories.find { it.id == state.selectedCategoryId }?.name ?: ""
+                        val brandName = state.brands.find { it.id == state.selectedBrandId }?.name ?: ""
+                        TextButton(
+                            onClick = { focusManager.clearFocus(); productsVm.selectCategory(state.selectedCategoryId!!) },
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("$catName ← $brandName", style = MaterialTheme.typography.labelMedium)
                         }
-                        item {
-                            OtherProductGridCard(onClick = { focusManager.clearFocus(); showOtherDialog = true })
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    PrintingButton(
+                        onAddToCart = { product -> cartVm.addToCart(product) },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    // Products grid
+                    if (state.products.isEmpty()) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("لا توجد منتجات", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            items(state.products) { product ->
+                                val qty = cartItems.find { it.product.id == product.id }?.quantity ?: 0
+                                WebProductCard(
+                                    product = product,
+                                    quantity = qty,
+                                    isMobile = true,
+                                    onAdd = { focusManager.clearFocus(); cartVm.addToCart(product) },
+                                    onIncrease = { focusManager.clearFocus(); cartVm.increaseQuantity(product.id) },
+                                    onDecrease = { focusManager.clearFocus(); cartVm.decreaseQuantity(product.id) })
+                            }
+                            item {
+                                OtherProductGridCard(onClick = { focusManager.clearFocus(); showOtherDialog = true })
+                            }
                         }
                     }
                 }
@@ -707,10 +755,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             ) {
                                 Text(
                                     cat.name,
-                                    modifier = Modifier.padding(
-                                        horizontal = 12.dp,
-                                        vertical = 10.dp
-                                    ),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                     color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
@@ -721,61 +766,131 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                         }
                     }
                 }
-                Column(
-                    Modifier.fillMaxSize().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = state.searchQuery,
-                        onValueChange = { productsVm.search(it) },
-                        placeholder = { Text("بحث عن منتج...") },
-                        leadingIcon = { Icon(Icons.Default.Search, null) },
-                        trailingIcon = {
-                            if (state.searchQuery.isNotEmpty()) IconButton(onClick = {
-                                productsVm.search("")
-                            }) { Icon(Icons.Default.Clear, null) }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    PrintingButton(
-                        onAddToCart = { product -> cartVm.addToCart(product) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (state.products.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                "لا توجد منتجات",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else {
+                if (showSubcategoryView) {
+                    // ── Desktop: subcategory circles view ────────────────────
+                    val catName = state.categories.find { it.id == state.selectedCategoryId }?.name ?: ""
+                    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            catName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                         LazyVerticalGrid(
-                            columns = GridCells.Adaptive(minSize = 180.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = PaddingValues(bottom = 16.dp)
+                            columns = GridCells.Adaptive(minSize = 120.dp),
+                            verticalArrangement = Arrangement.spacedBy(20.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(bottom = 16.dp),
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            items(state.products) { product ->
-                                val qty =
-                                    cartItems.find { it.product.id == product.id }?.quantity ?: 0
-                                WebProductCard(
-                                    product = product,
-                                    quantity = qty,
-                                    isMobile = false,
-                                    onAdd = { cartVm.addToCart(product) },
-                                    onIncrease = { cartVm.increaseQuantity(product.id) },
-                                    onDecrease = { cartVm.decreaseQuantity(product.id) })
+                            items(subcategoriesForCategory) { brand ->
+                                WebBrandCircle(
+                                    name = brand.name,
+                                    onClick = { productsVm.selectBrand(brand.id) }
+                                )
                             }
-                            item {
-                                OtherProductGridCard(onClick = { showOtherDialog = true })
+                        }
+                    }
+                } else {
+                    Column(
+                        Modifier.fillMaxSize().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Back breadcrumb when brand selected
+                        if (state.selectedBrandId != null) {
+                            val catName = state.categories.find { it.id == state.selectedCategoryId }?.name ?: ""
+                            TextButton(
+                                onClick = { productsVm.selectCategory(state.selectedCategoryId!!) },
+                                modifier = Modifier.padding(0.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(catName, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                        OutlinedTextField(
+                            value = state.searchQuery,
+                            onValueChange = { productsVm.search(it) },
+                            placeholder = { Text("بحث عن منتج...") },
+                            leadingIcon = { Icon(Icons.Default.Search, null) },
+                            trailingIcon = {
+                                if (state.searchQuery.isNotEmpty()) IconButton(onClick = {
+                                    productsVm.search("")
+                                }) { Icon(Icons.Default.Clear, null) }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        PrintingButton(
+                            onAddToCart = { product -> cartVm.addToCart(product) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (state.products.isEmpty()) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    "لا توجد منتجات",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(minSize = 180.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                contentPadding = PaddingValues(bottom = 16.dp)
+                            ) {
+                                items(state.products) { product ->
+                                    val qty = cartItems.find { it.product.id == product.id }?.quantity ?: 0
+                                    WebProductCard(
+                                        product = product,
+                                        quantity = qty,
+                                        isMobile = false,
+                                        onAdd = { cartVm.addToCart(product) },
+                                        onIncrease = { cartVm.increaseQuantity(product.id) },
+                                        onDecrease = { cartVm.decreaseQuantity(product.id) })
+                                }
+                                item {
+                                    OtherProductGridCard(onClick = { showOtherDialog = true })
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WebBrandCircle(name: String, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFDCEEFA)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                name.firstOrNull()?.toString() ?: "",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF08396C)
+            )
+        }
+        Text(
+            name,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
