@@ -74,8 +74,8 @@ class ProductsViewModel(private val repository: ProductRepository) : ViewModel()
 
     fun search(query: String) {
         val s = _uiState.value
-        // Keep selected category when searching; clear brand filters
-        val catId   = s.selectedCategoryId
+        // Global search across all products when query is active
+        val catId   = if (query.isBlank()) s.selectedCategoryId else null
         val brandId = if (query.isBlank()) s.selectedBrandId    else null
         val subId   = if (query.isBlank()) s.selectedSubBrandId else null
         _uiState.update {
@@ -155,6 +155,8 @@ class ProductsViewModel(private val repository: ProductRepository) : ViewModel()
         (categoryId == null || p.categoryId == categoryId) &&
         (brandId    == null || p.brandId    == brandId    || p.brandId == subBrandId) &&
         (subBrandId == null || p.brandId    == subBrandId) &&
-        (query.isBlank()    || p.name.contains(query, ignoreCase = true))
+        (query.isBlank()    || query.trim().split(Regex("\\s+")).all { word ->
+            p.name.contains(word, ignoreCase = true)
+        })
     }
 }
