@@ -64,8 +64,10 @@ class ManageProductsScreen : Screen {
         var catExpanded   by remember { mutableStateOf(false) }
         var brandExpanded by remember { mutableStateOf(false) }
         var deleteTarget  by remember { mutableStateOf<Product?>(null) }
-        var searchQuery   by remember { mutableStateOf("") }
-        var stockFilter   by remember { mutableStateOf("all") } // "all" | "0" | "1" | "2"
+        var searchQuery      by remember { mutableStateOf("") }
+        var stockFilter     by remember { mutableStateOf("all") } // "all" | "0" | "1" | "2"
+        var filterCategoryId by remember { mutableStateOf<String?>(null) }
+        var filterBrandId    by remember { mutableStateOf<String?>(null) }
 
         val isUploadingImage = state.isUploadingImage
 
@@ -84,9 +86,19 @@ class ManageProductsScreen : Screen {
         // Brands filtered by selected category (all levels)
         val brandsForCat = state.brands.filter { it.categoryId == selectedCatId }
 
-        val filteredProducts = remember(searchQuery, stockFilter, state.products) {
+        val brandsForFilter = remember(filterCategoryId, state.brands) {
+            if (filterCategoryId == null) emptyList()
+            else state.brands.filter { it.categoryId == filterCategoryId && it.parentId == null }
+        }
+
+        val filteredProducts = remember(searchQuery, stockFilter, filterCategoryId, filterBrandId, state.products) {
             state.products
-                .filter { if (searchQuery.isBlank()) true else it.name.contains(searchQuery, ignoreCase = true) }
+                .filter {
+                    if (searchQuery.isBlank()) true
+                    else searchQuery.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) }
+                }
+                .filter { filterCategoryId == null || it.categoryId == filterCategoryId }
+                .filter { filterBrandId == null || it.brandId == filterBrandId }
                 .filter {
                     when (stockFilter) {
                         "0"  -> it.stock == 0
@@ -159,6 +171,53 @@ class ManageProductsScreen : Screen {
                                             MaterialTheme.colorScheme.primaryContainer
                                     )
                                 )
+                            }
+                        }
+                        // Category filter row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = filterCategoryId == null,
+                                onClick  = { filterCategoryId = null; filterBrandId = null },
+                                label    = { Text("كل الأقسام", style = MaterialTheme.typography.labelMedium) }
+                            )
+                            state.categories.forEach { cat ->
+                                FilterChip(
+                                    selected = filterCategoryId == cat.id,
+                                    onClick  = {
+                                        filterCategoryId = if (filterCategoryId == cat.id) null else cat.id
+                                        filterBrandId = null
+                                    },
+                                    label    = { Text(cat.name, style = MaterialTheme.typography.labelMedium) }
+                                )
+                            }
+                        }
+                        // Brand filter row — only when category selected and has brands
+                        if (filterCategoryId != null && brandsForFilter.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = filterBrandId == null,
+                                    onClick  = { filterBrandId = null },
+                                    label    = { Text("كل الفئات", style = MaterialTheme.typography.labelMedium) }
+                                )
+                                brandsForFilter.forEach { brand ->
+                                    FilterChip(
+                                        selected = filterBrandId == brand.id,
+                                        onClick  = { filterBrandId = if (filterBrandId == brand.id) null else brand.id },
+                                        label    = { Text(brand.name, style = MaterialTheme.typography.labelMedium) }
+                                    )
+                                }
                             }
                         }
                     }
