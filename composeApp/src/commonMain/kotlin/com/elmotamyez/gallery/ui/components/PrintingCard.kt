@@ -195,7 +195,7 @@ private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
                 Surface(
                     onClick = { serviceType = type },
                     shape = RoundedCornerShape(10.dp),
-                    color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                     modifier = Modifier.weight(1f).height(56.dp)
                 ) {
                     Column(
