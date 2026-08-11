@@ -1,5 +1,8 @@
 package com.elmotamyez.gallery
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -8,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -496,6 +500,22 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
             }
         }
 
+    val listState = rememberLazyListState()
+    var headerExpanded by remember { mutableStateOf(true) }
+    var prevIndex  by remember { mutableIntStateOf(0) }
+    var prevOffset by remember { mutableIntStateOf(0) }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                val scrollingDown = index > prevIndex || (index == prevIndex && offset > prevOffset + 8)
+                val scrollingUp   = index < prevIndex || (index == prevIndex && offset < prevOffset - 8)
+                if (scrollingDown) headerExpanded = false
+                else if (scrollingUp) headerExpanded = true
+                prevIndex  = index
+                prevOffset = offset
+            }
+    }
+
     Column(Modifier.fillMaxSize().padding(if (isMobile) 12.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (isMobile) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -506,10 +526,12 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
                     Text("إضافة", fontSize = 13.sp)
                 }
             }
-            OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it },
-                placeholder = { Text("بحث...") }, singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+            AnimatedVisibility(visible = headerExpanded, enter = expandVertically(), exit = shrinkVertically()) {
+                OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it },
+                    placeholder = { Text("بحث...") }, singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+            }
         } else {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("إدارة المنتجات", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -527,62 +549,65 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
             }
         }
 
-        // Stock filter
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                listOf("all" to "الكل", "0" to "نفد المخزون", "12" to "مخزون 1 و 2").forEach { (key, label) ->
-                    FilterChip(
-                        selected = stockFilter == key,
-                        onClick  = { stockFilter = key },
-                        label    = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                        colors   = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = if (key == "0")
-                                MaterialTheme.colorScheme.errorContainer
-                            else MaterialTheme.colorScheme.primaryContainer
-                        ),
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
+        // Collapsible filters
+        AnimatedVisibility(visible = headerExpanded, enter = expandVertically(), exit = shrinkVertically()) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // Stock filter
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        listOf("all" to "الكل", "0" to "نفد المخزون", "12" to "مخزون 1 و 2").forEach { (key, label) ->
+                            FilterChip(
+                                selected = stockFilter == key,
+                                onClick  = { stockFilter = key },
+                                label    = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                                colors   = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = if (key == "0")
+                                        MaterialTheme.colorScheme.errorContainer
+                                    else MaterialTheme.colorScheme.primaryContainer
+                                ),
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                        }
+                    }
                 }
-            }
-        }
-
-        // Category filter
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                FilterChip(
-                    selected = selectedCategoryId == null,
-                    onClick  = { selectedCategoryId = null; selectedBrandId = null },
-                    label    = { Text("كل الأقسام", style = MaterialTheme.typography.labelMedium) }
-                )
-            }
-            items(categories) { cat ->
-                FilterChip(
-                    selected = selectedCategoryId == cat.id,
-                    onClick  = {
-                        selectedCategoryId = if (selectedCategoryId == cat.id) null else cat.id
-                        selectedBrandId = null
-                    },
-                    label    = { Text(cat.name, style = MaterialTheme.typography.labelMedium) }
-                )
-            }
-        }
-
-        // Subcategory (brand) filter — only when category selected and has brands
-        if (selectedCategoryId != null && brandsForCategory.isNotEmpty()) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item {
-                    FilterChip(
-                        selected = selectedBrandId == null,
-                        onClick  = { selectedBrandId = null },
-                        label    = { Text("كل الفئات", style = MaterialTheme.typography.labelMedium) }
-                    )
+                // Category filter
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        FilterChip(
+                            selected = selectedCategoryId == null,
+                            onClick  = { selectedCategoryId = null; selectedBrandId = null },
+                            label    = { Text("كل الأقسام", style = MaterialTheme.typography.labelMedium) }
+                        )
+                    }
+                    items(categories) { cat ->
+                        FilterChip(
+                            selected = selectedCategoryId == cat.id,
+                            onClick  = {
+                                selectedCategoryId = if (selectedCategoryId == cat.id) null else cat.id
+                                selectedBrandId = null
+                            },
+                            label    = { Text(cat.name, style = MaterialTheme.typography.labelMedium) }
+                        )
+                    }
                 }
-                items(brandsForCategory) { brand ->
-                    FilterChip(
-                        selected = selectedBrandId == brand.id,
-                        onClick  = { selectedBrandId = if (selectedBrandId == brand.id) null else brand.id },
-                        label    = { Text(brand.name, style = MaterialTheme.typography.labelMedium) }
-                    )
+                // Subcategory (brand) filter
+                if (selectedCategoryId != null && brandsForCategory.isNotEmpty()) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item {
+                            FilterChip(
+                                selected = selectedBrandId == null,
+                                onClick  = { selectedBrandId = null },
+                                label    = { Text("كل الفئات", style = MaterialTheme.typography.labelMedium) }
+                            )
+                        }
+                        items(brandsForCategory) { brand ->
+                            FilterChip(
+                                selected = selectedBrandId == brand.id,
+                                onClick  = { selectedBrandId = if (selectedBrandId == brand.id) null else brand.id },
+                                label    = { Text(brand.name, style = MaterialTheme.typography.labelMedium) }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -594,7 +619,7 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
                 Text("لا توجد منتجات", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(filtered, key = { it.id }) { product ->
                     val brandName = brands.find { it.id == product.brandId }?.name ?: ""
                     val catName   = categories.find { it.id == product.categoryId }?.name ?: ""
