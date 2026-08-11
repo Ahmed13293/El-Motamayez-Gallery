@@ -34,13 +34,15 @@ import com.elmotamyez.gallery.util.fmt2f
 // Single-sided prices
 private const val PRICE_PRINT_SINGLE = 2.00
 private const val PRICE_PHOTO_SINGLE = 1.50
+private const val PRICE_A3_SINGLE    = 3.00
 // Double-sided (وش وضهر) prices
 private const val PRICE_PRINT_DOUBLE = 3.50
 private const val PRICE_PHOTO_DOUBLE = 2.50
+private const val PRICE_A3_DOUBLE    = 4.00
 
 private val NavyGradient = listOf(Color(0xFF08396C), Color(0xFF1565C0))
 
-private enum class ServiceType(val label: String) { PRINT("طباعة"), PHOTO("تصوير") }
+private enum class ServiceType(val label: String) { PRINT("طباعة"), PHOTO("تصوير"), A3("طباعة A3") }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -130,6 +132,8 @@ private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
     val paperCount = paperCountText.toIntOrNull()?.coerceAtLeast(1) ?: 1
 
     val pricePerPage = when {
+        serviceType == ServiceType.A3    && doubleSided  -> PRICE_A3_DOUBLE
+        serviceType == ServiceType.A3    && !doubleSided -> PRICE_A3_SINGLE
         serviceType == ServiceType.PRINT && doubleSided  -> PRICE_PRINT_DOUBLE
         serviceType == ServiceType.PRINT && !doubleSided -> PRICE_PRINT_SINGLE
         serviceType == ServiceType.PHOTO && doubleSided  -> PRICE_PHOTO_DOUBLE
@@ -178,8 +182,16 @@ private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
         ) {
             ServiceType.entries.forEach { type ->
                 val selected = serviceType == type
-                val singlePrice = if (type == ServiceType.PRINT) PRICE_PRINT_SINGLE else PRICE_PHOTO_SINGLE
-                val doublePrice = if (type == ServiceType.PRINT) PRICE_PRINT_DOUBLE else PRICE_PHOTO_DOUBLE
+                val singlePrice = when (type) {
+                    ServiceType.PRINT -> PRICE_PRINT_SINGLE
+                    ServiceType.PHOTO -> PRICE_PHOTO_SINGLE
+                    ServiceType.A3    -> PRICE_A3_SINGLE
+                }
+                val doublePrice = when (type) {
+                    ServiceType.PRINT -> PRICE_PRINT_DOUBLE
+                    ServiceType.PHOTO -> PRICE_PHOTO_DOUBLE
+                    ServiceType.A3    -> PRICE_A3_DOUBLE
+                }
                 Surface(
                     onClick = { serviceType = type },
                     shape = RoundedCornerShape(10.dp),
