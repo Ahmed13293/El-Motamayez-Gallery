@@ -17,9 +17,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +37,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.util.formatPrice
@@ -63,7 +70,8 @@ private val StockState.label get() = when (this) {
 @Composable
 fun ProductImageSlider(
     images: List<String>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onImageClick: ((pageIndex: Int) -> Unit)? = null
 ) {
     Box(modifier = modifier) {
         when {
@@ -76,17 +84,31 @@ fun ProductImageSlider(
                     modifier = Modifier.size(36.dp))
             }
 
-            images.size == 1 -> AsyncImage(
-                model = images[0], contentDescription = null,
-                modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop
-            )
+            images.size == 1 -> Box(Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = images[0], contentDescription = null,
+                    modifier = Modifier.fillMaxSize().let {
+                        if (onImageClick != null) it.clickable { onImageClick(0) } else it
+                    },
+                    contentScale = ContentScale.Crop
+                )
+                if (onImageClick != null) ZoomHintIcon(Modifier.align(Alignment.TopEnd))
+            }
 
             else -> {
                 val pagerState = rememberPagerState(pageCount = { images.size })
                 val scope = androidx.compose.runtime.rememberCoroutineScope()
                 HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                    AsyncImage(model = images[page], contentDescription = null,
-                        modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    Box(Modifier.fillMaxSize()) {
+                        AsyncImage(
+                            model = images[page], contentDescription = null,
+                            modifier = Modifier.fillMaxSize().let {
+                                if (onImageClick != null) it.clickable { onImageClick(page) } else it
+                            },
+                            contentScale = ContentScale.Crop
+                        )
+                        if (onImageClick != null) ZoomHintIcon(Modifier.align(Alignment.TopEnd))
+                    }
                 }
                 // Prev arrow
                 if (pagerState.currentPage > 0) {
@@ -140,6 +162,121 @@ fun ProductImageSlider(
     }
 }
 
+// ── Zoom hint overlay ─────────────────────────────────────────────────────────
+
+@Composable
+private fun ZoomHintIcon(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .padding(4.dp)
+            .size(20.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.45f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(12.dp))
+    }
+}
+
+// ── Image lightbox dialog ─────────────────────────────────────────────────────
+
+@Composable
+fun ImageLightboxDialog(
+    images: List<String>,
+    startIndex: Int,
+    onDismiss: () -> Unit
+) {
+    if (images.isEmpty()) return
+    var currentIndex by remember { mutableStateOf(startIndex.coerceIn(0, images.lastIndex)) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.92f)),
+            contentAlignment = Alignment.Center
+        ) {
+            // Full image
+            AsyncImage(
+                model = images[currentIndex],
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.78f)
+            )
+
+            // Close button — top end
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.18f))
+                    .clickable { onDismiss() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+
+            // Prev arrow (start side)
+            if (currentIndex > 0) {
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 12.dp)
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.18f))
+                        .clickable { currentIndex-- },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                }
+            }
+
+            // Next arrow (end side)
+            if (currentIndex < images.lastIndex) {
+                Box(
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 12.dp)
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.18f))
+                        .clickable { currentIndex++ },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                }
+            }
+
+            // Page counter
+            if (images.size > 1) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 20.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        "${currentIndex + 1} / ${images.size}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
 // ── ProductCard ───────────────────────────────────────────────────────────────
 
 @Composable
@@ -153,7 +290,16 @@ fun ProductCard(
     modifier: Modifier = Modifier,
     categoryPath: String = ""   // e.g. "أدوات مكتبية › أقلام" or "cat › parent › sub"
 ) {
-    val stockSt = stockState(product.stock) // used for + button disabled state
+    val stockSt = stockState(product.stock)
+    var lightboxIndex by remember { mutableStateOf(-1) }
+
+    if (lightboxIndex >= 0 && product.displayImages.isNotEmpty()) {
+        ImageLightboxDialog(
+            images = product.displayImages,
+            startIndex = lightboxIndex,
+            onDismiss = { lightboxIndex = -1 }
+        )
+    }
 
     Card(
         modifier = modifier
@@ -173,6 +319,7 @@ fun ProductCard(
             // ── Product image ─────────────────────────────────────────────────
             ProductImageSlider(
                 images = product.displayImages,
+                onImageClick = { idx -> lightboxIndex = idx },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp)

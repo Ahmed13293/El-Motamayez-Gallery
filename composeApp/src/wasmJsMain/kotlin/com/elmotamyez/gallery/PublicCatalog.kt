@@ -43,6 +43,7 @@ import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.ui.screens.orders.OrderViewModel
 import com.elmotamyez.gallery.ui.screens.products.ProductsViewModel
+import com.elmotamyez.gallery.ui.components.ImageLightboxDialog
 import com.elmotamyez.gallery.ui.components.ProductImageSlider
 import com.elmotamyez.gallery.util.buildProductPath
 import com.elmotamyez.gallery.util.formatPrice
@@ -824,6 +825,16 @@ private fun PublicProductCard(
     onRemove: () -> Unit
 ) {
     val inCart = quantity > 0
+    var lightboxIndex by remember { mutableStateOf(-1) }
+
+    if (lightboxIndex >= 0 && product.displayImages.isNotEmpty()) {
+        ImageLightboxDialog(
+            images = product.displayImages,
+            startIndex = lightboxIndex,
+            onDismiss = { lightboxIndex = -1 }
+        )
+    }
+
     Card(
         shape = RoundedCornerShape(14.dp),
         elevation = CardDefaults.cardElevation(if (inCart) 6.dp else 2.dp),
@@ -837,6 +848,7 @@ private fun PublicProductCard(
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ProductImageSlider(
                 images = product.displayImages,
+                onImageClick = { idx -> lightboxIndex = idx },
                 modifier = Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(10.dp))
             )
             Text(product.name,

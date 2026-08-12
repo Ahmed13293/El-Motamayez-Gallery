@@ -118,6 +118,7 @@ import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.model.Receipt
 import com.elmotamyez.gallery.data.model.User
 import com.elmotamyez.gallery.data.model.UserRole
+import com.elmotamyez.gallery.ui.components.ImageLightboxDialog
 import com.elmotamyez.gallery.ui.components.PrintingButton
 import com.elmotamyez.gallery.ui.components.ProductImageSlider
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
@@ -962,6 +963,16 @@ private fun WebProductCard(
 ) {
     val outOfStock = product.stock == 0
     val inCart = quantity > 0
+    var lightboxIndex by remember { mutableStateOf(-1) }
+
+    if (lightboxIndex >= 0 && product.displayImages.isNotEmpty()) {
+        ImageLightboxDialog(
+            images = product.displayImages,
+            startIndex = lightboxIndex,
+            onDismiss = { lightboxIndex = -1 }
+        )
+    }
+
     Card(
         shape = RoundedCornerShape(14.dp),
         elevation = CardDefaults.cardElevation(2.dp),
@@ -973,6 +984,7 @@ private fun WebProductCard(
         ) {
             ProductImageSlider(
                 images = product.displayImages,
+                onImageClick = { idx -> lightboxIndex = idx },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(if (isMobile) 110.dp else 140.dp)
