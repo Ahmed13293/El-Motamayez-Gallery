@@ -216,7 +216,7 @@ fun ImageLightboxDialog(
                     .padding(12.dp)
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.18f))
+                    .background(Color.Black.copy(alpha = 0.55f))
                     .clickable { onDismiss() },
                 contentAlignment = Alignment.Center
             ) {
@@ -231,7 +231,7 @@ fun ImageLightboxDialog(
                         .padding(start = 12.dp)
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.18f))
+                        .background(Color.Black.copy(alpha = 0.55f))
                         .clickable { currentIndex-- },
                     contentAlignment = Alignment.Center
                 ) {
@@ -247,7 +247,7 @@ fun ImageLightboxDialog(
                         .padding(end = 12.dp)
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.18f))
+                        .background(Color.Black.copy(alpha = 0.55f))
                         .clickable { currentIndex++ },
                     contentAlignment = Alignment.Center
                 ) {
