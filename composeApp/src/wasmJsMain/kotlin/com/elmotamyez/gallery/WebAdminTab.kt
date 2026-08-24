@@ -534,6 +534,13 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
     var headerExpanded by remember { mutableStateOf(true) }
     var prevIndex  by remember { mutableIntStateOf(0) }
     var prevOffset by remember { mutableIntStateOf(0) }
+
+    // Scroll to top whenever the active filter changes
+    LaunchedEffect(selectedCategoryId, selectedBrandId) {
+        listState.scrollToItem(0)
+        headerExpanded = true
+    }
+
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (index, offset) ->
