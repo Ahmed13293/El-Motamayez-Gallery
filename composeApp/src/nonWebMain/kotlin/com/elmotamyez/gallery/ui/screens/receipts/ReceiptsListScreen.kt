@@ -96,9 +96,11 @@ class ReceiptsListScreen : Screen {
         val navigator = LocalNavigator.currentOrThrow
         val vm: ReceiptViewModel = koinInject()
         val authVm: AuthViewModel = koinInject()
-        val receipts   by vm.receipts.collectAsState()
-        val isLoading  by vm.isLoading.collectAsState()
-        val authState  by authVm.uiState.collectAsState()
+        val receipts    by vm.receipts.collectAsState()
+        val isLoading   by vm.isLoading.collectAsState()
+        val loadError   by vm.loadError.collectAsState()
+        val insertError by vm.insertError.collectAsState()
+        val authState   by authVm.uiState.collectAsState()
         val isAdmin    = authState.user?.role == UserRole.ADMIN
 
         // Current month key e.g. "2026-07"
@@ -192,9 +194,18 @@ class ReceiptsListScreen : Screen {
                             Text("لا توجد فواتير بعد",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("أكّد طلباً لتظهر هنا",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (loadError != null) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "خطأ: $loadError",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            } else {
+                                Text("أكّد طلباً لتظهر هنا",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 } else {
@@ -205,6 +216,32 @@ class ReceiptsListScreen : Screen {
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        // ── Server error banner ───────────────────────────────
+                        if (loadError != null) {
+                            item(key = "load_error_banner") {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.Top,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Warning, null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(18.dp).padding(top = 2.dp))
+                                        Text(
+                                            "خطأ في الاتصال: $loadError",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         // ── Pending-sync warning banner ───────────────────────
                         if (hasPending) {
                             item(key = "pending_banner") {
@@ -224,7 +261,10 @@ class ReceiptsListScreen : Screen {
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Text(
-                                            "يوجد فواتير لم تُحفظ بعد على الخادم — ستتم المزامنة تلقائياً عند الاتصال",
+                                            buildString {
+                                                append("يوجد فواتير لم تُحفظ بعد على الخادم — ستتم المزامنة تلقائياً عند الاتصال")
+                                                if (insertError != null) append("\nسبب الخطأ: $insertError")
+                                            },
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onErrorContainer
                                         )

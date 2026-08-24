@@ -4,6 +4,7 @@ import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Receipt
 import com.elmotamyez.gallery.data.remote.supabaseClient
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -15,6 +16,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 // ── Supabase DTO ─────────────────────────────────────────────────────────────
@@ -67,19 +69,32 @@ class ReceiptRepository {
     /** Fetch all receipts ordered by creation time (oldest first).
      *  Decodes each row individually with our own json instance (ignoreUnknownKeys = true)
      *  so one malformed/schema-drifted row cannot hide every other receipt. */
-    suspend fun fetchAll(): List<Receipt> {
+    data class FetchResult(val receipts: List<Receipt>, val firstError: String?)
+
+    suspend fun fetchAll(): FetchResult {
         val raw = supabaseClient
             .from("receipts")
-            .select { order("created_at", Order.ASCENDING) }
+            .select {
+                order("created_at", Order.DESCENDING)
+                limit(5000)
+            }
             .data
 
-        return runCatching { json.parseToJsonElement(raw).jsonArray }
-            .getOrElse { JsonArray(emptyList()) }
+        var firstError: String? = null
+        val receipts = runCatching { json.parseToJsonElement(raw).jsonArray }
+            .getOrElse { e ->
+                firstError = "parse: ${e.message}"
+                JsonArray(emptyList())
+            }
             .mapNotNull { element ->
                 runCatching {
                     json.decodeFromJsonElement<ReceiptRow>(element).toDomain()
-                }.getOrNull()
+                }.getOrElse { e ->
+                    if (firstError == null) firstError = "row decode: ${e.message}"
+                    null
+                }
             }
+        return FetchResult(receipts, firstError)
     }
 
     /** Update items, total, discount and payment method of an existing receipt. */
@@ -99,6 +114,22 @@ class ReceiptRepository {
         supabaseClient.from("receipts")
             .delete { filter { eq("id", receiptId) } }
     }
+
+    /** Returns the highest order_number among receipts whose created_at starts with [todayPrefix].
+     *  Falls back to 0 on any error so the caller can still compute a safe next number. */
+    suspend fun fetchTodayMax(todayPrefix: String): Int = runCatching {
+        val raw = supabaseClient
+            .from("receipts")
+            .select(columns = Columns.list("order_number")) {
+                filter { like("created_at", "$todayPrefix%") }
+                order("order_number", Order.DESCENDING)
+                limit(1)
+            }
+            .data
+        val arr = json.parseToJsonElement(raw).jsonArray
+        if (arr.isEmpty()) 0
+        else json.decodeFromJsonElement<Int>(arr[0].jsonObject["order_number"]!!)
+    }.getOrElse { 0 }
 
     /** Persist a new receipt (upsert so retries don't fail on duplicate key). */
     suspend fun insert(receipt: Receipt) {

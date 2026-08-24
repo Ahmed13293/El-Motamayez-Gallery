@@ -126,10 +126,11 @@ class OrderViewModel(
     private suspend fun createReceiptFromOrder(order: Order, username: String?) {
         val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
         val todayPrefix = dateString(now.year, now.monthNumber, now.dayOfMonth)
-        val existingMax = receiptRepo.fetchAll()
+        val localMax = receiptRepo.fetchAll().receipts
             .filter { it.createdAt?.startsWith(todayPrefix) == true }
             .maxOfOrNull { it.orderNumber } ?: 0
-        val nextNumber = existingMax + 1
+        val remoteMax = runCatching { receiptRepo.fetchTodayMax(todayPrefix) }.getOrElse { 0 }
+        val nextNumber = maxOf(localMax, remoteMax) + 1
         val nowIso = dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second)
         val receipt = Receipt(
             id            = "${todayPrefix}-${nextNumber.toString().padStart(4, '0')}",

@@ -72,9 +72,9 @@ class ReceiptViewModel(
         if (_expandedDays.value.isEmpty()) {
             _expandedDays.value = dateKeys.mapIndexed { i, key -> key to (i == 0) }.toMap()
         } else {
-            // Merge: keep existing state, add any new date keys as collapsed
+            // Merge: keep existing state, add any new date keys as expanded so new days aren't missed
             val current = _expandedDays.value.toMutableMap()
-            dateKeys.forEach { key -> if (!current.containsKey(key)) current[key] = false }
+            dateKeys.forEach { key -> if (!current.containsKey(key)) current[key] = true }
             _expandedDays.value = current
         }
     }
@@ -91,6 +91,12 @@ class ReceiptViewModel(
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _loadError = MutableStateFlow<String?>(null)
+    val loadError: StateFlow<String?> = _loadError.asStateFlow()
+
+    private val _insertError = MutableStateFlow<String?>(null)
+    val insertError: StateFlow<String?> = _insertError.asStateFlow()
 
     init {
         // Show cached receipts immediately so the list isn't empty on launch
@@ -109,7 +115,9 @@ class ReceiptViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             runCatching { repository.fetchAll() }
-                .onSuccess { fresh ->
+                .onSuccess { result ->
+                    _loadError.value = result.firstError
+                    val fresh = result.receipts
                     runCatching {
                         val freshIds = fresh.map { it.id }.toSet()
                         // Keep pending receipts in list — they haven't reached Supabase yet
@@ -117,8 +125,9 @@ class ReceiptViewModel(
                         val merged = (fresh + localOnly).sortedByDescending { it.createdAt ?: "" }
                         _receipts.value = merged
                         persistCache(merged)
-                    }
+                    }.onFailure { _loadError.value = "merge: ${it.message}" }
                 }
+                .onFailure { _loadError.value = it.message ?: it.toString() }
             _isLoading.value = false
             // Attempt to sync any receipts that failed to save previously
             syncPendingReceipts()
@@ -130,7 +139,11 @@ class ReceiptViewModel(
         val pending = _receipts.value.filter { it.pendingSave }
         if (pending.isEmpty()) return
         for (receipt in pending) {
-            val synced = runCatching { repository.insert(receipt) }.isSuccess
+            val syncResult = runCatching { repository.insert(receipt) }
+            if (!syncResult.isSuccess) {
+                _insertError.value = syncResult.exceptionOrNull()?.message ?: syncResult.exceptionOrNull()?.toString()
+            }
+            val synced = syncResult.isSuccess
             if (synced) {
                 receipt.items
                     .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
@@ -170,10 +183,11 @@ class ReceiptViewModel(
             val offset   = tz.offsetAt(instant)          // e.g. +02:00
             val (year, month, day) = overrideDate ?: Triple(now.year, now.monthNumber, now.dayOfMonth)
             val todayPrefix = dateString(year, month, day)
-            val todayMax = _receipts.value
+            val localMax = _receipts.value
                 .filter { it.createdAt?.startsWith(todayPrefix) == true }
                 .maxOfOrNull { it.orderNumber } ?: 0
-            val nextNumber = todayMax + 1
+            val remoteMax = runCatching { repository.fetchTodayMax(todayPrefix) }.getOrElse { 0 }
+            val nextNumber = maxOf(localMax, remoteMax) + 1
             val nowIso = if (overrideDate != null)
                 "${todayPrefix}T12:00:00+00:00"
             else
@@ -200,10 +214,14 @@ class ReceiptViewModel(
             persistCache(updated)
 
             // Push to Supabase — 2 attempts, 1.5 s between them
-            var inserted = runCatching { repository.insert(receipt) }.isSuccess
-            if (!inserted) {
+            var insertResult = runCatching { repository.insert(receipt) }
+            if (!insertResult.isSuccess) {
                 delay(1500)
-                inserted = runCatching { repository.insert(receipt) }.isSuccess
+                insertResult = runCatching { repository.insert(receipt) }
+            }
+            val inserted = insertResult.isSuccess
+            if (!inserted) {
+                _insertError.value = insertResult.exceptionOrNull()?.message ?: insertResult.exceptionOrNull()?.toString()
             }
 
             if (inserted) {
