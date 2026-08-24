@@ -27,7 +27,6 @@ import androidx.compose.material3.*
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import com.elmotamyez.gallery.util.rememberImagePickerLauncher
-import com.elmotamyez.gallery.util.rotateLandscapeToPortrait
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,7 +74,6 @@ class ManageProductsScreen : Screen {
         var filterBrandId    by remember { mutableStateOf<String?>(null) }
 
         val isUploadingImage   = state.isUploadingImage
-        val fixImagesProgress  = state.fixImagesProgress
 
         val launchPicker = rememberImagePickerLauncher { bytes ->
             vm.uploadImage(bytes) { url -> imageUrlsList = imageUrlsList + url }
@@ -168,15 +166,7 @@ class ManageProductsScreen : Screen {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.Black)
                             }
                             Text("إدارة المنتجات", style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold, color = Color.Black,
-                                modifier = Modifier.weight(1f))
-                            IconButton(
-                                onClick = { vm.fixExistingImages { rotateLandscapeToPortrait(it) } },
-                                enabled = fixImagesProgress == null
-                            ) {
-                                Icon(Icons.Default.Image, contentDescription = "تصحيح الصور",
-                                    tint = if (fixImagesProgress == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
-                            }
+                                fontWeight = FontWeight.Bold, color = Color.Black)
                         }
                         AnimatedVisibility(
                             visible = headerExpanded,
@@ -371,29 +361,6 @@ class ManageProductsScreen : Screen {
                     }
                 }
             }
-        }
-
-        // ── Fix images progress dialog ────────────────────────────────────────
-        if (fixImagesProgress != null) {
-            val (done, total) = fixImagesProgress
-            AlertDialog(
-                onDismissRequest = {},
-                title = { Text("جاري تصحيح الصور") },
-                text = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth()) {
-                        Text("$done / $total منتج")
-                        Spacer(Modifier.height(8.dp))
-                        if (total > 0)
-                            LinearProgressIndicator(
-                                progress = { done / total.toFloat() },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        else CircularProgressIndicator()
-                    }
-                },
-                confirmButton = {}
-            )
         }
 
         // ── Add / Edit dialog ─────────────────────────────────────────────────
