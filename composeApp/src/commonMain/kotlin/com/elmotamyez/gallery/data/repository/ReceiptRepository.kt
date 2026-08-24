@@ -37,7 +37,7 @@ private data class ReceiptRow(
 private data class ReceiptInsert(
     val id: String,
     val order_number: Int,
-    val items: String,
+    val items: JsonElement,     // sent as a JSON array so Postgres stores it as jsonb array
     val total: Double,
     val discount: Double,
     val payment_method: String,
@@ -50,7 +50,7 @@ private data class ReceiptInsert(
 
 @Serializable
 private data class ReceiptItemsUpdate(
-    val items: String,
+    val items: JsonElement,
     val total: Double,
     val discount: Double,
     val payment_method: String,
@@ -85,7 +85,7 @@ class ReceiptRepository {
     suspend fun update(receipt: Receipt) {
         supabaseClient.from("receipts")
             .update(ReceiptItemsUpdate(
-                items          = json.encodeToString(receipt.items),
+                items          = json.encodeToJsonElement(receipt.items),
                 total          = receipt.total,
                 discount       = receipt.discount,
                 payment_method = receipt.paymentMethod,
@@ -104,7 +104,7 @@ class ReceiptRepository {
         val row = ReceiptInsert(
             id             = receipt.id,
             order_number   = receipt.orderNumber,
-            items          = json.encodeToString(receipt.items),
+            items          = json.encodeToJsonElement(receipt.items),
             total          = receipt.total,
             discount       = receipt.discount,
             payment_method = receipt.paymentMethod,
