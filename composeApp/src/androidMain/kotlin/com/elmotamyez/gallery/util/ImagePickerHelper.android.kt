@@ -1,7 +1,11 @@
 package com.elmotamyez.gallery.util
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -11,15 +15,38 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 
-private fun compressImage(bytes: ByteArray, maxDimension: Int = 1200, quality: Int = 80): ByteArray {
-    val original = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return bytes
-    val scale = minOf(1f, maxDimension.toFloat() / maxOf(original.width, original.height))
-    val bitmap = if (scale < 1f)
-        Bitmap.createScaledBitmap(original, (original.width * scale).toInt(), (original.height * scale).toInt(), true)
-    else original
+private fun processImage(context: Context, uri: Uri, maxDimension: Int = 1200, quality: Int = 80): ByteArray? {
+    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+    var bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return bytes
+
+    // Apply EXIF orientation — camera images carry rotation metadata that BitmapFactory ignores
+    val orientation = context.contentResolver.openInputStream(uri)?.use { stream ->
+        ExifInterface(stream).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+    } ?: ExifInterface.ORIENTATION_NORMAL
+
+    val degrees = when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90  -> 90f
+        ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+        ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+        else -> 0f
+    }
+    if (degrees != 0f) {
+        val matrix = Matrix().apply { postRotate(degrees) }
+        val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        bitmap.recycle()
+        bitmap = rotated
+    }
+
+    // Scale down to maxDimension on the longest side
+    val scale = minOf(1f, maxDimension.toFloat() / maxOf(bitmap.width, bitmap.height))
+    val scaled = if (scale < 1f)
+        Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+    else bitmap
+
     val out = ByteArrayOutputStream()
-    bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
-    if (bitmap !== original) bitmap.recycle()
+    scaled.compress(Bitmap.CompressFormat.JPEG, quality, out)
+    if (scaled !== bitmap) scaled.recycle()
+    bitmap.recycle()
     return out.toByteArray()
 }
 
@@ -33,11 +60,26 @@ actual fun rememberImagePickerLauncher(onImagePicked: (ByteArray) -> Unit): () -
     ) { uris ->
         uris.forEach { u ->
             scope.launch(Dispatchers.IO) {
-                val raw = context.contentResolver.openInputStream(u)?.use { it.readBytes() }
-                raw?.let { onImagePicked(compressImage(it)) }
+                processImage(context, u)?.let { onImagePicked(it) }
             }
         }
     }
 
     return { launcher.launch("image/*") }
+}
+
+/** Rotate a landscape image 90° CW to portrait. Returns original bytes unchanged if already portrait. */
+actual fun rotateLandscapeToPortrait(bytes: ByteArray): ByteArray {
+    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return bytes
+    if (bitmap.width <= bitmap.height) {
+        bitmap.recycle()
+        return bytes
+    }
+    val matrix = Matrix().apply { postRotate(90f) }
+    val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    bitmap.recycle()
+    val out = ByteArrayOutputStream()
+    rotated.compress(Bitmap.CompressFormat.JPEG, 85, out)
+    rotated.recycle()
+    return out.toByteArray()
 }

@@ -7,6 +7,9 @@ import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.repository.ImageUploadRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,13 +18,15 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 data class AdminUiState(
-    val categories:       List<Category> = emptyList(),
-    val brands:           List<Brand>    = emptyList(),
-    val products:         List<Product>  = emptyList(),
-    val isLoading:        Boolean        = false,
-    val isUploadingImage: Boolean        = false,
-    val error:            String?        = null,
-    val toast:            String?        = null
+    val categories:          List<Category> = emptyList(),
+    val brands:              List<Brand>    = emptyList(),
+    val products:            List<Product>  = emptyList(),
+    val isLoading:           Boolean        = false,
+    val isUploadingImage:    Boolean        = false,
+    val error:               String?        = null,
+    val toast:               String?        = null,
+    /** null = idle, (done, total) = fix-images in progress */
+    val fixImagesProgress:   Pair<Int,Int>? = null
 )
 
 class AdminViewModel(
@@ -130,6 +135,40 @@ class AdminViewModel(
                 .onSuccess { url -> onUrl(url) }
                 .onFailure { _state.update { s -> s.copy(error = "فشل رفع الصورة: ${it.message}") } }
             _state.update { it.copy(isUploadingImage = false) }
+        }
+    }
+
+    /**
+     * Downloads every product image, rotates landscape ones to portrait using [rotateIfLandscape],
+     * re-uploads changed images, and updates the product record in Supabase.
+     */
+    fun fixExistingImages(rotateIfLandscape: suspend (ByteArray) -> ByteArray) {
+        viewModelScope.launch {
+            val products = _state.value.products.filter { it.displayImages.isNotEmpty() }
+            _state.update { it.copy(fixImagesProgress = 0 to products.size) }
+            val http = HttpClient()
+            var fixed = 0
+            for (product in products) {
+                val newUrls = product.displayImages.map { url ->
+                    val bytes = runCatching { http.get(url).body<ByteArray>() }.getOrNull() ?: return@map url
+                    val rotated = runCatching { rotateIfLandscape(bytes) }.getOrNull() ?: return@map url
+                    if (rotated.size == bytes.size && rotated.contentEquals(bytes)) return@map url
+                    runCatching { imageRepo.uploadProductImage(rotated) }.getOrElse { url }
+                }
+                if (newUrls != product.displayImages) {
+                    runCatching {
+                        repository.updateProduct(
+                            product.id, product.name, product.price, product.wholesalePrice,
+                            product.stock, product.brandId, product.categoryId, newUrls
+                        )
+                    }
+                }
+                fixed++
+                _state.update { it.copy(fixImagesProgress = fixed to products.size) }
+            }
+            http.close()
+            _state.update { it.copy(fixImagesProgress = null) }
+            toast("تم تصحيح صور المنتجات")
         }
     }
 

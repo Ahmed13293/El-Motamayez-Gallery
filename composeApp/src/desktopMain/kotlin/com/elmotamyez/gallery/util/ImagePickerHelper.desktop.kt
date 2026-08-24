@@ -49,6 +49,29 @@ private fun compressImage(bytes: ByteArray, maxDimension: Int = 1200, quality: F
     return out.toByteArray()
 }
 
+actual fun rotateLandscapeToPortrait(bytes: ByteArray): ByteArray {
+    val original = ImageIO.read(ByteArrayInputStream(bytes)) ?: return bytes
+    if (original.width <= original.height) return bytes
+    // 90° CW: new canvas is H×W, translate right by H then rotate
+    val rotated = BufferedImage(original.height, original.width, BufferedImage.TYPE_INT_RGB)
+    val g = rotated.createGraphics()
+    g.translate(original.height.toDouble(), 0.0)
+    g.rotate(Math.PI / 2)
+    g.drawImage(original, 0, 0, null)
+    g.dispose()
+    val out = ByteArrayOutputStream()
+    val writer = ImageIO.getImageWritersByFormatName("jpeg").next()
+    val params = writer.defaultWriteParam
+    params.compressionMode = ImageWriteParam.MODE_EXPLICIT
+    params.compressionQuality = 0.85f
+    val ios = ImageIO.createImageOutputStream(out)
+    writer.output = ios
+    writer.write(null, IIOImage(rotated, null, null), params)
+    writer.dispose()
+    ios.close()
+    return out.toByteArray()
+}
+
 @Composable
 actual fun rememberImagePickerLauncher(onImagePicked: (ByteArray) -> Unit): () -> Unit {
     val scope = rememberCoroutineScope()
