@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -197,11 +198,41 @@ class ReceiptsListScreen : Screen {
                         }
                     }
                 } else {
+                    val hasPending = receipts.any { it.pendingSave }
+
                     LazyColumn(
                         state = listState,
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        // ── Pending-sync warning banner ───────────────────────
+                        if (hasPending) {
+                            item(key = "pending_banner") {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Warning, null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            "يوجد فواتير لم تُحفظ بعد على الخادم — ستتم المزامنة تلقائياً عند الاتصال",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         // ── Monthly summary card (admin only) ─────────────────
                         if (isAdmin) {
                             item(key = "month_summary") {
@@ -421,6 +452,13 @@ private fun ReceiptCard(receipt: Receipt, dayIndex: Int, onClick: () -> Unit) {
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (receipt.pendingSave) {
+                    Icon(
+                        Icons.Default.Warning, null,
+                        tint     = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
                 Text(
                     receipt.total.formatPrice(),
                     style      = MaterialTheme.typography.bodyLarge,

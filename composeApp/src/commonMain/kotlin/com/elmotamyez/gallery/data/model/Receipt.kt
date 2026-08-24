@@ -15,5 +15,8 @@ data class Receipt(
     @SerialName("is_paid")         val isPaid:         Boolean = true,
     @SerialName("customer_phone")  val customerPhone:  String? = null,
     @SerialName("customer_info")   val customerInfo:   String? = null,
-    val username:                               String? = null
+    val username:                               String? = null,
+    // Local-only flag — true when the Supabase insert hasn't succeeded yet.
+    // Never sent to Supabase (not in ReceiptInsert DTO). Cleared on successful sync.
+    val pendingSave: Boolean = false
 )

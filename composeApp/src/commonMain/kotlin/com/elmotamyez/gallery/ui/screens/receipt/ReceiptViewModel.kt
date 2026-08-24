@@ -9,6 +9,7 @@ import com.elmotamyez.gallery.data.repository.ReceiptRepository
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.get
 import com.russhwolf.settings.set
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,6 +46,14 @@ class ReceiptViewModel(
     private val _deleteError = MutableStateFlow<String?>(null)
     val deleteError: StateFlow<String?> = _deleteError.asStateFlow()
     fun clearDeleteError() { _deleteError.value = null }
+
+    // Order confirmation states — drive CartScreen loading + error popup + navigation
+    private val _orderSaving = MutableStateFlow(false)
+    val orderSaving: StateFlow<Boolean> = _orderSaving.asStateFlow()
+
+    private val _orderSaved = MutableStateFlow(false)
+    val orderSaved: StateFlow<Boolean> = _orderSaved.asStateFlow()
+    fun resetOrderSaved() { _orderSaved.value = false }
 
     // Currently viewed receipt (shown in ReceiptScreen)
     private val _currentReceipt = MutableStateFlow<Receipt?>(null)
@@ -101,15 +110,43 @@ class ReceiptViewModel(
             _isLoading.value = true
             runCatching { repository.fetchAll() }
                 .onSuccess { fresh ->
-                    // Preserve any locally-added receipts not yet confirmed by Supabase
-                    // (avoids overwriting a receipt whose insert is still in-flight or failed)
-                    val freshIds = fresh.map { it.id }.toSet()
-                    val localOnly = _receipts.value.filter { it.id !in freshIds }
-                    val merged = (fresh + localOnly).sortedByDescending { it.createdAt ?: "" }
-                    _receipts.value = merged
-                    persistCache(merged)
+                    runCatching {
+                        val freshIds = fresh.map { it.id }.toSet()
+                        // Keep pending receipts in list — they haven't reached Supabase yet
+                        val localOnly = _receipts.value.filter { it.id !in freshIds }
+                        val merged = (fresh + localOnly).sortedByDescending { it.createdAt ?: "" }
+                        _receipts.value = merged
+                        persistCache(merged)
+                    }
                 }
             _isLoading.value = false
+            // Attempt to sync any receipts that failed to save previously
+            syncPendingReceipts()
+        }
+    }
+
+    /** Tries to push any locally-pending receipts to Supabase and decrement their stock. */
+    private suspend fun syncPendingReceipts() {
+        val pending = _receipts.value.filter { it.pendingSave }
+        if (pending.isEmpty()) return
+        for (receipt in pending) {
+            val synced = runCatching { repository.insert(receipt) }.isSuccess
+            if (synced) {
+                receipt.items
+                    .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
+                    .forEach { cartItem ->
+                        runCatching {
+                            productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+                        }
+                    }
+                _receipts.value = _receipts.value.map {
+                    if (it.id == receipt.id) it.copy(pendingSave = false) else it
+                }
+                if (_currentReceipt.value?.id == receipt.id)
+                    _currentReceipt.value = _currentReceipt.value?.copy(pendingSave = false)
+                persistCache(_receipts.value)
+                _stockVersion.value += 1
+            }
         }
     }
 
@@ -154,26 +191,45 @@ class ReceiptViewModel(
                 customerInfo  = customerInfo.takeIf  { !it.isNullOrBlank() },
                 username      = username.takeIf      { !it.isNullOrBlank() }
             )
-            // Update local state and cache immediately
+            _orderSaving.value = true
+
+            // Optimistic local update so ReceiptScreen has data immediately
             val updated = _receipts.value + receipt
             _receipts.value = updated
             _currentReceipt.value = receipt
             persistCache(updated)
 
-            // Push receipt to Supabase — retry once on failure
+            // Push to Supabase — 2 attempts, 1.5 s between them
             var inserted = runCatching { repository.insert(receipt) }.isSuccess
-            if (!inserted) inserted = runCatching { repository.insert(receipt) }.isSuccess
+            if (!inserted) {
+                delay(1500)
+                inserted = runCatching { repository.insert(receipt) }.isSuccess
+            }
 
-            // Decrement stock for each real product (skip printing/other virtual items)
-            items
-                .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
-                .forEach { cartItem ->
-                    runCatching {
-                        productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+            if (inserted) {
+                // Decrement stock only after the receipt is confirmed saved
+                items
+                    .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
+                    .forEach { cartItem ->
+                        runCatching {
+                            productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+                        }
                     }
+                _stockVersion.value += 1
+                loadReceipts()
+            } else {
+                // Keep receipt locally with pendingSave flag — evidence is preserved.
+                // Auto-sync runs on next loadReceipts() call (app launch / pull-to-refresh).
+                _receipts.value = _receipts.value.map {
+                    if (it.id == receipt.id) it.copy(pendingSave = true) else it
                 }
-            // Signal observers (e.g. CategoriesHomeScreen) to refresh product stock
-            _stockVersion.value += 1
+                _currentReceipt.value = receipt.copy(pendingSave = true)
+                persistCache(_receipts.value)
+            }
+
+            // Always navigate — order was placed (locally at minimum)
+            _orderSaved.value = true
+            _orderSaving.value = false
         }
     }
 
@@ -230,22 +286,29 @@ class ReceiptViewModel(
     }
 
     /** Restores stock for all items in the receipt, then deletes it from Supabase and local cache.
-     *  Only removes locally if Supabase confirms the deletion. */
+     *  Pending receipts (never saved to Supabase) are removed locally without a network call. */
     fun deleteReceipt(receipt: Receipt, onDone: () -> Unit = {}) {
         viewModelScope.launch {
             _isSaving.value = true
-            val result = runCatching { repository.delete(receipt.id) }
-            val deleted = result.isSuccess
-            if (!deleted) _deleteError.value = result.exceptionOrNull()?.message ?: "فشل الحذف"
+            val deleted = if (receipt.pendingSave) {
+                // Not in Supabase yet — just remove locally, no stock to restore
+                true
+            } else {
+                val result = runCatching { repository.delete(receipt.id) }
+                if (!result.isSuccess) _deleteError.value = result.exceptionOrNull()?.message ?: "فشل الحذف"
+                result.isSuccess
+            }
             if (deleted) {
-                receipt.items
-                    .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
-                    .forEach { runCatching { productRepository.incrementStock(it.product.id, it.quantity) } }
+                if (!receipt.pendingSave) {
+                    receipt.items
+                        .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
+                        .forEach { runCatching { productRepository.incrementStock(it.product.id, it.quantity) } }
+                    _stockVersion.value += 1
+                }
                 val updatedList = _receipts.value.filter { it.id != receipt.id }
                 _receipts.value = updatedList
                 persistCache(updatedList)
                 if (_currentReceipt.value?.id == receipt.id) _currentReceipt.value = null
-                _stockVersion.value += 1
                 onDone()
             }
             _isSaving.value = false

@@ -1226,13 +1226,24 @@ private fun WebCartTab(
     onOrderConfirmed: () -> Unit
 ) {
     val receiptVm: ReceiptViewModel = koinInject()
-    val cartItems by cartVm.cartItems.collectAsState()
-    val isAdmin = user.role == UserRole.ADMIN
+    val cartItems     by cartVm.cartItems.collectAsState()
+    val isAdmin       = user.role == UserRole.ADMIN
+    val orderSaving   by receiptVm.orderSaving.collectAsState()
+    val orderSaved    by receiptVm.orderSaved.collectAsState()
     var discount by remember { mutableStateOf("") }
     var paymentMethod by remember { mutableStateOf("كاش") }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var overrideDate   by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
+
+    LaunchedEffect(orderSaved) {
+        if (orderSaved) {
+            cartVm.clearCart()
+            receiptVm.resetOrderSaved()
+            showConfirmDialog = false
+            onOrderConfirmed()
+        }
+    }
     val overrideDateLabel = overrideDate?.let { (y, m, d) ->
         "${twoDigit(d)}/${twoDigit(m)}/$y"
     }
@@ -1581,22 +1592,37 @@ private fun WebCartTab(
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    receiptVm.confirmOrder(
-                        items = cartItems,
-                        total = total,
-                        discount = discountValue,
-                        paymentMethod = paymentMethod,
-                        username = user.name,
-                        overrideDate = overrideDate
-                    )
-                    cartVm.clearCart()
-                    showConfirmDialog = false
-                    onOrderConfirmed()
-                }) { Text("تأكيد") }
+                Button(
+                    onClick = {
+                        if (!orderSaving) {
+                            receiptVm.confirmOrder(
+                                items = cartItems,
+                                total = total,
+                                discount = discountValue,
+                                paymentMethod = paymentMethod,
+                                username = user.name,
+                                overrideDate = overrideDate
+                            )
+                        }
+                    },
+                    enabled = !orderSaving
+                ) {
+                    if (orderSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = LocalContentColor.current
+                        )
+                    } else {
+                        Text("تأكيد")
+                    }
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showConfirmDialog = false }) { Text("إلغاء") }
+                TextButton(
+                    onClick = { showConfirmDialog = false },
+                    enabled = !orderSaving
+                ) { Text("إلغاء") }
             })
     }
 

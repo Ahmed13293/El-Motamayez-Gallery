@@ -55,6 +55,17 @@ class CartScreen : Screen {
         val currentUser by authVm.uiState.collectAsState()
         val cartItems   by cartVm.cartItems.collectAsState()
         val isAdmin     = currentUser.user?.role == UserRole.ADMIN
+        val orderSaving by receiptVm.orderSaving.collectAsState()
+        val orderSaved  by receiptVm.orderSaved.collectAsState()
+
+        // Navigate to receipt screen once order is placed (success or pending-save)
+        LaunchedEffect(orderSaved) {
+            if (orderSaved) {
+                cartVm.clearCart()
+                receiptVm.resetOrderSaved()
+                (navigator.parent ?: navigator).push(ReceiptScreen())
+            }
+        }
 
         // ── Customer optional fields ──────────────────────────────────────────
         var customerPhone by remember { mutableStateOf("") }
@@ -358,22 +369,31 @@ class CartScreen : Screen {
 
                             Button(
                                 onClick = {
-                                    receiptVm.confirmOrder(
-                                        items         = cartItems,
-                                        total         = finalTotal,
-                                        discount      = discountAmount,
-                                        paymentMethod = selectedMethod.label,
-                                        customerPhone = customerPhone,
-                                        customerInfo  = customerInfo,
-                                        username      = currentUser.user?.username,
-                                        overrideDate  = overrideDate
-                                    )
-                                    cartVm.clearCart()
-                                    (navigator.parent ?: navigator).push(ReceiptScreen())
+                                    if (!orderSaving) {
+                                        receiptVm.confirmOrder(
+                                            items         = cartItems,
+                                            total         = finalTotal,
+                                            discount      = discountAmount,
+                                            paymentMethod = selectedMethod.label,
+                                            customerPhone = customerPhone,
+                                            customerInfo  = customerInfo,
+                                            username      = currentUser.user?.username,
+                                            overrideDate  = overrideDate
+                                        )
+                                    }
                                 },
+                                enabled  = !orderSaving,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("تأكيد الطلب")
+                                if (orderSaving) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        color = LocalContentColor.current
+                                    )
+                                } else {
+                                    Text("تأكيد الطلب")
+                                }
                             }
                         }
                     }
