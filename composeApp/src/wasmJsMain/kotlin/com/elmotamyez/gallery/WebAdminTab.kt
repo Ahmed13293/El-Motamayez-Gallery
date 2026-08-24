@@ -194,7 +194,7 @@ internal fun WebAdminTab(user: User, onLogout: () -> Unit) {
                         )
                     }
                 }
-                Box(Modifier.weight(1f).fillMaxWidth()) {
+                Box(Modifier.weight(1f).fillMaxSize()) {
                     if (state.isLoading) CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     when (section) {
                         AdminSection.CATEGORIES -> AdminCategoriesSection(state.categories, adminVm)
