@@ -100,6 +100,37 @@ private external fun jsOpenWebImagePicker()
 @JsFun("() => { var v = window.__webPickedImages; return (v === undefined || v === null) ? null : String(v); }")
 private external fun jsGetWebPickedImages(): String?
 
+/** Starts a 90° CW canvas rotation; result stored in window.__rotatedImage (null while pending). */
+@JsFun("""(b64) => {
+    window.__rotatedImage = null;
+    var img = new Image();
+    img.onload = function() {
+        var c = document.createElement('canvas');
+        c.width = img.height; c.height = img.width;
+        var ctx = c.getContext('2d');
+        ctx.translate(img.height, 0);
+        ctx.rotate(Math.PI / 2);
+        ctx.drawImage(img, 0, 0);
+        window.__rotatedImage = c.toDataURL('image/jpeg', 0.85).split(',')[1];
+    };
+    img.src = 'data:image/jpeg;base64,' + b64;
+}""")
+private external fun jsStartImageRotation(b64: String)
+
+@JsFun("() => { var v = window.__rotatedImage; return (v === undefined || v === null) ? null : String(v); }")
+private external fun jsGetRotatedImage(): String?
+
+private suspend fun webRotateImageBytes(bytes: ByteArray): ByteArray {
+    val b64 = kotlin.io.encoding.Base64.encode(bytes).decodeToString()
+    jsStartImageRotation(b64)
+    repeat(200) {
+        delay(50)
+        val result = jsGetRotatedImage()
+        if (result != null) return kotlin.io.encoding.Base64.decode(result)
+    }
+    return bytes
+}
+
 private enum class AdminSection {
     HUB, CATEGORIES, BRANDS, PRODUCTS, REPORT, EXPENSES, ANALYSIS, ATTENDANCE
 }
@@ -656,7 +687,7 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
                 Text("لا توجد منتجات", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
-            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(state = listState, modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(filtered, key = { it.id }) { product ->
                     val brandName = brands.find { it.id == product.brandId }?.name ?: ""
                     val catName   = categories.find { it.id == product.categoryId }?.name ?: ""
@@ -942,9 +973,11 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
     var imageUrls    by remember { mutableStateOf(initial?.displayImages ?: emptyList()) }
     var urlInput     by remember { mutableStateOf(TextFieldValue("")) }
     var isUploading  by remember { mutableStateOf(false) }
+    var isRotating   by remember { mutableStateOf(false) }
     var uploadError  by remember { mutableStateOf<String?>(null) }
     val scope        = rememberCoroutineScope()
     val imageRepo: ImageUploadRepository = koinInject()
+    val adminVm: AdminViewModel = koinInject()
     val defaultCatId = initial?.categoryId ?: categories.firstOrNull()?.id ?: ""
     var catId        by remember { mutableStateOf(defaultCatId) }
     var brandId      by remember { mutableStateOf(initial?.brandId ?: brands.firstOrNull { it.categoryId == defaultCatId }?.id ?: "") }
@@ -995,6 +1028,7 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
                                         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
                                         contentScale = ContentScale.Crop
                                     )
+                                    // Delete button — top end
                                     IconButton(
                                         onClick = { imageUrls = imageUrls.toMutableList().also { it.removeAt(idx) } },
                                         modifier = Modifier.size(22.dp).align(Alignment.TopEnd)
@@ -1002,6 +1036,27 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
                                         Icon(Icons.Default.Close, null,
                                             modifier = Modifier.size(14.dp),
                                             tint = MaterialTheme.colorScheme.error)
+                                    }
+                                    // Rotate 90° CW button — bottom end
+                                    IconButton(
+                                        onClick = {
+                                            if (!isRotating && !isUploading) {
+                                                scope.launch {
+                                                    isRotating = true
+                                                    runCatching {
+                                                        adminVm.rotateProductImage(url, { webRotateImageBytes(it) }) { newUrl ->
+                                                            imageUrls = imageUrls.toMutableList().also { list -> list[idx] = newUrl }
+                                                        }
+                                                    }
+                                                    isRotating = false
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.size(22.dp).align(Alignment.BottomEnd)
+                                    ) {
+                                        Icon(Icons.Default.Refresh, null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
