@@ -52,7 +52,15 @@ private fun compressImage(bytes: ByteArray, maxDimension: Int = 1200, quality: F
 actual fun rotateLandscapeToPortrait(bytes: ByteArray): ByteArray {
     val original = ImageIO.read(ByteArrayInputStream(bytes)) ?: return bytes
     if (original.width <= original.height) return bytes
-    // 90° CW: new canvas is H×W, translate right by H then rotate
+    return rotate90CW(original, bytes)
+}
+
+actual fun rotateImage90CW(bytes: ByteArray): ByteArray {
+    val original = ImageIO.read(ByteArrayInputStream(bytes)) ?: return bytes
+    return rotate90CW(original, bytes)
+}
+
+private fun rotate90CW(original: BufferedImage, @Suppress("UNUSED_PARAMETER") fallback: ByteArray): ByteArray {
     val rotated = BufferedImage(original.height, original.width, BufferedImage.TYPE_INT_RGB)
     val g = rotated.createGraphics()
     g.translate(original.height.toDouble(), 0.0)

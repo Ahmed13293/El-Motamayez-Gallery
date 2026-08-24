@@ -128,6 +128,23 @@ class AdminViewModel(
             .onFailure { _state.update { s -> s.copy(error = it.message) } }
     }
 
+    /** Downloads [imageUrl], rotates 90° CW using [rotate], re-uploads, and returns the new URL via [onNewUrl]. */
+    fun rotateProductImage(imageUrl: String, rotate: suspend (ByteArray) -> ByteArray, onNewUrl: (String) -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(isUploadingImage = true) }
+            runCatching {
+                val http = HttpClient()
+                val bytes = http.get(imageUrl).body<ByteArray>()
+                http.close()
+                val rotated = rotate(bytes)
+                imageRepo.uploadProductImage(rotated)
+            }
+                .onSuccess { url -> onNewUrl(url) }
+                .onFailure { _state.update { s -> s.copy(error = "فشل تدوير الصورة: ${it.message}") } }
+            _state.update { it.copy(isUploadingImage = false) }
+        }
+    }
+
     fun uploadImage(bytes: ByteArray, onUrl: (String) -> Unit) {
         viewModelScope.launch {
             _state.update { it.copy(isUploadingImage = true) }

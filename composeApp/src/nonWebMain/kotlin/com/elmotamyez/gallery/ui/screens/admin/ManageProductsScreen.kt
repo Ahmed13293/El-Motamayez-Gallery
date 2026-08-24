@@ -22,11 +22,13 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import com.elmotamyez.gallery.util.rememberImagePickerLauncher
+import com.elmotamyez.gallery.util.rotateImage90CW
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -453,6 +455,22 @@ class ManageProductsScreen : Screen {
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(Icons.Default.Close, null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(12.dp))
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(20.dp)
+                                                    .align(Alignment.BottomEnd)
+                                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), CircleShape)
+                                                    .clickable(enabled = !isUploadingImage) {
+                                                        vm.rotateProductImage(url, { rotateImage90CW(it) }) { newUrl ->
+                                                            imageUrlsList = imageUrlsList.toMutableList().also { list -> list[idx] = newUrl }
+                                                        }
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Default.Refresh, null,
                                                     tint = Color.White,
                                                     modifier = Modifier.size(12.dp))
                                             }

@@ -71,10 +71,17 @@ actual fun rememberImagePickerLauncher(onImagePicked: (ByteArray) -> Unit): () -
 /** Rotate a landscape image 90° CW to portrait. Returns original bytes unchanged if already portrait. */
 actual fun rotateLandscapeToPortrait(bytes: ByteArray): ByteArray {
     val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return bytes
-    if (bitmap.width <= bitmap.height) {
-        bitmap.recycle()
-        return bytes
-    }
+    if (bitmap.width <= bitmap.height) { bitmap.recycle(); return bytes }
+    return rotateBitmap90CW(bitmap)
+}
+
+/** Always rotates 90° CW regardless of orientation. */
+actual fun rotateImage90CW(bytes: ByteArray): ByteArray {
+    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return bytes
+    return rotateBitmap90CW(bitmap)
+}
+
+private fun rotateBitmap90CW(bitmap: Bitmap): ByteArray {
     val matrix = Matrix().apply { postRotate(90f) }
     val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     bitmap.recycle()

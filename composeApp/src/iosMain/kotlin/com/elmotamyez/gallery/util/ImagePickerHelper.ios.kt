@@ -6,3 +6,4 @@ import androidx.compose.runtime.Composable
 actual fun rememberImagePickerLauncher(onImagePicked: (ByteArray) -> Unit): () -> Unit = { }
 
 actual fun rotateLandscapeToPortrait(bytes: ByteArray): ByteArray = bytes
+actual fun rotateImage90CW(bytes: ByteArray): ByteArray = bytes
