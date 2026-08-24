@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -85,7 +86,7 @@ class ReceiptRepository {
     suspend fun update(receipt: Receipt) {
         supabaseClient.from("receipts")
             .update(ReceiptItemsUpdate(
-                items          = json.encodeToJsonElement(receipt.items),
+                items          = json.encodeToJsonElement<List<CartItem>>(receipt.items),
                 total          = receipt.total,
                 discount       = receipt.discount,
                 payment_method = receipt.paymentMethod,
@@ -104,7 +105,7 @@ class ReceiptRepository {
         val row = ReceiptInsert(
             id             = receipt.id,
             order_number   = receipt.orderNumber,
-            items          = json.encodeToJsonElement(receipt.items),
+            items          = json.encodeToJsonElement<List<CartItem>>(receipt.items),
             total          = receipt.total,
             discount       = receipt.discount,
             payment_method = receipt.paymentMethod,
