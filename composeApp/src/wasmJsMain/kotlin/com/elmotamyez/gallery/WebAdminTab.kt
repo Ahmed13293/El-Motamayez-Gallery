@@ -101,9 +101,11 @@ private external fun jsOpenWebImagePicker()
 private external fun jsGetWebPickedImages(): String?
 
 /** Starts a 90° CW canvas rotation; result stored in window.__rotatedImage (null while pending). */
-@JsFun("""(b64) => {
+/** Loads the image at [url] into an off-screen Canvas, rotates 90° CW, stores base64 result in window.__rotatedImage. */
+@JsFun("""(url) => {
     window.__rotatedImage = null;
     var img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = function() {
         var c = document.createElement('canvas');
         c.width = img.height; c.height = img.width;
@@ -113,23 +115,22 @@ private external fun jsGetWebPickedImages(): String?
         ctx.drawImage(img, 0, 0);
         window.__rotatedImage = c.toDataURL('image/jpeg', 0.85).split(',')[1];
     };
-    img.src = 'data:image/jpeg;base64,' + b64;
+    img.src = url;
 }""")
-private external fun jsStartImageRotation(b64: String)
+private external fun jsStartImageRotationFromUrl(url: String)
 
 @JsFun("() => { var v = window.__rotatedImage; return (v === undefined || v === null) ? null : String(v); }")
 private external fun jsGetRotatedImage(): String?
 
-@OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
-private suspend fun webRotateImageBytes(bytes: ByteArray): ByteArray {
-    val b64 = kotlin.io.encoding.Base64.Default.encodeToString(bytes)
-    jsStartImageRotation(b64)
+/** Rotates the image at [url] 90° CW via Canvas; returns base64-encoded JPEG result, or null on timeout. */
+private suspend fun webRotateFromUrl(url: String): String? {
+    jsStartImageRotationFromUrl(url)
     repeat(200) {
         delay(50)
         val result = jsGetRotatedImage()
-        if (result != null) return kotlin.io.encoding.Base64.Default.decode(result)
+        if (result != null) return result
     }
-    return bytes
+    return null
 }
 
 private enum class AdminSection {
@@ -978,7 +979,6 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
     var uploadError  by remember { mutableStateOf<String?>(null) }
     val scope        = rememberCoroutineScope()
     val imageRepo: ImageUploadRepository = koinInject()
-    val adminVm: AdminViewModel = koinInject()
     val defaultCatId = initial?.categoryId ?: categories.firstOrNull()?.id ?: ""
     var catId        by remember { mutableStateOf(defaultCatId) }
     var brandId      by remember { mutableStateOf(initial?.brandId ?: brands.firstOrNull { it.categoryId == defaultCatId }?.id ?: "") }
@@ -1044,8 +1044,12 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
                                             if (!isRotating && !isUploading) {
                                                 scope.launch {
                                                     isRotating = true
+                                                    @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
                                                     runCatching {
-                                                        adminVm.rotateProductImage(url, { webRotateImageBytes(it) }) { newUrl ->
+                                                        val b64 = webRotateFromUrl(url)
+                                                        if (b64 != null) {
+                                                            val bytes = kotlin.io.encoding.Base64.Default.decode(b64)
+                                                            val newUrl = imageRepo.uploadProductImage(bytes)
                                                             imageUrls = imageUrls.toMutableList().also { list -> list[idx] = newUrl }
                                                         }
                                                     }
