@@ -120,13 +120,14 @@ private external fun jsStartImageRotation(b64: String)
 @JsFun("() => { var v = window.__rotatedImage; return (v === undefined || v === null) ? null : String(v); }")
 private external fun jsGetRotatedImage(): String?
 
+@OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
 private suspend fun webRotateImageBytes(bytes: ByteArray): ByteArray {
-    val b64 = kotlin.io.encoding.Base64.encode(bytes).decodeToString()
+    val b64 = kotlin.io.encoding.Base64.Default.encodeToString(bytes)
     jsStartImageRotation(b64)
     repeat(200) {
         delay(50)
         val result = jsGetRotatedImage()
-        if (result != null) return kotlin.io.encoding.Base64.decode(result)
+        if (result != null) return kotlin.io.encoding.Base64.Default.decode(result)
     }
     return bytes
 }
