@@ -23,6 +23,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android.application)
     id("com.google.gms.google-services")
+    id("com.google.firebase.appdistribution")
 }
 
 kotlin {
@@ -132,8 +133,27 @@ android {
         applicationId = "com.elmotamyez.gallery"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = (System.getenv("BUILD_NUMBER") ?: "1").toInt()
+        versionName = System.getenv("VERSION_NAME") ?: "1.0"
+    }
+    signingConfigs {
+        create("release") {
+            storeFile = System.getenv("KEYSTORE_PATH")?.let { file(it) }
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("KEY_ALIAS")
+            keyPassword = System.getenv("KEY_PASSWORD")
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+            firebaseAppDistribution {
+                artifactType = "APK"
+                releaseNotesFile = "release-notes.txt"
+                groups = "testers"
+            }
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

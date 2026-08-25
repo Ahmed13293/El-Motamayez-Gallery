@@ -591,7 +591,7 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = hPad, bottom = hPad),
+        contentPadding = PaddingValues(start = hPad, end = hPad, bottom = hPad),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Sticky header: title + search + filters + count
@@ -704,7 +704,7 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
 
         if (filtered.isEmpty()) {
             item {
-                Box(Modifier.fillParentMaxWidth().padding(top = 64.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxWidth().padding(top = 64.dp), contentAlignment = Alignment.Center) {
                     Text("لا توجد منتجات", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
