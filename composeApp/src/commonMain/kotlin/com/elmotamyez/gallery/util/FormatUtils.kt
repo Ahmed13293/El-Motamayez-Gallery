@@ -3,10 +3,11 @@ package com.elmotamyez.gallery.util
 import kotlin.math.roundToInt
 
 fun Double.formatPrice(): String {
-    val cents = (this * 100).roundToInt()
+    val negative = this < 0
+    val cents = (kotlin.math.abs(this) * 100).roundToInt()
     val egp = cents / 100
     val dec = (cents % 100).toString().padStart(2, '0')
-    return "$egp.$dec"
+    return "${if (negative) "-" else ""}$egp.$dec"
 }
 
 // KMP-safe 2-decimal formatter (replaces "%.2f".format(x) which is JVM-only)
