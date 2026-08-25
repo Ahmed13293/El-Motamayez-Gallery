@@ -24,6 +24,7 @@ plugins {
     alias(libs.plugins.android.application)
     id("com.google.gms.google-services")
     id("com.google.firebase.appdistribution")
+    id("com.google.firebase.appdistribution")
 }
 
 kotlin {
@@ -150,7 +151,8 @@ android {
             isMinifyEnabled = false
             firebaseAppDistribution {
                 artifactType = "APK"
-                releaseNotesFile = "release-notes.txt"
+                appId = "1:1013516234653:android:b40c8192f98829bf4c8974"
+                releaseNotes = "Build ${System.getenv("BUILD_NUMBER") ?: "local"}"
                 groups = "testers"
             }
         }

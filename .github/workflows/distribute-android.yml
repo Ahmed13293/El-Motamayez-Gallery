@@ -4,15 +4,11 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-    inputs:
-      release_notes:
-        description: 'Release notes for testers'
-        required: false
-        default: 'تحديث جديد'
 
 jobs:
   distribute:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,20 +31,16 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', '**/libs.versions.toml') }}
           restore-keys: ${{ runner.os }}-gradle-
 
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > composeApp/elmotamyez.jks
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Decode keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystore.jks
-
-      - name: Write release notes
-        run: |
-          echo "${{ github.event.inputs.release_notes || 'تحديث جديد' }}" > release-notes.txt
-
-      - name: Build & upload release APK to Firebase App Distribution
+      - name: Build & upload to Firebase App Distribution
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/keystore.jks
+          KEYSTORE_PATH: elmotamyez.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}

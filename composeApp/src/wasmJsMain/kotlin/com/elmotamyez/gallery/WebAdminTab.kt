@@ -533,6 +533,7 @@ private fun AdminBrandsSection(brands: List<Brand>, categories: List<Category>, 
 
 // ── Products Section ──────────────────────────────────────────────────────────
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun AdminProductsSection(products: List<Product>, categories: List<Category>, brands: List<Brand>, adminVm: AdminViewModel, isMobile: Boolean = false) {
     var showAdd by remember { mutableStateOf(false) }
