@@ -586,131 +586,149 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
             }
     }
 
-    Column(Modifier.fillMaxSize().padding(if (isMobile) 12.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (isMobile) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("إدارة المنتجات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Button(onClick = { showAdd = true }, shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("إضافة", fontSize = 13.sp)
-                }
-            }
-            AnimatedVisibility(visible = headerExpanded, enter = expandVertically(), exit = shrinkVertically()) {
-                OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it },
-                    placeholder = { Text("بحث...") }, singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
-            }
-        } else {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("إدارة المنتجات", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it },
-                        placeholder = { Text("بحث...") }, singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.Search, null) },
-                        shape = RoundedCornerShape(10.dp), modifier = Modifier.width(220.dp))
-                    Button(onClick = { showAdd = true }, shape = RoundedCornerShape(10.dp)) {
-                        Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("إضافة منتج")
+    val hPad = if (isMobile) 12.dp else 24.dp
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = hPad, bottom = hPad),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Sticky header: title + search + filters + count
+        stickyHeader {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                tonalElevation = 0.dp,
+                color = MaterialTheme.colorScheme.background
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = hPad, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (isMobile) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("إدارة المنتجات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Button(onClick = { showAdd = true }, shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
+                                Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("إضافة", fontSize = 13.sp)
+                            }
+                        }
+                        AnimatedVisibility(visible = headerExpanded, enter = expandVertically(), exit = shrinkVertically()) {
+                            OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it },
+                                placeholder = { Text("بحث...") }, singleLine = true,
+                                leadingIcon = { Icon(Icons.Default.Search, null) },
+                                shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
+                        }
+                    } else {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("إدارة المنتجات", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it },
+                                    placeholder = { Text("بحث...") }, singleLine = true,
+                                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                                    shape = RoundedCornerShape(10.dp), modifier = Modifier.width(220.dp))
+                                Button(onClick = { showAdd = true }, shape = RoundedCornerShape(10.dp)) {
+                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("إضافة منتج")
+                                }
+                            }
+                        }
                     }
+
+                    // Collapsible filters
+                    AnimatedVisibility(visible = headerExpanded, enter = expandVertically(), exit = shrinkVertically()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                item {
+                                    listOf("all" to "الكل", "0" to "نفد المخزون", "12" to "مخزون 1 و 2").forEach { (key, label) ->
+                                        FilterChip(
+                                            selected = stockFilter == key,
+                                            onClick  = { stockFilter = key },
+                                            label    = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                                            colors   = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = if (key == "0")
+                                                    MaterialTheme.colorScheme.errorContainer
+                                                else MaterialTheme.colorScheme.primaryContainer
+                                            ),
+                                            modifier = Modifier.padding(end = 8.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                item {
+                                    FilterChip(
+                                        selected = selectedCategoryId == null,
+                                        onClick  = { selectedCategoryId = null; selectedBrandId = null },
+                                        label    = { Text("كل الأقسام", style = MaterialTheme.typography.labelMedium) }
+                                    )
+                                }
+                                items(categories) { cat ->
+                                    FilterChip(
+                                        selected = selectedCategoryId == cat.id,
+                                        onClick  = {
+                                            selectedCategoryId = if (selectedCategoryId == cat.id) null else cat.id
+                                            selectedBrandId = null
+                                        },
+                                        label    = { Text(cat.name, style = MaterialTheme.typography.labelMedium) }
+                                    )
+                                }
+                            }
+                            if (selectedCategoryId != null && brandsForCategory.isNotEmpty()) {
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    item {
+                                        FilterChip(
+                                            selected = selectedBrandId == null,
+                                            onClick  = { selectedBrandId = null },
+                                            label    = { Text("كل الفئات", style = MaterialTheme.typography.labelMedium) }
+                                        )
+                                    }
+                                    items(brandsForCategory) { brand ->
+                                        FilterChip(
+                                            selected = selectedBrandId == brand.id,
+                                            onClick  = { selectedBrandId = if (selectedBrandId == brand.id) null else brand.id },
+                                            label    = { Text(brand.name, style = MaterialTheme.typography.labelMedium) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Text("${filtered.size} منتج", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
-
-        // Collapsible filters
-        AnimatedVisibility(visible = headerExpanded, enter = expandVertically(), exit = shrinkVertically()) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                // Stock filter
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        listOf("all" to "الكل", "0" to "نفد المخزون", "12" to "مخزون 1 و 2").forEach { (key, label) ->
-                            FilterChip(
-                                selected = stockFilter == key,
-                                onClick  = { stockFilter = key },
-                                label    = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                                colors   = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = if (key == "0")
-                                        MaterialTheme.colorScheme.errorContainer
-                                    else MaterialTheme.colorScheme.primaryContainer
-                                ),
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
-                        }
-                    }
-                }
-                // Category filter
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        FilterChip(
-                            selected = selectedCategoryId == null,
-                            onClick  = { selectedCategoryId = null; selectedBrandId = null },
-                            label    = { Text("كل الأقسام", style = MaterialTheme.typography.labelMedium) }
-                        )
-                    }
-                    items(categories) { cat ->
-                        FilterChip(
-                            selected = selectedCategoryId == cat.id,
-                            onClick  = {
-                                selectedCategoryId = if (selectedCategoryId == cat.id) null else cat.id
-                                selectedBrandId = null
-                            },
-                            label    = { Text(cat.name, style = MaterialTheme.typography.labelMedium) }
-                        )
-                    }
-                }
-                // Subcategory (brand) filter
-                if (selectedCategoryId != null && brandsForCategory.isNotEmpty()) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item {
-                            FilterChip(
-                                selected = selectedBrandId == null,
-                                onClick  = { selectedBrandId = null },
-                                label    = { Text("كل الفئات", style = MaterialTheme.typography.labelMedium) }
-                            )
-                        }
-                        items(brandsForCategory) { brand ->
-                            FilterChip(
-                                selected = selectedBrandId == brand.id,
-                                onClick  = { selectedBrandId = if (selectedBrandId == brand.id) null else brand.id },
-                                label    = { Text(brand.name, style = MaterialTheme.typography.labelMedium) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Text("${filtered.size} منتج", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         if (filtered.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("لا توجد منتجات", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            item {
+                Box(Modifier.fillParentMaxWidth().padding(top = 64.dp), contentAlignment = Alignment.Center) {
+                    Text("لا توجد منتجات", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         } else {
-            LazyColumn(state = listState, modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(filtered, key = { it.id }) { product ->
-                    val brandName = brands.find { it.id == product.brandId }?.name ?: ""
-                    val catName   = categories.find { it.id == product.categoryId }?.name ?: ""
-                    CrudItemRow(
-                        title = product.name,
-                        subtitle = buildString {
-                            append("$catName / $brandName")
-                            append(" | السعر: ${product.price.fmt2f()} ج")
-                            if (product.wholesalePrice != null) append(" | الجملة: ${product.wholesalePrice.fmt2f()} ج")
-                            append(" | المخزون: ${product.stock}")
-                        },
-                        subtitleColor = when {
-                            product.stock == 0 -> MaterialTheme.colorScheme.error
-                            product.stock <= 2 -> Color(0xFFE65100)
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        onEdit = { editTarget = product },
-                        onDelete = { deleteTarget = product },
-                        thumbnailUrl = product.displayImages.firstOrNull()
-                    )
-                }
+            items(filtered, key = { it.id }) { product ->
+                val brandName = brands.find { it.id == product.brandId }?.name ?: ""
+                val catName   = categories.find { it.id == product.categoryId }?.name ?: ""
+                CrudItemRow(
+                    title = product.name,
+                    subtitle = buildString {
+                        append("$catName / $brandName")
+                        append(" | السعر: ${product.price.fmt2f()} ج")
+                        if (product.wholesalePrice != null) append(" | الجملة: ${product.wholesalePrice.fmt2f()} ج")
+                        append(" | المخزون: ${product.stock}")
+                    },
+                    subtitleColor = when {
+                        product.stock == 0 -> MaterialTheme.colorScheme.error
+                        product.stock <= 2 -> Color(0xFFE65100)
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    onEdit = { editTarget = product },
+                    onDelete = { deleteTarget = product },
+                    thumbnailUrl = product.displayImages.firstOrNull()
+                )
             }
         }
     }
