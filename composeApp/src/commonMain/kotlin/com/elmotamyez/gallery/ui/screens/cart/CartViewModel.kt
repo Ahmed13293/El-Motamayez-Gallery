@@ -13,12 +13,21 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-private const val KEY_CART = "cart_items_json"
+private const val KEY_CART_0 = "cart_items_json_0"
+private const val KEY_CART_1 = "cart_items_json_1"
+private const val KEY_CART_LEGACY = "cart_items_json"
 
 class CartViewModel : ViewModel() {
 
     private val settings = Settings()
     private val json = Json { ignoreUnknownKeys = true }
+
+    private val _activeSlotIndex = MutableStateFlow(0)
+    val activeSlotIndex: StateFlow<Int> = _activeSlotIndex.asStateFlow()
+
+    // Both slot item lists — kept in sync with _cartItems for the active slot
+    private val _slots = MutableStateFlow(listOf(emptyList<CartItem>(), emptyList<CartItem>()))
+    val slots: StateFlow<List<List<CartItem>>> = _slots.asStateFlow()
 
     private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
     val cartItems: StateFlow<List<CartItem>> = _cartItems.asStateFlow()
@@ -26,13 +35,23 @@ class CartViewModel : ViewModel() {
     val totalPrice: Double get() = _cartItems.value.sumOf { it.totalPrice }
 
     init {
-        // Restore saved cart on startup
-        val stored: String = settings[KEY_CART, ""]
-        if (stored.isNotEmpty()) {
-            runCatching {
-                _cartItems.value = json.decodeFromString<List<CartItem>>(stored)
-            }
-        }
+        val s0: String = settings[KEY_CART_0, ""].ifEmpty { settings[KEY_CART_LEGACY, ""] }
+        val s1: String = settings[KEY_CART_1, ""]
+        val slot0 = if (s0.isNotEmpty()) runCatching { json.decodeFromString<List<CartItem>>(s0) }.getOrDefault(emptyList()) else emptyList()
+        val slot1 = if (s1.isNotEmpty()) runCatching { json.decodeFromString<List<CartItem>>(s1) }.getOrDefault(emptyList()) else emptyList()
+        _slots.value = listOf(slot0, slot1)
+        _cartItems.value = slot0
+    }
+
+    fun switchSlot(newIdx: Int) {
+        if (newIdx == _activeSlotIndex.value || newIdx !in 0..1) return
+        val currentIdx = _activeSlotIndex.value
+        persistSlot(currentIdx, _cartItems.value)
+        val updated = _slots.value.toMutableList()
+        updated[currentIdx] = _cartItems.value
+        _slots.value = updated
+        _activeSlotIndex.value = newIdx
+        _cartItems.value = _slots.value[newIdx]
     }
 
     fun addToCart(product: Product) {
@@ -54,10 +73,7 @@ class CartViewModel : ViewModel() {
         _cartItems.update { items ->
             val existing = items.find { it.product.id == product.id }
             if (existing != null) {
-                items.map {
-                    if (it.product.id == product.id) it.copy(quantity = it.quantity + quantity)
-                    else it
-                }
+                items.map { if (it.product.id == product.id) it.copy(quantity = it.quantity + quantity) else it }
             } else {
                 items + CartItem(product, quantity)
             }
@@ -92,8 +108,7 @@ class CartViewModel : ViewModel() {
         persist()
     }
 
-    fun isInCart(productId: String): Boolean =
-        _cartItems.value.any { it.product.id == productId }
+    fun isInCart(productId: String): Boolean = _cartItems.value.any { it.product.id == productId }
 
     fun clearCart() {
         _cartItems.update { emptyList() }
@@ -101,6 +116,15 @@ class CartViewModel : ViewModel() {
     }
 
     private fun persist() {
-        settings[KEY_CART] = json.encodeToString(_cartItems.value)
+        val idx = _activeSlotIndex.value
+        persistSlot(idx, _cartItems.value)
+        val updated = _slots.value.toMutableList()
+        updated[idx] = _cartItems.value
+        _slots.value = updated
+    }
+
+    private fun persistSlot(index: Int, items: List<CartItem>) {
+        val key = if (index == 0) KEY_CART_0 else KEY_CART_1
+        settings[key] = json.encodeToString(items)
     }
 }

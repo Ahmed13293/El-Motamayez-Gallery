@@ -53,8 +53,10 @@ class CartScreen : Screen {
         val receiptVm   = koinInject<ReceiptViewModel>()
         val authVm      = koinInject<AuthViewModel>()
         val currentUser by authVm.uiState.collectAsState()
-        val cartItems   by cartVm.cartItems.collectAsState()
-        val isAdmin     = currentUser.user?.role == UserRole.ADMIN
+        val cartItems       by cartVm.cartItems.collectAsState()
+        val activeSlot      by cartVm.activeSlotIndex.collectAsState()
+        val slots           by cartVm.slots.collectAsState()
+        val isAdmin         = currentUser.user?.role == UserRole.ADMIN
         val orderSaving    by receiptVm.orderSaving.collectAsState()
         val orderSaved     by receiptVm.orderSaved.collectAsState()
         val quotationSaving by receiptVm.quotationSaving.collectAsState()
@@ -65,6 +67,15 @@ class CartScreen : Screen {
             if (orderSaved) {
                 cartVm.clearCart()
                 receiptVm.resetOrderSaved()
+                (navigator.parent ?: navigator).push(ReceiptScreen())
+            }
+        }
+
+        // Navigate to receipt screen after saving a quotation
+        LaunchedEffect(quotationSaved) {
+            if (quotationSaved) {
+                cartVm.clearCart()
+                receiptVm.resetQuotationSaved()
                 (navigator.parent ?: navigator).push(ReceiptScreen())
             }
         }
@@ -398,15 +409,6 @@ class CartScreen : Screen {
                                 }
                             }
 
-                            if (quotationSaved) {
-                                Text(
-                                    "✓ تم حفظ عرض السعر",
-                                    color = MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    textAlign = TextAlign.Center
-                                )
-                            }
                             Button(
                                 onClick = {
                                     if (!quotationSaving) {
@@ -437,13 +439,63 @@ class CartScreen : Screen {
                 }
             }
         ) { padding ->
-            if (cartItems.isEmpty()) {
-                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    Text("السلة فارغة", style = MaterialTheme.typography.bodyLarge)
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                // ── Slot switcher ─────────────────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    slots.forEachIndexed { idx, slotItems ->
+                        val selected = idx == activeSlot
+                        val count = slotItems.size
+                        Surface(
+                            onClick = { cartVm.switchSlot(idx) },
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "فاتورة ${idx + 1}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (selected) Color.White
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (count > 0) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (selected) Color.White.copy(alpha = 0.25f)
+                                                else MaterialTheme.colorScheme.primary
+                                    ) {
+                                        Text(
+                                            "$count",
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (selected) Color.White
+                                                    else Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-            } else {
+                if (cartItems.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("السلة فارغة", style = MaterialTheme.typography.bodyLarge)
+                    }
+                } else {
                 LazyColumn(
-                    modifier = Modifier.padding(padding),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -499,7 +551,8 @@ class CartScreen : Screen {
                         }
                     }
                 }
-            }
+                }   // else
+            }   // Column
         }
 
         // ── Date picker dialog (admin only) ───────────────────────────────────

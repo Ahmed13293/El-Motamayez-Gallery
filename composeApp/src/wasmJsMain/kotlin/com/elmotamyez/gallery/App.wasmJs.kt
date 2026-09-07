@@ -1229,10 +1229,12 @@ private fun WebCartTab(
     onOrderConfirmed: () -> Unit
 ) {
     val receiptVm: ReceiptViewModel = koinInject()
-    val cartItems     by cartVm.cartItems.collectAsState()
-    val isAdmin       = user.role == UserRole.ADMIN
-    val orderSaving   by receiptVm.orderSaving.collectAsState()
-    val orderSaved    by receiptVm.orderSaved.collectAsState()
+    val cartItems      by cartVm.cartItems.collectAsState()
+    val activeSlot     by cartVm.activeSlotIndex.collectAsState()
+    val slots          by cartVm.slots.collectAsState()
+    val isAdmin        = user.role == UserRole.ADMIN
+    val orderSaving    by receiptVm.orderSaving.collectAsState()
+    val orderSaved     by receiptVm.orderSaved.collectAsState()
     var discount by remember { mutableStateOf("") }
     var paymentMethod by remember { mutableStateOf("كاش") }
     var showConfirmDialog by remember { mutableStateOf(false) }
@@ -1254,29 +1256,75 @@ private fun WebCartTab(
     val discountValue = discount.toDoubleOrNull() ?: 0.0
     val total = (cartVm.totalPrice - discountValue).coerceAtLeast(0.0)
 
-    if (cartItems.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    Icons.Default.ShoppingCart,
-                    null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-                )
-                Text(
-                    "السلة فارغة",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    // ── Slot switcher ──────────────────────────────────────────────────────────
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            slots.forEachIndexed { idx, slotItems ->
+                val selected = idx == activeSlot
+                val count = slotItems.size
+                Surface(
+                    onClick = { cartVm.switchSlot(idx) },
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "فاتورة ${idx + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selected) Color.White
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (count > 0) {
+                            Spacer(Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (selected) Color.White.copy(alpha = 0.25f)
+                                        else MaterialTheme.colorScheme.primary
+                            ) {
+                                Text(
+                                    "$count",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
-        return
-    }
 
-    if (isMobile) {
+        if (cartItems.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ShoppingCart,
+                        null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                    )
+                    Text(
+                        "السلة فارغة",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else if (isMobile) {
         // Mobile: stacked vertically — items list + summary card in one LazyColumn
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -1814,6 +1862,7 @@ private fun WebCartItemRow(
             }
         }
     }
+    }   // Column
 }
 
 // ── Receipts Tab — grouped by date, expand/collapse like mobile ───────────────
