@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -126,6 +127,13 @@ class ReceiptViewModel(
         // Then sync latest from Supabase in the background
         loadReceipts()
         loadReconciliations()
+        // Keep both devices in sync — re-fetch from Supabase every 30 seconds
+        viewModelScope.launch {
+            while (isActive) {
+                delay(30_000)
+                if (!_isLoading.value) loadReceipts()
+            }
+        }
     }
 
     fun loadReconciliations() {
