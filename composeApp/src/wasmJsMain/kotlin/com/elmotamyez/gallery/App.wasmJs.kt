@@ -2023,13 +2023,18 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false, isMobile: Boolean = false)
 
                 grouped.forEach { (dateKey, dayReceipts) ->
                     val isOpen = expandedMap[dateKey] == true
-                    val dayTotal = dayReceipts.sumOf { it.total }
+                    val confirmed = dayReceipts.filter { !it.isQuotation }
+                    val dayTotal = confirmed.sumOf { it.total }
+                    val cashTotal = confirmed.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
+                    val transferTotal = confirmed.filter { it.paymentMethod == "تحويل" }.sumOf { it.total }
 
                     item(key = "header_$dateKey") {
                         ReceiptDayHeader(
                             dateKey = dateKey,
                             count = dayReceipts.size,
                             dayTotal = dayTotal,
+                            cashTotal = cashTotal,
+                            transferTotal = transferTotal,
                             isExpanded = isOpen,
                             onClick = { expandedMap[dateKey] = !isOpen })
                     }
@@ -2125,6 +2130,8 @@ private fun ReceiptDayHeader(
     dateKey: String,
     count: Int,
     dayTotal: Double,
+    cashTotal: Double,
+    transferTotal: Double,
     isExpanded: Boolean,
     onClick: () -> Unit
 ) {
@@ -2165,6 +2172,22 @@ private fun ReceiptDayHeader(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
+                if (cashTotal > 0.0 || transferTotal > 0.0) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (cashTotal > 0.0)
+                            Text(
+                                "كاش: ${cashTotal.formatPrice()} ج",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        if (transferTotal > 0.0)
+                            Text(
+                                "تحويل: ${transferTotal.formatPrice()} ج",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                    }
+                }
             }
             Icon(
                 imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
