@@ -2156,7 +2156,10 @@ private fun ReceiptDayHeader(
 
     var showDialog by remember { mutableStateOf(false) }
     var inputValue by remember(reconciliation) {
-        mutableStateOf(reconciliation?.actualCash?.let { "%.2f".format(it) } ?: "")
+        mutableStateOf(reconciliation?.actualCash?.let { v ->
+            val rounded = kotlin.math.round(v * 100) / 100.0
+            if (rounded == rounded.toLong().toDouble()) "${rounded.toLong()}" else "$rounded"
+        } ?: "")
     }
 
     if (showDialog) {
