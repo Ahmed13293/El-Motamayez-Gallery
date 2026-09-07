@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import androidx.compose.ui.graphics.Color
 import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.model.UserRole
@@ -113,7 +114,7 @@ class ReceiptScreen : Screen {
                                 }
                             }
                             TextButton(onClick = {
-                                receipt?.let { exportReceiptToPdf(it, "${it.id}.pdf") }
+                                receipt?.let { exportReceiptToPdf(it, "${it.id}.pdf", it.isQuotation) }
                             }) {
                                 Text("إصدار PDF", style = MaterialTheme.typography.labelLarge)
                             }
@@ -270,13 +271,26 @@ class ReceiptScreen : Screen {
                         )
                     }
 
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        "شكراً لتسوقكم معنا!",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    if (receipt?.isQuotation == true) {
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick  = { receipt?.let { vm.confirmQuotation(it) } },
+                            enabled  = !isSaving,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape    = RoundedCornerShape(10.dp),
+                            colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100))
+                        ) {
+                            Text("تأكيد عرض السعر")
+                        }
+                    } else {
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "شكراً لتسوقكم معنا!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }

@@ -23,14 +23,12 @@ data class Order(
 )
 
 enum class OrderStatus(val key: String, val arabicLabel: String) {
-    QUOTATION("quotation", "عرض سعر"),
     RECEIVED("received", "استلام الطلب"),
     PREPARING("preparing", "جاري التحضير"),
     DELIVERING("delivering", "جاري التوصيل"),
     DELIVERED("delivered", "تم التسليم");
 
     fun next(): OrderStatus? = when (this) {
-        QUOTATION  -> RECEIVED
         RECEIVED   -> PREPARING
         PREPARING  -> DELIVERING
         DELIVERING -> DELIVERED

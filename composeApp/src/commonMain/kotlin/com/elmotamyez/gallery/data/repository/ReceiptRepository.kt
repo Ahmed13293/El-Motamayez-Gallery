@@ -33,7 +33,8 @@ private data class ReceiptRow(
     val is_paid: Boolean        = true,
     val customer_phone: String? = null,
     val customer_info: String?  = null,
-    val username: String?       = null
+    val username: String?       = null,
+    val is_quotation: Boolean   = false
 )
 
 @Serializable
@@ -48,8 +49,12 @@ private data class ReceiptInsert(
     val created_at: String?     = null,
     val customer_phone: String? = null,
     val customer_info: String?  = null,
-    val username: String?       = null
+    val username: String?       = null,
+    val is_quotation: Boolean   = false
 )
+
+@Serializable
+private data class QuotationConfirmUpdate(val is_quotation: Boolean)
 
 @Serializable
 private data class ReceiptItemsUpdate(
@@ -144,9 +149,18 @@ class ReceiptRepository {
             created_at     = receipt.createdAt,
             customer_phone = receipt.customerPhone,
             customer_info  = receipt.customerInfo,
-            username       = receipt.username
+            username       = receipt.username,
+            is_quotation   = receipt.isQuotation
         )
         supabaseClient.from("receipts").upsert(row)
+    }
+
+    /** Confirms a quotation receipt: sets is_quotation = false in Supabase. */
+    suspend fun confirmQuotation(receiptId: String) {
+        supabaseClient.from("receipts")
+            .update(QuotationConfirmUpdate(is_quotation = false)) {
+                filter { eq("id", receiptId) }
+            }
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -168,6 +182,7 @@ class ReceiptRepository {
         isPaid        = is_paid,
         customerPhone = customer_phone,
         customerInfo  = customer_info,
-        username      = username
+        username      = username,
+        isQuotation   = is_quotation
     )
 }

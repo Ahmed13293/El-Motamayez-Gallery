@@ -2044,9 +2044,10 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false, isMobile: Boolean = false)
                                 Spacer(Modifier.height(2.dp))
                                 dayReceipts.forEachIndexed { index, receipt ->
                                     WebReceiptCard(
-                                        receipt = receipt,
-                                        dayIndex = dayReceipts.size - index,
-                                        isAdmin = isAdmin,
+                                        receipt             = receipt,
+                                        dayIndex            = dayReceipts.size - index,
+                                        isAdmin             = isAdmin,
+                                        onConfirmQuotation  = { receiptVm.confirmQuotation(receipt) },
                                         onEdit = {
                                             receiptVm.loadProductsForEdit()
                                             receiptVm.viewReceipt(receipt)
@@ -2170,12 +2171,14 @@ internal fun WebReceiptCard(
     receipt: Receipt,
     dayIndex: Int,
     isAdmin: Boolean = false,
+    onConfirmQuotation: () -> Unit = {},
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
     val discount = receipt.discount
     val subtotal = receipt.total + discount
+    val quotationColor = androidx.compose.ui.graphics.Color(0xFFE65100)
 
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -2211,6 +2214,17 @@ internal fun WebReceiptCard(
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.tertiary
                             )
+                        }
+                        if (receipt.isQuotation) {
+                            Surface(shape = RoundedCornerShape(6.dp), color = quotationColor.copy(alpha = 0.15f)) {
+                                Text(
+                                    "عرض سعر",
+                                    modifier   = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                    style      = MaterialTheme.typography.labelSmall,
+                                    color      = quotationColor,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                     val time = receipt.timeLabel()
@@ -2441,9 +2455,21 @@ internal fun WebReceiptCard(
 
                     Spacer(Modifier.height(4.dp))
 
+                    // Confirm button (quotations only)
+                    if (receipt.isQuotation) {
+                        Button(
+                            onClick  = onConfirmQuotation,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape    = RoundedCornerShape(10.dp),
+                            colors   = ButtonDefaults.buttonColors(containerColor = quotationColor)
+                        ) {
+                            Text("تأكيد عرض السعر")
+                        }
+                    }
+
                     // PDF export button
                     OutlinedButton(
-                        onClick = { exportReceiptToPdf(receipt, "${receipt.id}.pdf") },
+                        onClick = { exportReceiptToPdf(receipt, "${receipt.id}.pdf", receipt.isQuotation) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     ) {

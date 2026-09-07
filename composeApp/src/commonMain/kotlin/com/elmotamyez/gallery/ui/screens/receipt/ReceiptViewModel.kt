@@ -43,6 +43,13 @@ class ReceiptViewModel(
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
 
+    private val _quotationSaving = MutableStateFlow(false)
+    val quotationSaving: StateFlow<Boolean> = _quotationSaving.asStateFlow()
+
+    private val _quotationSaved = MutableStateFlow(false)
+    val quotationSaved: StateFlow<Boolean> = _quotationSaved.asStateFlow()
+    fun resetQuotationSaved() { _quotationSaved.value = false }
+
     private val _deleteError = MutableStateFlow<String?>(null)
     val deleteError: StateFlow<String?> = _deleteError.asStateFlow()
     fun clearDeleteError() { _deleteError.value = null }
@@ -134,7 +141,8 @@ class ReceiptViewModel(
         }
     }
 
-    /** Tries to push any locally-pending receipts to Supabase and decrement their stock. */
+    /** Tries to push any locally-pending receipts to Supabase and decrement their stock.
+     *  Quotation receipts are synced (insert) but stock is NOT decremented until confirmed. */
     private suspend fun syncPendingReceipts() {
         val pending = _receipts.value.filter { it.pendingSave }
         if (pending.isEmpty()) return
@@ -145,13 +153,15 @@ class ReceiptViewModel(
             }
             val synced = syncResult.isSuccess
             if (synced) {
-                receipt.items
-                    .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
-                    .forEach { cartItem ->
-                        runCatching {
-                            productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+                if (!receipt.isQuotation) {
+                    receipt.items
+                        .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
+                        .forEach { cartItem ->
+                            runCatching {
+                                productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+                            }
                         }
-                    }
+                }
                 _receipts.value = _receipts.value.map {
                     if (it.id == receipt.id) it.copy(pendingSave = false) else it
                 }
@@ -251,6 +261,75 @@ class ReceiptViewModel(
         }
     }
 
+    /** Saves a quotation receipt (isQuotation=true) without deducting stock or navigating. */
+    fun saveQuotation(
+        items: List<CartItem>,
+        total: Double,
+        discount: Double = 0.0,
+        paymentMethod: String = "كاش",
+        customerPhone: String? = null,
+        customerInfo: String? = null,
+        username: String? = null
+    ) {
+        viewModelScope.launch {
+            _quotationSaving.value = true
+            val tz      = TimeZone.currentSystemDefault()
+            val instant = Clock.System.now()
+            val now     = instant.toLocalDateTime(tz)
+            val offset  = tz.offsetAt(instant)
+            val todayPrefix = dateString(now.year, now.monthNumber, now.dayOfMonth)
+            val localMax = _receipts.value
+                .filter { it.createdAt?.startsWith(todayPrefix) == true }
+                .maxOfOrNull { it.orderNumber } ?: 0
+            val remoteMax = runCatching { repository.fetchTodayMax(todayPrefix) }.getOrElse { 0 }
+            val nextNumber = maxOf(localMax, remoteMax) + 1
+            val nowIso = dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second) + offset
+            val receipt = Receipt(
+                id            = "${todayPrefix}-${nextNumber.toString().padStart(4, '0')}",
+                orderNumber   = nextNumber,
+                items         = items,
+                total         = total,
+                discount      = discount,
+                paymentMethod = paymentMethod,
+                isPaid        = false,
+                createdAt     = nowIso,
+                customerPhone = customerPhone.takeIf { !it.isNullOrBlank() },
+                customerInfo  = customerInfo.takeIf  { !it.isNullOrBlank() },
+                username      = username.takeIf      { !it.isNullOrBlank() },
+                isQuotation   = true
+            )
+            val updated = _receipts.value + receipt
+            _receipts.value = updated
+            persistCache(updated)
+            runCatching { repository.insert(receipt) }
+                .onFailure { e -> _insertError.value = "فشل حفظ عرض السعر: ${e.message}" }
+            loadReceipts()
+            _quotationSaving.value = false
+            _quotationSaved.value = true
+        }
+    }
+
+    /** Confirms a quotation: marks is_quotation=false and deducts stock. */
+    fun confirmQuotation(receipt: Receipt) {
+        viewModelScope.launch {
+            _isSaving.value = true
+            runCatching { repository.confirmQuotation(receipt.id) }
+                .onFailure { e -> _insertError.value = "فشل تأكيد عرض السعر: ${e.message}" }
+            receipt.items
+                .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
+                .forEach { cartItem ->
+                    runCatching { productRepository.decrementStock(cartItem.product.id, cartItem.quantity) }
+                }
+            _stockVersion.value += 1
+            val confirmed = receipt.copy(isQuotation = false)
+            val updatedList = _receipts.value.map { if (it.id == receipt.id) confirmed else it }
+            _receipts.value = updatedList
+            persistCache(updatedList)
+            if (_currentReceipt.value?.id == receipt.id) _currentReceipt.value = confirmed
+            _isSaving.value = false
+        }
+    }
+
     /** Called when tapping a receipt from the history list. */
     fun viewReceipt(receipt: Receipt) {
         _currentReceipt.value = receipt
@@ -317,7 +396,7 @@ class ReceiptViewModel(
                 result.isSuccess
             }
             if (deleted) {
-                if (!receipt.pendingSave) {
+                if (!receipt.pendingSave && !receipt.isQuotation) {
                     receipt.items
                         .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
                         .forEach { runCatching { productRepository.incrementStock(it.product.id, it.quantity) } }

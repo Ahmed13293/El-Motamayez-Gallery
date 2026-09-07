@@ -53,9 +53,7 @@ class OrderViewModel(
             runCatching { repository.fetchAll() }
                 .onSuccess { list ->
                     _orders.value = list
-                    _pendingCount.value = list.count {
-                        it.status != OrderStatus.DELIVERED.key && it.status != OrderStatus.QUOTATION.key
-                    }
+                    _pendingCount.value = list.count { it.status != OrderStatus.DELIVERED.key }
                 }
                 .onFailure { e ->
                     println("OrderViewModel.loadOrders failed: $e")
@@ -99,51 +97,6 @@ class OrderViewModel(
             loadOrders()
             _isSaving.value = false
             onDone()
-        }
-    }
-
-    fun createQuotation(
-        items: List<CartItem>,
-        total: Double,
-        paymentMethod: String = "كاش",
-        discount: Double = 0.0,
-        customerName: String? = null,
-        customerPhone: String? = null,
-        notes: String? = null,
-        createdBy: String? = null,
-        onDone: () -> Unit = {}
-    ) {
-        viewModelScope.launch {
-            _isSaving.value = true
-            val order = Order(
-                items         = items,
-                total         = total,
-                discount      = discount,
-                paymentMethod = paymentMethod,
-                status        = OrderStatus.QUOTATION.key,
-                customerName  = customerName,
-                customerPhone = customerPhone,
-                notes         = notes,
-                createdBy     = createdBy
-            )
-            runCatching { repository.insert(order) }
-                .onFailure { e -> _error.value = "فشل حفظ عرض السعر: ${e.message}" }
-            loadOrders()
-            _isSaving.value = false
-            onDone()
-        }
-    }
-
-    fun confirmQuotation(order: Order) {
-        viewModelScope.launch {
-            _isSaving.value = true
-            runCatching { repository.updateStatus(order.id, OrderStatus.RECEIVED.key, null) }
-                .onFailure { e -> _error.value = "فشل تأكيد عرض السعر: ${e.message}" }
-            val updated = order.copy(status = OrderStatus.RECEIVED.key)
-            val newList = _orders.value.map { if (it.id == order.id) updated else it }
-            _orders.value = newList
-            _pendingCount.value = newList.count { it.status != OrderStatus.DELIVERED.key }
-            _isSaving.value = false
         }
     }
 

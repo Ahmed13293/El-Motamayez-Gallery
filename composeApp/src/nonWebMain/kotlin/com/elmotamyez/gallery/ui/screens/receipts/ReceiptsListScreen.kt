@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import androidx.compose.ui.graphics.Color
 import com.elmotamyez.gallery.data.model.Receipt
 import com.elmotamyez.gallery.data.model.UserRole
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
@@ -348,9 +349,10 @@ class ReceiptsListScreen : Screen {
                                         Spacer(Modifier.height(2.dp))
                                         dayReceipts.forEachIndexed { index, receipt ->
                                             ReceiptCard(
-                                                receipt      = receipt,
-                                                dayIndex     = dayReceipts.size - index,
-                                                onClick      = {
+                                                receipt             = receipt,
+                                                dayIndex            = dayReceipts.size - index,
+                                                onConfirmQuotation  = { vm.confirmQuotation(receipt) },
+                                                onClick             = {
                                                     vm.listScrollIndex  = listState.firstVisibleItemIndex
                                                     vm.listScrollOffset = listState.firstVisibleItemScrollOffset
                                                     vm.viewReceipt(receipt)
@@ -423,92 +425,126 @@ private fun DayHeader(
 // ── Receipt card ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun ReceiptCard(receipt: Receipt, dayIndex: Int, onClick: () -> Unit) {
+private fun ReceiptCard(
+    receipt: Receipt,
+    dayIndex: Int,
+    onConfirmQuotation: () -> Unit,
+    onClick: () -> Unit
+) {
+    val quotationColor = Color(0xFFE65100)
     Card(
         modifier  = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape     = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment     = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment     = Alignment.CenterVertically
-                ) {
-                    Text(
-                        receipt.createdAt?.take(10)?.replace("-", "")?.let { "${it}${receipt.orderNumber}" } ?: "${receipt.orderNumber}",
-                        style      = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color      = MaterialTheme.colorScheme.primary
-                    )
-                    if (!receipt.username.isNullOrBlank()) {
-                        Text("•", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment     = Alignment.CenterVertically
+                    ) {
                         Text(
-                            receipt.username,
-                            style      = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color      = MaterialTheme.colorScheme.tertiary
+                            receipt.createdAt?.take(10)?.replace("-", "")?.let { "${it}${receipt.orderNumber}" } ?: "${receipt.orderNumber}",
+                            style      = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color      = MaterialTheme.colorScheme.primary
                         )
-                    }
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment     = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "${receipt.items.size} منتج",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    val time = receipt.timeLabel()
-                    if (time.isNotEmpty()) {
-                        Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall)
-                        Text(time, style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    if (receipt.paymentMethod.isNotEmpty()) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer
-                        ) {
+                        if (!receipt.username.isNullOrBlank()) {
+                            Text("•", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
-                                receipt.paymentMethod,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-                                style    = MaterialTheme.typography.labelSmall,
-                                color    = MaterialTheme.colorScheme.onSecondaryContainer,
-                                fontWeight = FontWeight.SemiBold
+                                receipt.username,
+                                style      = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color      = MaterialTheme.colorScheme.tertiary
                             )
+                        }
+                        if (receipt.isQuotation) {
+                            Surface(shape = RoundedCornerShape(6.dp), color = quotationColor.copy(alpha = 0.15f)) {
+                                Text(
+                                    "عرض سعر",
+                                    modifier   = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                    style      = MaterialTheme.typography.labelSmall,
+                                    color      = quotationColor,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment     = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "${receipt.items.size} منتج",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        val time = receipt.timeLabel()
+                        if (time.isNotEmpty()) {
+                            Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall)
+                            Text(time, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (receipt.paymentMethod.isNotEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer
+                            ) {
+                                Text(
+                                    receipt.paymentMethod,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                    style    = MaterialTheme.typography.labelSmall,
+                                    color    = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
-            }
-            Row(
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (receipt.pendingSave) {
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (receipt.pendingSave) {
+                        Icon(
+                            Icons.Default.Warning, null,
+                            tint     = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Text(
+                        receipt.total.formatPrice(),
+                        style      = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color      = MaterialTheme.colorScheme.onSurface
+                    )
                     Icon(
-                        Icons.Default.Warning, null,
-                        tint     = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(16.dp)
+                        Icons.Default.KeyboardArrowRight, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Text(
-                    receipt.total.formatPrice(),
-                    style      = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color      = MaterialTheme.colorScheme.onSurface
-                )
-                Icon(
-                    Icons.Default.KeyboardArrowRight, null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            }
+            if (receipt.isQuotation) {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Button(
+                        onClick = onConfirmQuotation,
+                        colors  = ButtonDefaults.buttonColors(containerColor = quotationColor),
+                        shape   = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("تأكيد عرض السعر", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
             }
         }
     }
