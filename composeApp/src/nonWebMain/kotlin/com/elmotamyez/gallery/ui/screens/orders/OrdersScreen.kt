@@ -151,9 +151,11 @@ class OrdersScreen : Screen {
                     items(orders, key = { it.id }) { order ->
                         OrderCard(
                             order = order,
+                            products = products,
                             isSaving = isSaving,
                             isAdmin = isAdmin,
                             onAdvance = { vm.advanceStatus(order, username) },
+                            onConfirmQuotation = { vm.confirmQuotation(order) },
                             onEdit = { editingOrder = order },
                             onDelete = { deletingOrder = order })
                     }
@@ -215,11 +217,19 @@ class OrdersScreen : Screen {
 
 @Composable
 private fun OrderCard(
-    order: Order, isSaving: Boolean, isAdmin: Boolean, onAdvance: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit
+    order: Order,
+    products: List<Product>,
+    isSaving: Boolean,
+    isAdmin: Boolean,
+    onAdvance: () -> Unit,
+    onConfirmQuotation: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(true) }
     val status = OrderStatus.fromKey(order.status)
     val nextStatus = status.next()
+    val isQuotation = status == OrderStatus.QUOTATION
 
     Card(
         shape = RoundedCornerShape(14.dp),
@@ -312,11 +322,13 @@ private fun OrderCard(
                 }
             }
 
-            // ── Status stepper ────────────────────────────────────────────────
-            OrderStatusStepper(
-                currentStatus = status,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp)
-            )
+            // ── Status stepper (hidden for quotations) ───────────────────────
+            if (!isQuotation) {
+                OrderStatusStepper(
+                    currentStatus = status,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp)
+                )
+            }
 
             // ── Expanded detail ───────────────────────────────────────────────
             AnimatedVisibility(
@@ -434,8 +446,87 @@ private fun OrderCard(
                         )
                     }
 
-                    // Advance status button
-                    if (nextStatus != null) {
+                    // ── Quotation actions ─────────────────────────────────────
+                    if (isQuotation) {
+                        Spacer(Modifier.height(4.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "فحص المخزون",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        order.items.filter { !it.product.id.startsWith("other_") }.forEach { item ->
+                            val currentStock = products.find { it.id == item.product.id }?.stock ?: 0
+                            val available = currentStock >= item.quantity
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    item.product.name,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        "مخزون: $currentStock",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Icon(
+                                        if (available) Icons.Default.Check else Icons.Default.Close,
+                                        null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = if (available) MaterialTheme.colorScheme.primary
+                                               else MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Button(
+                            onClick = onConfirmQuotation,
+                            enabled = !isSaving,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("تأكيد الطلب")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                val receipt = com.elmotamyez.gallery.data.model.Receipt(
+                                    id          = order.id,
+                                    orderNumber = 0,
+                                    items       = order.items,
+                                    total       = order.total,
+                                    discount    = order.discount,
+                                    paymentMethod = order.paymentMethod,
+                                    isPaid      = false,
+                                    createdAt   = order.createdAt,
+                                    customerPhone = order.customerPhone,
+                                    customerInfo  = order.customerName
+                                )
+                                com.elmotamyez.gallery.util.exportReceiptToPdf(
+                                    receipt, "عرض_سعر_${order.id}.pdf", isQuotation = true
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("تصدير عرض السعر PDF")
+                        }
+                    } else if (nextStatus != null) {
+                        // Normal order advance button
                         Spacer(Modifier.height(4.dp))
                         Button(
                             onClick = onAdvance,
@@ -458,7 +549,7 @@ private fun OrderCard(
 
 @Composable
 private fun OrderStatusStepper(currentStatus: OrderStatus, modifier: Modifier = Modifier) {
-    val steps = OrderStatus.entries
+    val steps = OrderStatus.entries.filter { it != OrderStatus.QUOTATION }
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         steps.forEachIndexed { i, step ->
             val done = step.ordinal <= currentStatus.ordinal
@@ -511,10 +602,11 @@ private fun OrderStatusStepper(currentStatus: OrderStatus, modifier: Modifier = 
 
 @Composable
 private fun statusColor(status: OrderStatus) = when (status) {
-    OrderStatus.RECEIVED -> MaterialTheme.colorScheme.tertiary
-    OrderStatus.PREPARING -> MaterialTheme.colorScheme.secondary
+    OrderStatus.QUOTATION  -> androidx.compose.ui.graphics.Color(0xFFE65100)
+    OrderStatus.RECEIVED   -> MaterialTheme.colorScheme.tertiary
+    OrderStatus.PREPARING  -> MaterialTheme.colorScheme.secondary
     OrderStatus.DELIVERING -> MaterialTheme.colorScheme.primary
-    OrderStatus.DELIVERED -> MaterialTheme.colorScheme.outline
+    OrderStatus.DELIVERED  -> MaterialTheme.colorScheme.outline
 }
 
 // ── Edit dialog ───────────────────────────────────────────────────────────────

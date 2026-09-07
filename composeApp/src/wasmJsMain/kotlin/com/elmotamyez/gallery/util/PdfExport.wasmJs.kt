@@ -2,7 +2,7 @@ package com.elmotamyez.gallery.util
 
 import com.elmotamyez.gallery.data.model.Receipt
 
-actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
+actual fun exportReceiptToPdf(receipt: Receipt, fileName: String, isQuotation: Boolean) {
     val dateText = receipt.createdAt?.let { raw ->
         runCatching {
             "${raw.substring(8, 10)}/${raw.substring(5, 7)}/${raw.substring(0, 4)}  ${raw.substring(11, 16)}"
@@ -50,12 +50,14 @@ td{padding:7px 6px;text-align:center;border-bottom:.5px solid #ddd}
 .sub-row td{font-size:12px;color:#555}
 .tot td{font-size:15px;font-weight:900;border-top:2px solid #111;border-bottom:2px solid #111;padding:10px 6px}
 .ftr{text-align:center;border-top:1px solid #111;margin-top:16px;padding-top:10px;font-size:12px;color:#555}
+.stamp{font-size:28px;font-weight:900;color:rgba(200,0,0,0.25);transform:rotate(-20deg);display:inline-block;margin-top:6px;letter-spacing:4px}
 @media print{body{padding:0}}
 </style></head><body>
 <div class="hdr">
   <h1>مكتبة المتميز</h1>
-  <p>فرع الشيخ زايد  |  فاتورة طلب</p>
+  <p>فرع الشيخ زايد  |  ${if (isQuotation) "عرض سعر" else "فاتورة طلب"}</p>
   <p>رقم المرجع: $receiptRef</p>
+  ${if (isQuotation) "<p class=\"stamp\">غير مؤكد</p>" else ""}
 </div>
 <div class="info">
   <div>

@@ -2,7 +2,7 @@ package com.elmotamyez.gallery.util
 
 import com.elmotamyez.gallery.data.model.Receipt
 
-actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
+actual fun exportReceiptToPdf(receipt: Receipt, fileName: String, isQuotation: Boolean) {
     println("=== مكتبة المتميز - فرع الشيخ زايد ===")
     println("رقم الفاتورة: ${receipt.orderNumber}")
     receipt.createdAt?.let { println("تاريخ الفاتورة: $it") }

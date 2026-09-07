@@ -21,7 +21,7 @@ private val WHITE  = DeviceRgb(255, 255, 255)
 private val GREY   = DeviceRgb(180, 180, 180)   // divider lines
 private val DKGREY = DeviceRgb(80,  80,  80)    // secondary text
 
-actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
+actual fun exportReceiptToPdf(receipt: Receipt, fileName: String, isQuotation: Boolean) {
     try {
         val receiptRef = receipt.createdAt?.take(10)?.replace("-", "")?.let { "${it}${receipt.orderNumber}" } ?: "${receipt.orderNumber}"
         val outputFile = File(System.getProperty("user.home"), fileName)
@@ -40,9 +40,17 @@ actual fun exportReceiptToPdf(receipt: Receipt, fileName: String) {
             .add(Paragraph("مكتبة المتميز")
                 .setBold().setFontSize(22f).setFontColor(BLACK)
                 .setTextAlignment(TextAlignment.CENTER).setMarginBottom(4f))
-            .add(Paragraph("فرع الشيخ زايد  |  فاتورة طلب")
+            .add(Paragraph(if (isQuotation) "فرع الشيخ زايد  |  عرض سعر" else "فرع الشيخ زايد  |  فاتورة طلب")
                 .setFontSize(12f).setFontColor(BLACK)
                 .setTextAlignment(TextAlignment.CENTER).setMarginBottom(2f))
+            .also { cell ->
+                if (isQuotation) cell.add(
+                    Paragraph("— غير مؤكد —")
+                        .setBold().setFontSize(13f)
+                        .setFontColor(DeviceRgb(180, 0, 0))
+                        .setTextAlignment(TextAlignment.CENTER).setMarginTop(4f)
+                )
+            }
             .add(Paragraph("رقم المرجع: $receiptRef")
                 .setFontSize(10f).setFontColor(DKGREY)
                 .setTextAlignment(TextAlignment.CENTER))

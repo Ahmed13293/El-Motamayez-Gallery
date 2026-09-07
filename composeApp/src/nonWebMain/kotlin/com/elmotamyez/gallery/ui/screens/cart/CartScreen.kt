@@ -29,6 +29,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.elmotamyez.gallery.data.model.UserRole
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
+import com.elmotamyez.gallery.ui.screens.orders.OrderViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptScreen
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.formatPrice
@@ -51,12 +52,15 @@ class CartScreen : Screen {
         val navigator   = LocalNavigator.currentOrThrow
         val cartVm      = koinInject<CartViewModel>()
         val receiptVm   = koinInject<ReceiptViewModel>()
+        val orderVm     = koinInject<OrderViewModel>()
         val authVm      = koinInject<AuthViewModel>()
         val currentUser by authVm.uiState.collectAsState()
         val cartItems   by cartVm.cartItems.collectAsState()
         val isAdmin     = currentUser.user?.role == UserRole.ADMIN
-        val orderSaving by receiptVm.orderSaving.collectAsState()
-        val orderSaved  by receiptVm.orderSaved.collectAsState()
+        val orderSaving    by receiptVm.orderSaving.collectAsState()
+        val orderSaved     by receiptVm.orderSaved.collectAsState()
+        val quotationSaving by orderVm.isSaving.collectAsState()
+        var quotationSaved  by remember { mutableStateOf(false) }
 
         // Navigate to receipt screen once order is placed (success or pending-save)
         LaunchedEffect(orderSaved) {
@@ -393,6 +397,41 @@ class CartScreen : Screen {
                                     )
                                 } else {
                                     Text("تأكيد الطلب")
+                                }
+                            }
+
+                            if (quotationSaved) {
+                                Text(
+                                    "✓ تم حفظ عرض السعر",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    if (!quotationSaving) {
+                                        quotationSaved = false
+                                        orderVm.createQuotation(
+                                            items         = cartItems,
+                                            total         = finalTotal,
+                                            discount      = discountAmount,
+                                            paymentMethod = selectedMethod.label,
+                                            customerPhone = customerPhone.takeIf { it.isNotBlank() },
+                                            customerName  = customerInfo.takeIf { it.isNotBlank() },
+                                            createdBy     = currentUser.user?.username,
+                                            onDone        = { quotationSaved = true }
+                                        )
+                                    }
+                                },
+                                enabled  = !quotationSaving,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (quotationSaving) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Text("حفظ كعرض سعر")
                                 }
                             }
                         }
