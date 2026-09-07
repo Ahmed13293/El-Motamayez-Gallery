@@ -365,7 +365,7 @@ class ReceiptsListScreen : Screen {
                                                     }
                                                 )
                                             }
-                                            if (isAdmin && !username.isNullOrBlank()) {
+                                            if (!username.isNullOrBlank()) {
                                                 val shiftTotal = shiftReceipts.filter { !it.isQuotation }.sumOf { it.total }
                                                 val shiftCount = shiftReceipts.count { !it.isQuotation }
                                                 ShiftSummaryCard(username = username, total = shiftTotal, count = shiftCount)
@@ -415,7 +415,7 @@ private fun ShiftSummaryCard(username: String, total: Double, count: Int) {
         ) {
             Column {
                 Text(
-                    "إجمالي وردية $username",
+                    "إجمالي شيفت $username",
                     style      = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color      = MaterialTheme.colorScheme.onTertiaryContainer

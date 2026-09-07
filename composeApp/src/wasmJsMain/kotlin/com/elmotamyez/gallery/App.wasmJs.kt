@@ -2061,7 +2061,7 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false, isMobile: Boolean = false)
                                             onDelete = { deletingReceipt = receipt }
                                         )
                                     }
-                                    if (isAdmin && !username.isNullOrBlank()) {
+                                    if (!username.isNullOrBlank()) {
                                         val shiftTotal = shiftReceipts.filter { !it.isQuotation }.sumOf { it.total }
                                         val shiftCount = shiftReceipts.count { !it.isQuotation }
                                         WebShiftSummaryCard(username = username, total = shiftTotal, count = shiftCount)
@@ -2206,7 +2206,7 @@ private fun WebShiftSummaryCard(username: String, total: Double, count: Int) {
         ) {
             Column {
                 Text(
-                    "إجمالي وردية $username",
+                    "إجمالي شيفت $username",
                     style      = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color      = MaterialTheme.colorScheme.onTertiaryContainer
