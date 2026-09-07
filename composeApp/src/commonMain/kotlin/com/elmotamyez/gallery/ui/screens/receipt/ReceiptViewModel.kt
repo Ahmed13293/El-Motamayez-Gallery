@@ -3,7 +3,9 @@ package com.elmotamyez.gallery.ui.screens.receipt
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elmotamyez.gallery.data.model.CartItem
+import com.elmotamyez.gallery.data.model.DailyReconciliation
 import com.elmotamyez.gallery.data.model.Receipt
+import com.elmotamyez.gallery.data.repository.DailyReconciliationRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
 import com.elmotamyez.gallery.data.repository.ReceiptRepository
 import com.russhwolf.settings.Settings
@@ -27,7 +29,8 @@ private const val KEY_RECEIPTS_CACHE = "receipts_cache_json"
 
 class ReceiptViewModel(
     private val repository: ReceiptRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val reconciliationRepository: DailyReconciliationRepository
 ) : ViewModel() {
 
     private val settings = Settings()
@@ -105,6 +108,13 @@ class ReceiptViewModel(
     private val _insertError = MutableStateFlow<String?>(null)
     val insertError: StateFlow<String?> = _insertError.asStateFlow()
 
+    // Cash reconciliation — map of dateKey (YYYY-MM-DD) → saved reconciliation
+    private val _reconciliations = MutableStateFlow<Map<String, DailyReconciliation>>(emptyMap())
+    val reconciliations: StateFlow<Map<String, DailyReconciliation>> = _reconciliations.asStateFlow()
+
+    private val _reconciliationSaving = MutableStateFlow(false)
+    val reconciliationSaving: StateFlow<Boolean> = _reconciliationSaving.asStateFlow()
+
     init {
         // Show cached receipts immediately so the list isn't empty on launch
         val cached: String = settings[KEY_RECEIPTS_CACHE, ""]
@@ -115,6 +125,29 @@ class ReceiptViewModel(
         }
         // Then sync latest from Supabase in the background
         loadReceipts()
+        loadReconciliations()
+    }
+
+    fun loadReconciliations() {
+        viewModelScope.launch {
+            runCatching { reconciliationRepository.fetchAll() }
+                .onSuccess { list ->
+                    _reconciliations.value = list.associateBy { it.date }
+                }
+        }
+    }
+
+    fun saveReconciliation(date: String, actualCash: Double, username: String?) {
+        viewModelScope.launch {
+            _reconciliationSaving.value = true
+            runCatching { reconciliationRepository.upsert(date, actualCash, username) }
+                .onSuccess {
+                    _reconciliations.value = _reconciliations.value.toMutableMap().also {
+                        it[date] = DailyReconciliation(date = date, actualCash = actualCash, enteredBy = username)
+                    }
+                }
+            _reconciliationSaving.value = false
+        }
     }
 
     /** Reload all receipts from the cloud (called on init and on pull-to-refresh). */

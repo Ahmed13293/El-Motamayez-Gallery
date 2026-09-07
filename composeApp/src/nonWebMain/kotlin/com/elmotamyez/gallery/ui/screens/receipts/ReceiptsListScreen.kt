@@ -14,12 +14,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.ui.text.input.KeyboardType
+import com.elmotamyez.gallery.data.model.DailyReconciliation
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -97,12 +101,14 @@ class ReceiptsListScreen : Screen {
         val navigator = LocalNavigator.currentOrThrow
         val vm: ReceiptViewModel = koinInject()
         val authVm: AuthViewModel = koinInject()
-        val receipts    by vm.receipts.collectAsState()
-        val isLoading   by vm.isLoading.collectAsState()
-        val loadError   by vm.loadError.collectAsState()
-        val insertError by vm.insertError.collectAsState()
-        val authState   by authVm.uiState.collectAsState()
-        val isAdmin    = authState.user?.role == UserRole.ADMIN
+        val receipts         by vm.receipts.collectAsState()
+        val isLoading        by vm.isLoading.collectAsState()
+        val loadError        by vm.loadError.collectAsState()
+        val insertError      by vm.insertError.collectAsState()
+        val authState        by authVm.uiState.collectAsState()
+        val isAdmin          = authState.user?.role == UserRole.ADMIN
+        val currentUsername  = authState.user?.username
+        val reconciliations  by vm.reconciliations.collectAsState()
 
         // Current month key e.g. "2026-07"
         val currentMonthKey = remember {
@@ -325,16 +331,25 @@ class ReceiptsListScreen : Screen {
 
                         grouped.forEach { (dateKey, dayReceipts) ->
                             val isOpen = expandedDays[dateKey] == true
-                            val dayTotal = dayReceipts.sumOf { it.total }
+                            val confirmed = dayReceipts.filter { !it.isQuotation }
+                            val dayTotal    = confirmed.sumOf { it.total }
+                            val cashTotal   = confirmed.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
+                            val transferTotal = confirmed.filter { it.paymentMethod == "تحويل" }.sumOf { it.total }
 
                             // ── Day header ────────────────────────────────────
                             item(key = "header_$dateKey") {
                                 DayHeader(
-                                    dateKey     = dateKey,
-                                    count       = dayReceipts.size,
-                                    dayTotal    = dayTotal,
-                                    isExpanded  = isOpen,
-                                    onClick     = { vm.toggleDay(dateKey) }
+                                    dateKey            = dateKey,
+                                    count              = confirmed.size,
+                                    dayTotal           = dayTotal,
+                                    cashTotal          = cashTotal,
+                                    transferTotal      = transferTotal,
+                                    reconciliation     = reconciliations[dateKey],
+                                    onSaveReconciliation = { actual ->
+                                        vm.saveReconciliation(dateKey, actual, currentUsername)
+                                    },
+                                    isExpanded         = isOpen,
+                                    onClick            = { vm.toggleDay(dateKey) }
                                 )
                             }
 
@@ -443,9 +458,90 @@ private fun DayHeader(
     dateKey: String,
     count: Int,
     dayTotal: Double,
+    cashTotal: Double,
+    transferTotal: Double,
+    reconciliation: DailyReconciliation?,
+    onSaveReconciliation: (Double) -> Unit,
     isExpanded: Boolean,
     onClick: () -> Unit
 ) {
+    var showDialog by remember { mutableStateOf(false) }
+    var inputValue by remember(reconciliation) {
+        mutableStateOf(reconciliation?.actualCash?.let { "%.2f".format(it) } ?: "")
+    }
+
+    if (showDialog) {
+        val actual    = inputValue.toDoubleOrNull()
+        val diff      = actual?.let { it - cashTotal }
+        val surplus   = diff != null && diff >= 0.0
+        val diffColor = if (surplus) Color(0xFF2E7D32) else Color(0xFFC62828)
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = {
+                Text("تسوية الكاش", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "اليوم: ${dateKey.toArabicDisplayDate()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("الكاش المتوقع", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "${cashTotal.formatPrice()} ج",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    OutlinedTextField(
+                        value = inputValue,
+                        onValueChange = { inputValue = it },
+                        label = { Text("الكاش الفعلي") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (diff != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                if (surplus) "زيادة" else "عجز",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = diffColor
+                            )
+                            Text(
+                                "${if (surplus) "+" else ""}${diff.formatPrice()} ج",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = diffColor
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        actual?.let { onSaveReconciliation(it) }
+                        showDialog = false
+                    },
+                    enabled = actual != null
+                ) { Text("حفظ") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) { Text("إلغاء") }
+            }
+        )
+    }
+
     Surface(
         modifier  = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape     = RoundedCornerShape(14.dp),
@@ -473,6 +569,43 @@ private fun DayHeader(
                     "$count فاتورة  •  ${dayTotal.formatPrice()} ج",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                )
+                if (cashTotal > 0.0 || transferTotal > 0.0) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (cashTotal > 0.0)
+                            Text(
+                                "كاش: ${cashTotal.formatPrice()} ج",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        if (transferTotal > 0.0)
+                            Text(
+                                "تحويل: ${transferTotal.formatPrice()} ج",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                    }
+                }
+                reconciliation?.let {
+                    val diff  = it.actualCash - cashTotal
+                    val color = if (diff >= 0.0) Color(0xFF2E7D32) else Color(0xFFC62828)
+                    Text(
+                        "فعلي: ${it.actualCash.formatPrice()} ج  (${if (diff >= 0) "+" else ""}${diff.formatPrice()})",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = color
+                    )
+                }
+            }
+            IconButton(
+                onClick = { showDialog = true },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.AccountBalanceWallet,
+                    contentDescription = "تسوية الكاش",
+                    tint = if (reconciliation != null) Color(0xFF2E7D32)
+                           else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.size(18.dp)
                 )
             }
             Icon(

@@ -3,6 +3,7 @@ package com.elmotamyez.gallery.di
 import com.elmotamyez.gallery.NavigationController
 import com.elmotamyez.gallery.data.repository.AttendanceRepository
 import com.elmotamyez.gallery.data.repository.AuthRepository
+import com.elmotamyez.gallery.data.repository.DailyReconciliationRepository
 import com.elmotamyez.gallery.data.repository.ImageUploadRepository
 import com.elmotamyez.gallery.data.repository.ExpenseRepository
 import com.elmotamyez.gallery.data.repository.OrderRepository
@@ -26,6 +27,7 @@ val appModule = module {
     // Repositories
     single { ProductRepository() }
     single { ReceiptRepository() }
+    single { DailyReconciliationRepository() }
     single { OrderRepository() }
     single { ExpenseRepository() }
     single { AuthRepository() }

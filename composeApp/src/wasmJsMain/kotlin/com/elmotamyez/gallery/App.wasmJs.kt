@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -113,6 +114,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elmotamyez.gallery.data.model.CartItem
+import com.elmotamyez.gallery.data.model.DailyReconciliation
 import com.elmotamyez.gallery.data.model.Order
 import com.elmotamyez.gallery.data.model.OrderStatus
 import com.elmotamyez.gallery.data.model.Product
@@ -1855,7 +1857,11 @@ private fun String.webToArabicMonth(): String {
 @Composable
 internal fun WebReceiptsTab(isAdmin: Boolean = false, isMobile: Boolean = false) {
     val receiptVm: ReceiptViewModel = koinInject()
+    val authVm: AuthViewModel = koinInject()
+    val authState by authVm.uiState.collectAsState()
+    val currentUsername = authState.user?.username
     val receipts by receiptVm.receipts.collectAsState()
+    val reconciliations by receiptVm.reconciliations.collectAsState()
     val isLoading by receiptVm.isLoading.collectAsState()
     val allProducts by receiptVm.allProducts.collectAsState()
     val isSaving by receiptVm.isSaving.collectAsState()
@@ -2035,6 +2041,10 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false, isMobile: Boolean = false)
                             dayTotal = dayTotal,
                             cashTotal = cashTotal,
                             transferTotal = transferTotal,
+                            reconciliation = reconciliations[dateKey],
+                            onSaveReconciliation = { actual ->
+                                receiptVm.saveReconciliation(dateKey, actual, currentUsername)
+                            },
                             isExpanded = isOpen,
                             onClick = { expandedMap[dateKey] = !isOpen })
                     }
@@ -2132,15 +2142,87 @@ private fun ReceiptDayHeader(
     dayTotal: Double,
     cashTotal: Double,
     transferTotal: Double,
+    reconciliation: DailyReconciliation?,
+    onSaveReconciliation: (Double) -> Unit,
     isExpanded: Boolean,
     onClick: () -> Unit
 ) {
-    // Show date as DD/MM/YYYY — same as mobile toArabicDisplayDate()
     val displayDate = try {
         val (y, m, d) = dateKey.split("-")
         "$d/$m/$y"
     } catch (_: Exception) {
         dateKey
+    }
+
+    var showDialog by remember { mutableStateOf(false) }
+    var inputValue by remember(reconciliation) {
+        mutableStateOf(reconciliation?.actualCash?.let { "%.2f".format(it) } ?: "")
+    }
+
+    if (showDialog) {
+        val actual  = inputValue.toDoubleOrNull()
+        val diff    = actual?.let { it - cashTotal }
+        val surplus = diff != null && diff >= 0.0
+        val diffColor = if (surplus) Color(0xFF2E7D32) else Color(0xFFC62828)
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("تسوية الكاش", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "اليوم: $displayDate",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("الكاش المتوقع", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "${cashTotal.formatPrice()} ج",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    OutlinedTextField(
+                        value = inputValue,
+                        onValueChange = { inputValue = it },
+                        label = { Text("الكاش الفعلي") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (diff != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                if (surplus) "زيادة" else "عجز",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = diffColor
+                            )
+                            Text(
+                                "${if (surplus) "+" else ""}${diff.formatPrice()} ج",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = diffColor
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { actual?.let { onSaveReconciliation(it) }; showDialog = false },
+                    enabled = actual != null
+                ) { Text("حفظ") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) { Text("إلغاء") }
+            }
+        )
     }
 
     Surface(
@@ -2188,6 +2270,27 @@ private fun ReceiptDayHeader(
                             )
                     }
                 }
+                reconciliation?.let {
+                    val diff  = it.actualCash - cashTotal
+                    val color = if (diff >= 0.0) Color(0xFF2E7D32) else Color(0xFFC62828)
+                    Text(
+                        "فعلي: ${it.actualCash.formatPrice()} ج  (${if (diff >= 0) "+" else ""}${diff.formatPrice()})",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = color
+                    )
+                }
+            }
+            IconButton(
+                onClick = { showDialog = true },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.AccountBalanceWallet,
+                    contentDescription = "تسوية الكاش",
+                    tint = if (reconciliation != null) Color(0xFF2E7D32)
+                           else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.size(18.dp)
+                )
             }
             Icon(
                 imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
