@@ -407,7 +407,7 @@ class CartScreen : Screen {
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            OutlinedButton(
+                            Button(
                                 onClick = {
                                     if (!quotationSaving) {
                                         receiptVm.resetQuotationSaved()
@@ -423,7 +423,8 @@ class CartScreen : Screen {
                                     }
                                 },
                                 enabled  = !quotationSaving,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF00897B))
                             ) {
                                 if (quotationSaving) {
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
