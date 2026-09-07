@@ -2403,17 +2403,6 @@ internal fun WebReceiptCard(
                                 color = MaterialTheme.colorScheme.tertiary
                             )
                         }
-                        if (receipt.isQuotation) {
-                            Surface(shape = RoundedCornerShape(6.dp), color = quotationColor.copy(alpha = 0.15f)) {
-                                Text(
-                                    "عرض سعر",
-                                    modifier   = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-                                    style      = MaterialTheme.typography.labelSmall,
-                                    color      = quotationColor,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
                     }
                     val time = receipt.timeLabel()
                     val refNo = receipt.createdAt?.take(10)?.let { d ->
@@ -2429,11 +2418,22 @@ internal fun WebReceiptCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (receipt.paymentMethod.isNotEmpty() || !receipt.isPaid) {
+                    if (receipt.isQuotation || receipt.paymentMethod.isNotEmpty() || !receipt.isPaid) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            if (receipt.isQuotation) {
+                                Surface(shape = RoundedCornerShape(6.dp), color = quotationColor.copy(alpha = 0.15f)) {
+                                    Text(
+                                        "عرض سعر",
+                                        modifier   = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                        style      = MaterialTheme.typography.labelSmall,
+                                        color      = quotationColor,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
                             if (receipt.paymentMethod.isNotEmpty()) {
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
@@ -2643,15 +2643,28 @@ internal fun WebReceiptCard(
 
                     Spacer(Modifier.height(4.dp))
 
-                    // Confirm button (quotations only)
+                    // Confirm + delete buttons (quotations only)
                     if (receipt.isQuotation) {
-                        Button(
-                            onClick  = onConfirmQuotation,
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            shape    = RoundedCornerShape(10.dp),
-                            colors   = ButtonDefaults.buttonColors(containerColor = quotationColor)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("تأكيد عرض السعر")
+                            OutlinedButton(
+                                onClick  = onDelete,
+                                modifier = Modifier.weight(1f),
+                                shape    = RoundedCornerShape(10.dp),
+                                colors   = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("حذف")
+                            }
+                            Button(
+                                onClick  = onConfirmQuotation,
+                                modifier = Modifier.weight(2f),
+                                shape    = RoundedCornerShape(10.dp),
+                                colors   = ButtonDefaults.buttonColors(containerColor = quotationColor)
+                            ) {
+                                Text("تأكيد عرض السعر")
+                            }
                         }
                     }
 

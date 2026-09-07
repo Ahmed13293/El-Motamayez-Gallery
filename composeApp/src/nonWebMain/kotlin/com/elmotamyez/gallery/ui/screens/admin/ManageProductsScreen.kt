@@ -423,7 +423,7 @@ class ManageProductsScreen : Screen {
                             placeholder = { Text("0") },
                             singleLine = true,
                             isError = stockError,
-                            supportingText = if (stockError) {{ Text("يجب إدخال كمية أكبر من صفر") }} else null,
+                            supportingText = if (stockError) {{ Text("يجب إدخال رقم صحيح") }} else null,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -580,8 +580,9 @@ class ManageProductsScreen : Screen {
                     Button(onClick = {
                         val price = priceField.toDoubleOrNull()
                         val wholesalePrice = wholesalePriceField.trim().toDoubleOrNull()
-                        val stock = stockField.toIntOrNull() ?: 0
-                        if (stock < 1) { stockError = true; return@Button }
+                        val stockRaw = stockField.toIntOrNull()
+                        if (stockRaw == null || stockRaw < 0) { stockError = true; return@Button }
+                        val stock = stockRaw
                         val trimmedName = nameField.trim()
                         val isDuplicate = state.products.any {
                             it.name.trim().equals(trimmedName, ignoreCase = true) &&
