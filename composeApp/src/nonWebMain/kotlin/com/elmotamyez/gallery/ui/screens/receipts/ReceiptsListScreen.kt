@@ -345,20 +345,31 @@ class ReceiptsListScreen : Screen {
                                     enter   = expandVertically(),
                                     exit    = shrinkVertically()
                                 ) {
+                                    val shiftGroups = dayReceipts.groupByShift()
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Spacer(Modifier.height(2.dp))
-                                        dayReceipts.forEachIndexed { index, receipt ->
-                                            ReceiptCard(
-                                                receipt             = receipt,
-                                                dayIndex            = dayReceipts.size - index,
-                                                onConfirmQuotation  = { vm.confirmQuotation(receipt) },
-                                                onClick             = {
-                                                    vm.listScrollIndex  = listState.firstVisibleItemIndex
-                                                    vm.listScrollOffset = listState.firstVisibleItemScrollOffset
-                                                    vm.viewReceipt(receipt)
-                                                    (navigator.parent ?: navigator).push(ReceiptScreen())
-                                                }
-                                            )
+                                        var globalIdx = 0
+                                        shiftGroups.forEach { (username, shiftReceipts) ->
+                                            shiftReceipts.forEach { receipt ->
+                                                val dayIdx = dayReceipts.size - globalIdx
+                                                globalIdx++
+                                                ReceiptCard(
+                                                    receipt            = receipt,
+                                                    dayIndex           = dayIdx,
+                                                    onConfirmQuotation = { vm.confirmQuotation(receipt) },
+                                                    onClick            = {
+                                                        vm.listScrollIndex  = listState.firstVisibleItemIndex
+                                                        vm.listScrollOffset = listState.firstVisibleItemScrollOffset
+                                                        vm.viewReceipt(receipt)
+                                                        (navigator.parent ?: navigator).push(ReceiptScreen())
+                                                    }
+                                                )
+                                            }
+                                            if (isAdmin && !username.isNullOrBlank()) {
+                                                val shiftTotal = shiftReceipts.filter { !it.isQuotation }.sumOf { it.total }
+                                                val shiftCount = shiftReceipts.count { !it.isQuotation }
+                                                ShiftSummaryCard(username = username, total = shiftTotal, count = shiftCount)
+                                            }
                                         }
                                         Spacer(Modifier.height(2.dp))
                                     }
@@ -368,6 +379,59 @@ class ReceiptsListScreen : Screen {
                     }
                 }
             }
+        }
+    }
+}
+
+// ── Shift grouping helper ─────────────────────────────────────────────────────
+
+private fun List<Receipt>.groupByShift(): List<Pair<String?, List<Receipt>>> {
+    if (isEmpty()) return emptyList()
+    val groups = mutableListOf<Pair<String?, MutableList<Receipt>>>()
+    for (receipt in this) {
+        val user = receipt.username
+        if (groups.isEmpty() || groups.last().first != user) {
+            groups.add(Pair(user, mutableListOf(receipt)))
+        } else {
+            groups.last().second.add(receipt)
+        }
+    }
+    return groups.map { Pair(it.first, it.second.toList()) }
+}
+
+// ── Shift summary card ────────────────────────────────────────────────────────
+
+@Composable
+private fun ShiftSummaryCard(username: String, total: Double, count: Int) {
+    Surface(
+        shape  = RoundedCornerShape(10.dp),
+        color  = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    "إجمالي وردية $username",
+                    style      = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color      = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Text(
+                    "$count فاتورة",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                )
+            }
+            Text(
+                "${total.formatPrice()} ج",
+                style      = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color      = MaterialTheme.colorScheme.tertiary
+            )
         }
     }
 }

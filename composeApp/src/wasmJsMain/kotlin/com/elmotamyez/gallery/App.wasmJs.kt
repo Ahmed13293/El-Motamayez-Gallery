@@ -2040,21 +2040,32 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false, isMobile: Boolean = false)
                             enter = expandVertically(),
                             exit = shrinkVertically()
                         ) {
+                            val shiftGroups = dayReceipts.webGroupByShift()
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Spacer(Modifier.height(2.dp))
-                                dayReceipts.forEachIndexed { index, receipt ->
-                                    WebReceiptCard(
-                                        receipt             = receipt,
-                                        dayIndex            = dayReceipts.size - index,
-                                        isAdmin             = isAdmin,
-                                        onConfirmQuotation  = { receiptVm.confirmQuotation(receipt) },
-                                        onEdit = {
-                                            receiptVm.loadProductsForEdit()
-                                            receiptVm.viewReceipt(receipt)
-                                            editingReceipt = receipt
-                                        },
-                                        onDelete = { deletingReceipt = receipt }
-                                    )
+                                var globalIdx = 0
+                                shiftGroups.forEach { (username, shiftReceipts) ->
+                                    shiftReceipts.forEach { receipt ->
+                                        val dayIdx = dayReceipts.size - globalIdx
+                                        globalIdx++
+                                        WebReceiptCard(
+                                            receipt            = receipt,
+                                            dayIndex           = dayIdx,
+                                            isAdmin            = isAdmin,
+                                            onConfirmQuotation = { receiptVm.confirmQuotation(receipt) },
+                                            onEdit = {
+                                                receiptVm.loadProductsForEdit()
+                                                receiptVm.viewReceipt(receipt)
+                                                editingReceipt = receipt
+                                            },
+                                            onDelete = { deletingReceipt = receipt }
+                                        )
+                                    }
+                                    if (isAdmin && !username.isNullOrBlank()) {
+                                        val shiftTotal = shiftReceipts.filter { !it.isQuotation }.sumOf { it.total }
+                                        val shiftCount = shiftReceipts.count { !it.isQuotation }
+                                        WebShiftSummaryCard(username = username, total = shiftTotal, count = shiftCount)
+                                    }
                                 }
                                 Spacer(Modifier.height(2.dp))
                             }
@@ -2160,6 +2171,57 @@ private fun ReceiptDayHeader(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp)
+            )
+        }
+    }
+}
+
+// ── Shift grouping helper ─────────────────────────────────────────────────────
+
+private fun List<Receipt>.webGroupByShift(): List<Pair<String?, List<Receipt>>> {
+    if (isEmpty()) return emptyList()
+    val groups = mutableListOf<Pair<String?, MutableList<Receipt>>>()
+    for (receipt in this) {
+        val user = receipt.username
+        if (groups.isEmpty() || groups.last().first != user) {
+            groups.add(Pair(user, mutableListOf(receipt)))
+        } else {
+            groups.last().second.add(receipt)
+        }
+    }
+    return groups.map { Pair(it.first, it.second.toList()) }
+}
+
+@Composable
+private fun WebShiftSummaryCard(username: String, total: Double, count: Int) {
+    Surface(
+        shape  = RoundedCornerShape(10.dp),
+        color  = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    "إجمالي وردية $username",
+                    style      = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color      = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Text(
+                    "$count فاتورة",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                )
+            }
+            Text(
+                "${total.formatPrice()} ج",
+                style      = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color      = MaterialTheme.colorScheme.tertiary
             )
         }
     }
