@@ -35,6 +35,17 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > composeApp/elmotamyez.jks
 
+      - name: Verify keystore
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "=== JKS file info ==="
+          file composeApp/elmotamyez.jks
+          ls -lh composeApp/elmotamyez.jks
+          echo "=== keytool list ==="
+          keytool -list -keystore composeApp/elmotamyez.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" -v 2>&1 || true
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
