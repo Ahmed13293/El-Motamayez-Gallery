@@ -401,18 +401,20 @@ class ReceiptViewModel(
         viewModelScope.launch {
             _isSaving.value = true
 
-            val oldQtyMap = receipt.items
-                .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
-                .associate { it.product.id to it.quantity }
-            val newQtyMap = newItems
-                .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
-                .associate { it.product.id to it.quantity }
+            if (!receipt.isQuotation) {
+                val oldQtyMap = receipt.items
+                    .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
+                    .associate { it.product.id to it.quantity }
+                val newQtyMap = newItems
+                    .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
+                    .associate { it.product.id to it.quantity }
 
-            (oldQtyMap.keys + newQtyMap.keys).toSet().forEach { id ->
-                val diff = (newQtyMap[id] ?: 0) - (oldQtyMap[id] ?: 0)
-                when {
-                    diff > 0 -> runCatching { productRepository.decrementStock(id, diff) }
-                    diff < 0 -> runCatching { productRepository.incrementStock(id, -diff) }
+                (oldQtyMap.keys + newQtyMap.keys).toSet().forEach { id ->
+                    val diff = (newQtyMap[id] ?: 0) - (oldQtyMap[id] ?: 0)
+                    when {
+                        diff > 0 -> runCatching { productRepository.decrementStock(id, diff) }
+                        diff < 0 -> runCatching { productRepository.incrementStock(id, -diff) }
+                    }
                 }
             }
 

@@ -94,7 +94,7 @@ class ReceiptScreen : Screen {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (isAdmin) {
+                            if (isAdmin || receipt?.isQuotation == true) {
                                 IconButton(onClick = {
                                     vm.loadProductsForEdit()
                                     showEditSheet = true
@@ -105,6 +105,8 @@ class ReceiptScreen : Screen {
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
+                            }
+                            if (isAdmin) {
                                 IconButton(onClick = { showDeleteDialog = true }) {
                                     Icon(
                                         Icons.Default.Delete,

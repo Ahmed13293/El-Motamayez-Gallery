@@ -2533,7 +2533,7 @@ internal fun WebReceiptCard(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    if (isAdmin) {
+                    if (isAdmin || receipt.isQuotation) {
                         IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 Icons.Default.Edit,
@@ -2542,6 +2542,8 @@ internal fun WebReceiptCard(
                                 modifier = Modifier.size(18.dp)
                             )
                         }
+                    }
+                    if (isAdmin) {
                         IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 Icons.Default.Delete,
