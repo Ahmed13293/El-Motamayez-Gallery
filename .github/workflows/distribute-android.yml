@@ -43,8 +43,9 @@ jobs:
           echo "=== JKS file info ==="
           file composeApp/elmotamyez.jks
           ls -lh composeApp/elmotamyez.jks
+          echo "KEY_ALIAS secret length: ${#KEY_ALIAS}"
           echo "=== keytool list ==="
-          keytool -list -keystore composeApp/elmotamyez.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" -v 2>&1 || true
+          keytool -list -keystore composeApp/elmotamyez.jks -storepass "$KEYSTORE_PASSWORD" -alias "elmotamyez" -v 2>&1 || true
 
       - name: Make gradlew executable
         run: chmod +x gradlew
@@ -53,7 +54,7 @@ jobs:
         env:
           KEYSTORE_PATH: elmotamyez.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_ALIAS: elmotamyez
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           BUILD_NUMBER: ${{ github.run_number }}
           VERSION_NAME: "1.${{ github.run_number }}"
