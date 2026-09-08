@@ -1707,6 +1707,7 @@ private fun WebCartTab(
         }
     }
 }
+}
 
 @Composable
 private fun WebCartItemRow(
