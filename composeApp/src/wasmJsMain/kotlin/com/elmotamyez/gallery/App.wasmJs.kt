@@ -1863,7 +1863,6 @@ private fun WebCartItemRow(
             }
         }
     }
-    }   // Column
 }
 
 // ── Receipts Tab — grouped by date, expand/collapse like mobile ───────────────
