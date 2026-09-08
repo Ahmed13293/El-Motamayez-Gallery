@@ -525,7 +525,7 @@ class ManageProductsScreen : Screen {
                                 value = selectedCatName, onValueChange = {}, readOnly = true,
                                 label = { Text("القسم") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(catExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor()
+                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
                             )
                             ExposedDropdownMenu(expanded = catExpanded,
                                 onDismissRequest = { catExpanded = false }) {
@@ -551,7 +551,7 @@ class ManageProductsScreen : Screen {
                                 value = selectedBrandName, onValueChange = {}, readOnly = true,
                                 label = { Text("الفئة الفرعية") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(brandExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor()
+                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
                             )
                             ExposedDropdownMenu(expanded = brandExpanded,
                                 onDismissRequest = { brandExpanded = false }) {

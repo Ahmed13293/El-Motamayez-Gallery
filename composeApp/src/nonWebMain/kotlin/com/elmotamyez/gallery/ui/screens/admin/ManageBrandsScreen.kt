@@ -204,7 +204,7 @@ class ManageBrandsScreen : Screen {
                                 readOnly = true,
                                 label = { Text("القسم الرئيسي") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(catExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor()
+                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
                             )
                             ExposedDropdownMenu(
                                 expanded = catExpanded,
@@ -229,7 +229,7 @@ class ManageBrandsScreen : Screen {
                                 readOnly = true,
                                 label = { Text("تابع لـ (اختياري للفرعي الثاني)") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(parentExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor()
+                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
                             )
                             ExposedDropdownMenu(
                                 expanded = parentExpanded,

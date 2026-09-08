@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.ListAlt
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -130,7 +130,7 @@ class MainScreen : Screen {
                         NavItem(ReceiptsTab,   Icons.Default.Receipt,    tabNavigator,
                                 badgeCount = newReceiptsCount,
                                 onSelected = { seenReceiptsCount = receipts.size })
-                        NavItem(OrdersTab, Icons.Default.ListAlt, tabNavigator, badgeCount = pendingOrders)
+                        NavItem(OrdersTab, Icons.AutoMirrored.Filled.ListAlt, tabNavigator, badgeCount = pendingOrders)
                         if (isAdmin) {
                             NavItem(AdminTab, Icons.Default.Person, tabNavigator)
                         }

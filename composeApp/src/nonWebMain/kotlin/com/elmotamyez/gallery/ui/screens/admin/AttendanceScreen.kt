@@ -271,7 +271,7 @@ private fun AddEditAttendanceDialog(
                             readOnly = true,
                             label = { Text("الموظف") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(showUserMenu) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth()
                         )
                         ExposedDropdownMenu(
                             expanded = showUserMenu,

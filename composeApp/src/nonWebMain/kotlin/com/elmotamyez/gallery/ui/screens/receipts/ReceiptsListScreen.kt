@@ -19,7 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.text.input.KeyboardType
@@ -725,7 +725,7 @@ private fun ReceiptCard(
                         color      = MaterialTheme.colorScheme.onSurface
                     )
                     Icon(
-                        Icons.Default.KeyboardArrowRight, null,
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight, null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

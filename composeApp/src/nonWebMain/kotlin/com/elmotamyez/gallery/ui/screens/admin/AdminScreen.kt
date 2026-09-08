@@ -11,7 +11,7 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Inventory
-import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.MoneyOff
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Schedule
@@ -166,7 +166,7 @@ class AdminScreen : Screen {
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error)
             ) {
-                Icon(Icons.Default.Logout, null, tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.Logout, null, tint = Color.White)
                 Spacer(Modifier.width(8.dp))
                 Text("تسجيل الخروج", fontWeight = FontWeight.Bold, color = Color.White)
             }
