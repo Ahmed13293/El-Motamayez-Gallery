@@ -168,8 +168,8 @@ class ReceiptViewModel(
                     val fresh = result.receipts
                     runCatching {
                         val freshIds = fresh.map { it.id }.toSet()
-                        // Keep pending receipts in list — they haven't reached Supabase yet
-                        val localOnly = _receipts.value.filter { it.id !in freshIds }
+                        // Only keep pending receipts — ones deleted on another device must not survive the merge
+                        val localOnly = _receipts.value.filter { it.id !in freshIds && it.pendingSave }
                         val merged = (fresh + localOnly).sortedByDescending { it.createdAt ?: "" }
                         _receipts.value = merged
                         persistCache(merged)
