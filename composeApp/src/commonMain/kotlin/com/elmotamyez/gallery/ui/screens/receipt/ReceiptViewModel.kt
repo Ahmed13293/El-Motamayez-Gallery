@@ -310,7 +310,7 @@ class ReceiptViewModel(
     /** Saves a quotation receipt (isQuotation=true) without deducting stock or navigating. */
     fun saveQuotation(
         items: List<CartItem>,
-        total: Double,
+        total: Double = 0.0,
         discount: Double = 0.0,
         paymentMethod: String = "كاش",
         customerPhone: String? = null,
@@ -334,7 +334,7 @@ class ReceiptViewModel(
                 id            = "${todayPrefix}-${nextNumber.toString().padStart(4, '0')}",
                 orderNumber   = nextNumber,
                 items         = items,
-                total         = total,
+                total         = maxOf(0.0, items.sumOf { it.totalPrice } - discount),
                 discount      = discount,
                 paymentMethod = paymentMethod,
                 isPaid        = false,
