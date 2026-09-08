@@ -81,7 +81,7 @@ class ReceiptRepository {
             .from("receipts")
             .select {
                 order("created_at", Order.DESCENDING)
-                limit(5000)
+                limit(300)
             }
             .data
 

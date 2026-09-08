@@ -168,8 +168,13 @@ class ReceiptViewModel(
                     val fresh = result.receipts
                     runCatching {
                         val freshIds = fresh.map { it.id }.toSet()
-                        // Only keep pending receipts — ones deleted on another device must not survive the merge
-                        val localOnly = _receipts.value.filter { it.id !in freshIds && it.pendingSave }
+                        // Oldest date covered by this fetch — receipts older than this are historical
+                        // and not part of the current window, so keep them (they can't have been deleted in this sync)
+                        val oldestFreshDate = fresh.minOfOrNull { it.createdAt ?: "" } ?: ""
+                        val localOnly = _receipts.value.filter { r ->
+                            r.id !in freshIds &&
+                            (r.pendingSave || (r.createdAt ?: "") < oldestFreshDate)
+                        }
                         val merged = (fresh + localOnly).sortedByDescending { it.createdAt ?: "" }
                         _receipts.value = merged
                         persistCache(merged)
