@@ -97,7 +97,7 @@ class CartScreen : Screen {
         var discountMode  by remember { mutableStateOf(DiscountMode.AMOUNT) }
         var discountInput by remember { mutableStateOf("") }
 
-        val subtotal = cartVm.totalPrice
+        val subtotal = cartItems.sumOf { it.totalPrice }
         val discountAmount = remember(discountInput, discountMode, subtotal) {
             val v = discountInput.toDoubleOrNull() ?: 0.0
             when (discountMode) {

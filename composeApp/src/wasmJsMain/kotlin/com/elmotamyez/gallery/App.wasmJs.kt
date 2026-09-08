@@ -1254,7 +1254,7 @@ private fun WebCartTab(
     }
 
     val discountValue = discount.toDoubleOrNull() ?: 0.0
-    val total = (cartVm.totalPrice - discountValue).coerceAtLeast(0.0)
+    val total = (cartItems.sumOf { it.totalPrice } - discountValue).coerceAtLeast(0.0)
 
     // ── Slot switcher ──────────────────────────────────────────────────────────
     Column(Modifier.fillMaxSize()) {
