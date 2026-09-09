@@ -8,6 +8,7 @@ import coil3.compose.AsyncImage
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -94,6 +95,7 @@ class CategoriesHomeScreen : Screen {
         val authState by authVm.uiState.collectAsState()
         val isNormalUser = authState.user?.role == UserRole.USER
         var showExpenseSheet by remember { mutableStateOf(false) }
+        val listState = rememberLazyListState()
         val keyboard = LocalSoftwareKeyboardController.current
 
         val state by vm.uiState.collectAsState()
@@ -230,9 +232,10 @@ class CategoriesHomeScreen : Screen {
             floatingActionButton = {
                 if (isNormalUser) {
                     ExtendedFloatingActionButton(
-                        onClick = { showExpenseSheet = true },
-                        icon    = { Icon(Icons.Default.AttachMoney, null) },
-                        text    = { Text("إضافة مصروف", fontWeight = FontWeight.Bold) }
+                        onClick   = { showExpenseSheet = true },
+                        expanded  = !listState.isScrollInProgress,
+                        icon      = { Icon(Icons.Default.AttachMoney, null) },
+                        text      = { Text("إضافة مصروف", fontWeight = FontWeight.Bold) }
                     )
                 }
             },
@@ -274,6 +277,7 @@ class CategoriesHomeScreen : Screen {
 
                 // ── Search results view ──────────────────────────────────
                 searchQuery.isNotBlank() -> LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .padding(padding)
                         .background(MaterialTheme.colorScheme.background),
@@ -329,6 +333,7 @@ class CategoriesHomeScreen : Screen {
 
                 // ── Normal home view ─────────────────────────────────────────
                 else -> LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .padding(padding)
                         .background(MaterialTheme.colorScheme.background),
