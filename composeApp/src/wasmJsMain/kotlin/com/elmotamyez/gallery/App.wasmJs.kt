@@ -1941,7 +1941,7 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false, isMobile: Boolean = false)
             .groupBy { it.dateKey() }.entries.sortedByDescending { it.key }
     }
 
-    val monthTotal = remember(grouped) { grouped.sumOf { it.value.sumOf { r -> r.total } } }
+    val monthTotal = remember(grouped) { grouped.sumOf { it.value.filter { r -> !r.isQuotation }.sumOf { r -> r.total } } }
     val monthCount = remember(grouped) { grouped.sumOf { it.value.size } }
 
     // Newest day starts expanded
