@@ -181,9 +181,9 @@ private fun PirlantaContent(onLoginClick: () -> Unit) {
 
     val displayedProducts = remember(prlView, selectedCategory, selectedBrand, allProducts, searchQuery) {
         when (prlView) {
-            PrlView.ALL_PRODUCTS  -> allProducts.filter { searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true) }
-            PrlView.SUBCATEGORIES -> allProducts.filter { it.categoryId == selectedCategory?.id && (searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true)) }
-            PrlView.PRODUCTS      -> allProducts.filter { it.brandId == selectedBrand?.id    && (searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true)) }
+            PrlView.ALL_PRODUCTS  -> allProducts.filter { searchQuery.isBlank() || searchQuery.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) } }
+            PrlView.SUBCATEGORIES -> allProducts.filter { it.categoryId == selectedCategory?.id && (searchQuery.isBlank() || searchQuery.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) }) }
+            PrlView.PRODUCTS      -> allProducts.filter { it.brandId == selectedBrand?.id    && (searchQuery.isBlank() || searchQuery.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) }) }
         }
     }
 

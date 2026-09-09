@@ -153,15 +153,15 @@ fun PublicCatalogScreen(onLoginClick: () -> Unit, defaultCategoryKeyword: String
     val displayedProducts = remember(catalogView, selectedCategory, selectedBrand, allProducts, searchQuery) {
         when (catalogView) {
             CatalogView.ALL_PRODUCTS -> allProducts.filter {
-                searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true)
+                searchQuery.isBlank() || searchQuery.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) }
             }
             CatalogView.SUBCATEGORIES -> allProducts.filter {
                 it.categoryId == selectedCategory?.id &&
-                (searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true))
+                (searchQuery.isBlank() || searchQuery.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) })
             }
             CatalogView.PRODUCTS -> allProducts.filter {
                 it.brandId == selectedBrand?.id &&
-                (searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true))
+                (searchQuery.isBlank() || searchQuery.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) })
             }
         }
     }

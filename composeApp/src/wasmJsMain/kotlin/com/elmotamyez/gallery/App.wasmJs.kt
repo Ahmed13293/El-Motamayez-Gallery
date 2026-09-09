@@ -2876,7 +2876,7 @@ private fun WebAddProductDialog(
     var searchText by remember { mutableStateOf("") }
     val filtered = remember(searchText, allProducts) {
         if (searchText.isBlank()) allProducts
-        else allProducts.filter { it.name.contains(searchText, ignoreCase = true) }
+        else allProducts.filter { searchText.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) } }
     }
 
     AlertDialog(
@@ -3495,7 +3495,7 @@ private fun WebAddStockItemDialog(
     var selected by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Product?>(null) }
     var qtyText  by remember { mutableStateOf("1") }
 
-    val filtered = products.filter { it.name.contains(search, ignoreCase = true) }
+    val filtered = products.filter { search.isBlank() || search.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) } }
 
     if (selected == null) {
         AlertDialog(
