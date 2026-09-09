@@ -82,7 +82,8 @@ class CartScreen : Screen {
         var customerInfo  by remember { mutableStateOf("") }
         var overrideDate   by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
         var showDatePicker by remember { mutableStateOf(false) }
-        var showCheckoutSheet by remember { mutableStateOf(false) }
+        var showCheckoutSheet   by remember { mutableStateOf(false) }
+        var showClearDialog     by remember { mutableStateOf(false) }
 
         val overrideDateLabel = overrideDate?.let { (y, m, d) ->
             "${twoDigit(d)}/${twoDigit(m)}/$y"
@@ -188,6 +189,25 @@ class CartScreen : Screen {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+
+                if (cartItems.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 4.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = { showClearDialog = true },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("مسح السلة", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
@@ -564,6 +584,24 @@ class CartScreen : Screen {
                     }
                 }
             }
+        }
+
+        // ── Clear cart confirmation ───────────────────────────────────────────
+        if (showClearDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearDialog = false },
+                title = { Text("مسح السلة") },
+                text  = { Text("هل تريد مسح جميع منتجات فاتورة ${activeSlot + 1}؟") },
+                confirmButton = {
+                    TextButton(
+                        onClick = { cartVm.clearCart(); showClearDialog = false },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("مسح") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearDialog = false }) { Text("إلغاء") }
+                }
+            )
         }
 
         // ── Date picker dialog (admin only) ───────────────────────────────────
