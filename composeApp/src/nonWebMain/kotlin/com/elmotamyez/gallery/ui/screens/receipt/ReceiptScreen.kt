@@ -1,11 +1,14 @@
 package com.elmotamyez.gallery.ui.screens.receipt
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -346,6 +349,8 @@ class ReceiptScreen : Screen {
 
 // ── Edit bottom sheet ─────────────────────────────────────────────────────────
 
+private enum class DiscountMode { AMOUNT, PERCENT }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditReceiptSheet(
@@ -358,12 +363,21 @@ private fun EditReceiptSheet(
     onSave: (List<CartItem>, Double, String) -> Unit
 ) {
     val editItems     = remember { mutableStateListOf<CartItem>().apply { addAll(initialItems) } }
+    var discountMode  by remember { mutableStateOf(DiscountMode.AMOUNT) }
     var discountText  by remember { mutableStateOf(if (initialDiscount > 0.0) initialDiscount.toInt().toString() else "") }
     var paymentMethod by remember { mutableStateOf(initialPaymentMethod) }
     var showAddDialog    by remember { mutableStateOf(false) }
     var showOtherDialog  by remember { mutableStateOf(false) }
 
-    val computedTotal = editItems.sumOf { it.totalPrice } - (discountText.toDoubleOrNull() ?: 0.0)
+    val subtotal = editItems.sumOf { it.totalPrice }
+    val discountAmount = run {
+        val v = discountText.toDoubleOrNull() ?: 0.0
+        when (discountMode) {
+            DiscountMode.AMOUNT  -> v.coerceIn(0.0, subtotal)
+            DiscountMode.PERCENT -> (subtotal * (v.coerceIn(0.0, 100.0) / 100.0))
+        }
+    }
+    val computedTotal = (subtotal - discountAmount).coerceAtLeast(0.0)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -503,14 +517,88 @@ private fun EditReceiptSheet(
             HorizontalDivider()
 
             // Discount field
-            OutlinedTextField(
-                value = discountText,
-                onValueChange = { discountText = it.filter { c -> c.isDigit() || c == '.' } },
-                label = { Text("خصم (ج)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "خصم:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.width(36.dp)
+                )
+                Row(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                        .padding(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    DiscountMode.entries.forEach { mode ->
+                        val selected = discountMode == mode
+                        Surface(
+                            onClick = { discountMode = mode; discountText = "" },
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 10.dp)
+                            ) {
+                                Text(
+                                    if (mode == DiscountMode.AMOUNT) "مبلغ" else "%",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+                val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                val textColor   = MaterialTheme.colorScheme.onSurface
+                val hintColor   = MaterialTheme.colorScheme.outline
+                BasicTextField(
+                    value = discountText,
+                    onValueChange = { discountText = it.filter { c -> c.isDigit() || c == '.' } },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    textStyle = MaterialTheme.typography.labelMedium.copy(
+                        textAlign = TextAlign.Center, color = textColor
+                    ),
+                    modifier = Modifier.weight(1f),
+                    decorationBox = { inner ->
+                        Box(
+                            modifier = Modifier
+                                .height(34.dp)
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (discountText.isEmpty()) {
+                                Text(
+                                    if (discountMode == DiscountMode.AMOUNT) "0.00" else "0",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = hintColor,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            inner()
+                        }
+                    }
+                )
+                if (discountAmount > 0.0) {
+                    Text(
+                        "-${discountAmount.formatPrice()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
 
             // Total preview
             Row(
@@ -527,7 +615,7 @@ private fun EditReceiptSheet(
 
             // Save button
             Button(
-                onClick = { onSave(editItems.toList(), discountText.toDoubleOrNull() ?: 0.0, paymentMethod) },
+                onClick = { onSave(editItems.toList(), discountAmount, paymentMethod) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isSaving && editItems.isNotEmpty()
             ) {
