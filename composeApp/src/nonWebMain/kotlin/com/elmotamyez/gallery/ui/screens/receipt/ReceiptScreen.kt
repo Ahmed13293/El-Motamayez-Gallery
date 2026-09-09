@@ -106,7 +106,7 @@ class ReceiptScreen : Screen {
                                     )
                                 }
                             }
-                            if (isAdmin) {
+                            if (isAdmin || receipt?.isQuotation == true) {
                                 IconButton(onClick = { showDeleteDialog = true }) {
                                     Icon(
                                         Icons.Default.Delete,

@@ -2543,7 +2543,7 @@ internal fun WebReceiptCard(
                             )
                         }
                     }
-                    if (isAdmin) {
+                    if (isAdmin || receipt.isQuotation) {
                         IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 Icons.Default.Delete,

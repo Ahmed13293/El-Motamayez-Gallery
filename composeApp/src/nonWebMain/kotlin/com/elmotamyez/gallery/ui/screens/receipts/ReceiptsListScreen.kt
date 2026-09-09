@@ -372,7 +372,6 @@ class ReceiptsListScreen : Screen {
                                                     receipt              = receipt,
                                                     dayIndex             = dayIdx,
                                                     onConfirmQuotation   = { vm.confirmQuotation(receipt) },
-                                                    onDeleteQuotation    = { vm.deleteReceipt(receipt) },
                                                     onClick              = {
                                                         vm.listScrollIndex  = listState.firstVisibleItemIndex
                                                         vm.listScrollOffset = listState.firstVisibleItemScrollOffset
@@ -627,7 +626,6 @@ private fun ReceiptCard(
     receipt: Receipt,
     dayIndex: Int,
     onConfirmQuotation: () -> Unit,
-    onDeleteQuotation: () -> Unit,
     onClick: () -> Unit
 ) {
     val quotationColor = Color(0xFFE65100)
@@ -736,13 +734,6 @@ private fun ReceiptCard(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                 ) {
-                    OutlinedButton(
-                        onClick = onDeleteQuotation,
-                        shape   = RoundedCornerShape(8.dp),
-                        colors  = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        Text("حذف", style = MaterialTheme.typography.labelMedium)
-                    }
                     Button(
                         onClick = onConfirmQuotation,
                         colors  = ButtonDefaults.buttonColors(containerColor = quotationColor),
