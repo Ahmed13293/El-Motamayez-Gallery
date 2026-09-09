@@ -1,4 +1,4 @@
-﻿package com.elmotamyez.gallery.ui.screens.cart
+package com.elmotamyez.gallery.ui.screens.cart
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -62,7 +62,6 @@ class CartScreen : Screen {
         val quotationSaving by receiptVm.quotationSaving.collectAsState()
         val quotationSaved  by receiptVm.quotationSaved.collectAsState()
 
-        // Navigate to receipt screen once order is placed (success or pending-save)
         LaunchedEffect(orderSaved) {
             if (orderSaved) {
                 cartVm.clearCart()
@@ -71,7 +70,6 @@ class CartScreen : Screen {
             }
         }
 
-        // Navigate to receipt screen after saving a quotation
         LaunchedEffect(quotationSaved) {
             if (quotationSaved) {
                 cartVm.clearCart()
@@ -80,20 +78,16 @@ class CartScreen : Screen {
             }
         }
 
-        // ── Customer optional fields ──────────────────────────────────────────
         var customerPhone by remember { mutableStateOf("") }
         var customerInfo  by remember { mutableStateOf("") }
-
-        // ── Back-date (admin only) ────────────────────────────────────────────
-        // null = use today's real timestamp; non-null = override to this date
         var overrideDate   by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
         var showDatePicker by remember { mutableStateOf(false) }
+        var showCheckoutSheet by remember { mutableStateOf(false) }
 
         val overrideDateLabel = overrideDate?.let { (y, m, d) ->
             "${twoDigit(d)}/${twoDigit(m)}/$y"
         }
 
-        // ── Discount state ────────────────────────────────────────────────────
         var discountMode  by remember { mutableStateOf(DiscountMode.AMOUNT) }
         var discountInput by remember { mutableStateOf("") }
 
@@ -113,326 +107,34 @@ class CartScreen : Screen {
             bottomBar = {
                 if (cartItems.isNotEmpty()) {
                     Surface(tonalElevation = 8.dp) {
-                        Column(
+                        Row(
                             modifier = Modifier
-                                .padding(horizontal = 16.dp)
-                                .padding(top = 12.dp, bottom = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // ── Discount row ──────────────────────────────────
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    "خصم:",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.width(36.dp)
-                                )
-                                // Mode toggle
-                                Row(
-                                    modifier = Modifier
-                                        .background(
-                                            MaterialTheme.colorScheme.surfaceVariant,
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(2.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    DiscountMode.entries.forEach { mode ->
-                                        val selected = discountMode == mode
-                                        Surface(
-                                            onClick = { discountMode = mode; discountInput = "" },
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = if (selected) MaterialTheme.colorScheme.primary
-                                                    else Color.Transparent,
-                                            modifier = Modifier.height(30.dp)
-                                        ) {
-                                            Box(
-                                                contentAlignment = Alignment.Center,
-                                                modifier = Modifier.padding(horizontal = 10.dp)
-                                            ) {
-                                                Text(
-                                                    if (mode == DiscountMode.AMOUNT) "مبلغ" else "%",
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = if (selected) Color.White
-                                                            else MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                // Input — same height as the toggle pill
-                                val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                                val textColor   = MaterialTheme.colorScheme.onSurface
-                                val hintColor   = MaterialTheme.colorScheme.outline
-                                val labelStyle  = MaterialTheme.typography.labelMedium
-                                BasicTextField(
-                                    value = discountInput,
-                                    onValueChange = { discountInput = it },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    textStyle = labelStyle.copy(
-                                        textAlign = TextAlign.Center,
-                                        color = textColor
-                                    ),
-                                    modifier = Modifier.weight(1f),
-                                    decorationBox = { inner ->
-                                        Box(
-                                            modifier = Modifier
-                                                .height(34.dp)
-                                                .background(Color.White, RoundedCornerShape(8.dp))
-                                                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                                                .padding(horizontal = 8.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (discountInput.isEmpty()) {
-                                                Text(
-                                                    if (discountMode == DiscountMode.AMOUNT) "0.00" else "0",
-                                                    style = labelStyle,
-                                                    color = hintColor,
-                                                    textAlign = TextAlign.Center,
-                                                    modifier = Modifier.fillMaxWidth()
-                                                )
-                                            }
-                                            inner()
-                                        }
-                                    }
-                                )
-                                // Discount amount preview
+                            Column {
                                 if (discountAmount > 0.0) {
                                     Text(
-                                        "-${discountAmount.formatPrice()}",
+                                        subtotal.formatPrice(),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.error,
-                                        fontWeight = FontWeight.SemiBold
+                                        color = MaterialTheme.colorScheme.outline,
+                                        textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
                                     )
                                 }
-                            }
-
-                            // ── Payment method ────────────────────────────────
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    "الدفع:",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.width(36.dp)
-                                )
-                                PaymentMethod.entries.forEach { method ->
-                                    val selected = selectedMethod == method
-                                    Surface(
-                                        onClick = { selectedMethod = method },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (selected) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.surfaceVariant,
-                                        modifier = Modifier.height(34.dp).weight(1f)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                method.label,
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = if (selected) Color.White
-                                                        else MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider()
-
-                            // ── Totals ────────────────────────────────────────
-                            if (discountAmount > 0.0) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("المجموع", style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.outline)
-                                    Text(subtotal.formatPrice(), style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.outline)
-                                }
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("الإجمالي", style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold)
                                 Text(
                                     finalTotal.formatPrice(),
                                     style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.ExtraBold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
-
-                            // ── Optional customer fields ──────────────────────
-                            val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-                            val textColor   = MaterialTheme.colorScheme.onSurface
-                            val hintColor   = MaterialTheme.colorScheme.outline
-                            val fieldStyle  = MaterialTheme.typography.labelMedium
-
-                            BasicTextField(
-                                value = customerPhone,
-                                onValueChange = { customerPhone = it },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                                textStyle = fieldStyle.copy(color = textColor, textAlign = TextAlign.End),
-                                modifier = Modifier.fillMaxWidth(),
-                                decorationBox = { inner ->
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(36.dp)
-                                            .background(Color.White, RoundedCornerShape(8.dp))
-                                            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                                            .padding(horizontal = 10.dp),
-                                        contentAlignment = Alignment.CenterEnd
-                                    ) {
-                                        if (customerPhone.isEmpty()) {
-                                            Text("رقم العميل (اختياري)", style = fieldStyle,
-                                                color = hintColor, modifier = Modifier.fillMaxWidth(),
-                                                textAlign = TextAlign.End)
-                                        }
-                                        inner()
-                                    }
-                                }
-                            )
-
-                            BasicTextField(
-                                value = customerInfo,
-                                onValueChange = { customerInfo = it },
-                                singleLine = true,
-                                textStyle = fieldStyle.copy(color = textColor, textAlign = TextAlign.End),
-                                modifier = Modifier.fillMaxWidth(),
-                                decorationBox = { inner ->
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(36.dp)
-                                            .background(Color.White, RoundedCornerShape(8.dp))
-                                            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                                            .padding(horizontal = 10.dp),
-                                        contentAlignment = Alignment.CenterEnd
-                                    ) {
-                                        if (customerInfo.isEmpty()) {
-                                            Text("معلومات العميل (اختياري)", style = fieldStyle,
-                                                color = hintColor, modifier = Modifier.fillMaxWidth(),
-                                                textAlign = TextAlign.End)
-                                        }
-                                        inner()
-                                    }
-                                }
-                            )
-
-                            // ── Back-date row (admin only) ────────────────────
-                            if (isAdmin) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(
-                                            if (overrideDate != null)
-                                                MaterialTheme.colorScheme.tertiaryContainer
-                                            else MaterialTheme.colorScheme.surfaceVariant,
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable { showDatePicker = true }
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            Icons.Default.CalendarMonth,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = if (overrideDate != null)
-                                                MaterialTheme.colorScheme.tertiary
-                                            else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Text(
-                                            "تاريخ الفاتورة:",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    Text(
-                                        overrideDateLabel ?: "اليوم",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (overrideDate != null)
-                                            MaterialTheme.colorScheme.tertiary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
                             Button(
-                                onClick = {
-                                    if (!orderSaving) {
-                                        receiptVm.confirmOrder(
-                                            items         = cartItems,
-                                            total         = finalTotal,
-                                            discount      = discountAmount,
-                                            paymentMethod = selectedMethod.label,
-                                            customerPhone = customerPhone,
-                                            customerInfo  = customerInfo,
-                                            username      = currentUser.user?.username,
-                                            overrideDate  = overrideDate
-                                        )
-                                    }
-                                },
-                                enabled  = !orderSaving,
-                                modifier = Modifier.fillMaxWidth()
+                                onClick = { showCheckoutSheet = true },
+                                shape = RoundedCornerShape(12.dp)
                             ) {
-                                if (orderSaving) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp,
-                                        color = LocalContentColor.current
-                                    )
-                                } else {
-                                    Text("تأكيد الطلب")
-                                }
-                            }
-
-                            Button(
-                                onClick = {
-                                    if (!quotationSaving) {
-                                        receiptVm.resetQuotationSaved()
-                                        receiptVm.saveQuotation(
-                                            items         = cartItems,
-                                            total         = finalTotal,
-                                            discount      = discountAmount,
-                                            paymentMethod = selectedMethod.label,
-                                            customerPhone = customerPhone.takeIf { it.isNotBlank() },
-                                            customerInfo  = customerInfo.takeIf { it.isNotBlank() },
-                                            username      = currentUser.user?.username
-                                        )
-                                    }
-                                },
-                                enabled  = !quotationSaving,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF00897B))
-                            ) {
-                                if (quotationSaving) {
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Text("حفظ كعرض سعر")
-                                }
+                                Text("إتمام الطلب", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -481,8 +183,7 @@ class CartScreen : Screen {
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (selected) Color.White
-                                                    else Color.White
+                                            color = Color.White
                                         )
                                     }
                                 }
@@ -490,69 +191,379 @@ class CartScreen : Screen {
                         }
                     }
                 }
+
                 if (cartItems.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("السلة فارغة", style = MaterialTheme.typography.bodyLarge)
                     }
                 } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(cartItems, key = { it.product.id }) { item ->
-                        Card(elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(item.product.name, fontWeight = FontWeight.Bold)
-                                    Text("${item.product.price.formatPrice()} للقطعة",
-                                        style = MaterialTheme.typography.bodySmall)
-                                    Text("الإجمالي: ${item.totalPrice.formatPrice()}",
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.SemiBold)
-                                }
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(cartItems, key = { it.product.id }) { item ->
+                            Card(elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
-                                            .height(36.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        IconButton(onClick = { cartVm.decreaseQuantity(item.product.id) },
-                                            modifier = Modifier.size(36.dp)) {
-                                            Icon(Icons.Default.Remove, null, modifier = Modifier.size(16.dp),
-                                                tint = MaterialTheme.colorScheme.primary)
-                                        }
-                                        Text("${item.quantity}", fontWeight = FontWeight.Bold, fontSize = 15.sp,
-                                            textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 28.dp),
-                                            style = MaterialTheme.typography.bodyMedium)
-                                        val atLimit = item.quantity >= item.product.stock
-                                        IconButton(onClick = { cartVm.increaseQuantity(item.product.id) },
-                                            enabled = !atLimit, modifier = Modifier.size(36.dp)) {
-                                            Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp),
-                                                tint = if (atLimit)
-                                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
-                                                else MaterialTheme.colorScheme.primary)
-                                        }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(item.product.name, fontWeight = FontWeight.Bold)
+                                        Text("${item.product.price.formatPrice()} للقطعة",
+                                            style = MaterialTheme.typography.bodySmall)
+                                        Text("الإجمالي: ${item.totalPrice.formatPrice()}",
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.SemiBold)
                                     }
-                                    IconButton(onClick = { cartVm.removeFromCart(item.product.id) },
-                                        modifier = Modifier.size(36.dp)) {
-                                        Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(20.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+                                                .height(36.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            IconButton(onClick = { cartVm.decreaseQuantity(item.product.id) },
+                                                modifier = Modifier.size(36.dp)) {
+                                                Icon(Icons.Default.Remove, null, modifier = Modifier.size(16.dp),
+                                                    tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                            Text("${item.quantity}", fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                                                textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 28.dp),
+                                                style = MaterialTheme.typography.bodyMedium)
+                                            val atLimit = item.quantity >= item.product.stock
+                                            IconButton(onClick = { cartVm.increaseQuantity(item.product.id) },
+                                                enabled = !atLimit, modifier = Modifier.size(36.dp)) {
+                                                Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp),
+                                                    tint = if (atLimit)
+                                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+                                                    else MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                        IconButton(onClick = { cartVm.removeFromCart(item.product.id) },
+                                            modifier = Modifier.size(36.dp)) {
+                                            Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(20.dp))
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-                }   // else
-            }   // Column
+            }
+        }
+
+        // ── Checkout bottom sheet ─────────────────────────────────────────────
+        if (showCheckoutSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showCheckoutSheet = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "إتمام الطلب",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+
+                    Spacer(Modifier.height(4.dp))
+
+                    // ── Discount ──────────────────────────────────────────────
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "خصم:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.width(36.dp)
+                        )
+                        Row(
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                .padding(2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            DiscountMode.entries.forEach { mode ->
+                                val selected = discountMode == mode
+                                Surface(
+                                    onClick = { discountMode = mode; discountInput = "" },
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    modifier = Modifier.height(30.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 10.dp)) {
+                                        Text(
+                                            if (mode == DiscountMode.AMOUNT) "مبلغ" else "%",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        val textColor   = MaterialTheme.colorScheme.onSurface
+                        val hintColor   = MaterialTheme.colorScheme.outline
+                        BasicTextField(
+                            value = discountInput,
+                            onValueChange = { discountInput = it },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            textStyle = MaterialTheme.typography.labelMedium.copy(
+                                textAlign = TextAlign.Center, color = textColor
+                            ),
+                            modifier = Modifier.weight(1f),
+                            decorationBox = { inner ->
+                                Box(
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                                        .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (discountInput.isEmpty()) {
+                                        Text(
+                                            if (discountMode == DiscountMode.AMOUNT) "0.00" else "0",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = hintColor,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                    inner()
+                                }
+                            }
+                        )
+                        if (discountAmount > 0.0) {
+                            Text(
+                                "-${discountAmount.formatPrice()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    // ── Payment method ────────────────────────────────────────
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "الدفع:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.width(36.dp)
+                        )
+                        PaymentMethod.entries.forEach { method ->
+                            val selected = selectedMethod == method
+                            Surface(
+                                onClick = { selectedMethod = method },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (selected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.height(34.dp).weight(1f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        method.label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider()
+
+                    // ── Total summary ─────────────────────────────────────────
+                    if (discountAmount > 0.0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("المجموع", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline)
+                            Text(subtotal.formatPrice(), style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline)
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("الإجمالي", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            finalTotal.formatPrice(),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    // ── Customer fields ───────────────────────────────────────
+                    val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                    val textColor   = MaterialTheme.colorScheme.onSurface
+                    val hintColor   = MaterialTheme.colorScheme.outline
+                    val fieldStyle  = MaterialTheme.typography.labelMedium
+
+                    BasicTextField(
+                        value = customerPhone,
+                        onValueChange = { customerPhone = it },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        textStyle = fieldStyle.copy(color = textColor, textAlign = TextAlign.End),
+                        modifier = Modifier.fillMaxWidth(),
+                        decorationBox = { inner ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth().height(36.dp)
+                                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                                    .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 10.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                if (customerPhone.isEmpty()) {
+                                    Text("رقم العميل (اختياري)", style = fieldStyle, color = hintColor,
+                                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                                }
+                                inner()
+                            }
+                        }
+                    )
+
+                    BasicTextField(
+                        value = customerInfo,
+                        onValueChange = { customerInfo = it },
+                        singleLine = true,
+                        textStyle = fieldStyle.copy(color = textColor, textAlign = TextAlign.End),
+                        modifier = Modifier.fillMaxWidth(),
+                        decorationBox = { inner ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth().height(36.dp)
+                                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                                    .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 10.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                if (customerInfo.isEmpty()) {
+                                    Text("معلومات العميل (اختياري)", style = fieldStyle, color = hintColor,
+                                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                                }
+                                inner()
+                            }
+                        }
+                    )
+
+                    // ── Back-date (admin only) ────────────────────────────────
+                    if (isAdmin) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (overrideDate != null) MaterialTheme.colorScheme.tertiaryContainer
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable { showDatePicker = true }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(16.dp),
+                                    tint = if (overrideDate != null) MaterialTheme.colorScheme.tertiary
+                                           else MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("تاريخ الفاتورة:", style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text(
+                                overrideDateLabel ?: "اليوم",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (overrideDate != null) MaterialTheme.colorScheme.tertiary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+
+                    // ── Action buttons ────────────────────────────────────────
+                    Button(
+                        onClick = {
+                            if (!orderSaving) {
+                                receiptVm.confirmOrder(
+                                    items         = cartItems,
+                                    total         = finalTotal,
+                                    discount      = discountAmount,
+                                    paymentMethod = selectedMethod.label,
+                                    customerPhone = customerPhone,
+                                    customerInfo  = customerInfo,
+                                    username      = currentUser.user?.username,
+                                    overrideDate  = overrideDate
+                                )
+                            }
+                        },
+                        enabled  = !orderSaving,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (orderSaving) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp,
+                                color = LocalContentColor.current)
+                        } else {
+                            Text("تأكيد الطلب")
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            if (!quotationSaving) {
+                                receiptVm.resetQuotationSaved()
+                                receiptVm.saveQuotation(
+                                    items         = cartItems,
+                                    total         = finalTotal,
+                                    discount      = discountAmount,
+                                    paymentMethod = selectedMethod.label,
+                                    customerPhone = customerPhone.takeIf { it.isNotBlank() },
+                                    customerInfo  = customerInfo.takeIf  { it.isNotBlank() },
+                                    username      = currentUser.user?.username
+                                )
+                            }
+                        },
+                        enabled  = !quotationSaving,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF00897B))
+                    ) {
+                        if (quotationSaving) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text("حفظ كعرض سعر")
+                        }
+                    }
+                }
+            }
         }
 
         // ── Date picker dialog (admin only) ───────────────────────────────────
