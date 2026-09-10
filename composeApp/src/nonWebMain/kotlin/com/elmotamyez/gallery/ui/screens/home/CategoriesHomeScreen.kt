@@ -233,7 +233,7 @@ class CategoriesHomeScreen : Screen {
                 if (isNormalUser) {
                     ExtendedFloatingActionButton(
                         onClick   = { showExpenseSheet = true },
-                        expanded  = !listState.isScrollInProgress,
+                        expanded  = !listState.isScrollInProgress && searchQuery.isBlank(),
                         icon      = { Icon(Icons.Default.AttachMoney, null) },
                         text      = { Text("إضافة مصروف", fontWeight = FontWeight.Bold) }
                     )
