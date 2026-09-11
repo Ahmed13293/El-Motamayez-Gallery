@@ -64,6 +64,8 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.formatPrice
+import com.elmotamyez.gallery.util.BarcodeScannerSheet
+import androidx.compose.material.icons.filled.QrCodeScanner
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -94,7 +96,10 @@ class CategoriesHomeScreen : Screen {
         val expenseVm: ExpenseViewModel = koinInject()
         val authState by authVm.uiState.collectAsState()
         val isNormalUser = authState.user?.role == UserRole.USER
-        var showExpenseSheet by remember { mutableStateOf(false) }
+        var showExpenseSheet    by remember { mutableStateOf(false) }
+        var showBarcodeScanner  by remember { mutableStateOf(false) }
+        var scannedProduct      by remember { mutableStateOf<Product?>(null) }
+        var barcodeNotFound     by remember { mutableStateOf(false) }
         val listState = rememberLazyListState()
         val keyboard = LocalSoftwareKeyboardController.current
 
@@ -185,24 +190,35 @@ class CategoriesHomeScreen : Screen {
                                 )
                             }
                         }
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            placeholder = { Text("بحث عن أي منتج…") },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = ""; keyboard?.hide() }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Clear")
-                                    }
-                                }
-                            },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                            shape = RoundedCornerShape(10.dp),
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.fillMaxWidth()
-                        )
+                        ) {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text("بحث عن أي منتج…") },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { searchQuery = ""; keyboard?.hide() }) {
+                                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = { showBarcodeScanner = true }) {
+                                Icon(Icons.Default.QrCodeScanner,
+                                    contentDescription = "مسح الباركود",
+                                    tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                         if (searchQuery.isNotBlank() && state.categories.isNotEmpty()) {
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -253,6 +269,52 @@ class CategoriesHomeScreen : Screen {
                     onSave    = { type, amount, note ->
                         expenseVm.addExpense(type, amount, note) {}
                         showExpenseSheet = false
+                    }
+                )
+            }
+
+            if (showBarcodeScanner) {
+                BarcodeScannerSheet(
+                    onResult = { code ->
+                        showBarcodeScanner = false
+                        val found = state.allProducts.firstOrNull { it.barcode == code }
+                        if (found != null) scannedProduct = found else barcodeNotFound = true
+                    },
+                    onDismiss = { showBarcodeScanner = false }
+                )
+            }
+
+            scannedProduct?.let { product ->
+                AlertDialog(
+                    onDismissRequest = { scannedProduct = null },
+                    title = { Text(product.name, fontWeight = FontWeight.Bold) },
+                    text  = {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("السعر: ${product.price.formatPrice()} ج",
+                                style = MaterialTheme.typography.bodyMedium)
+                            Text("المخزون: ${product.stock}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline)
+                        }
+                    },
+                    confirmButton = {
+                        Button(onClick = { cartVm.addToCart(product); scannedProduct = null }) {
+                            Text("إضافة للسلة")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { scannedProduct = null }) { Text("إغلاق") }
+                    }
+                )
+            }
+
+            if (barcodeNotFound) {
+                AlertDialog(
+                    onDismissRequest = { barcodeNotFound = false },
+                    title = { Text("لم يتم العثور على المنتج") },
+                    text  = { Text("لا يوجد منتج مرتبط بهذا الباركود. تأكد من إضافة الباركود للمنتج في إدارة المنتجات.") },
+                    confirmButton = {
+                        TextButton(onClick = { barcodeNotFound = false }) { Text("حسناً") }
                     }
                 )
             }

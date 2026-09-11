@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
@@ -29,6 +30,7 @@ import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import com.elmotamyez.gallery.util.rememberImagePickerLauncher
 import com.elmotamyez.gallery.util.rotateImage90CW
+import com.elmotamyez.gallery.util.BarcodeScannerSheet
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +65,8 @@ class ManageProductsScreen : Screen {
         var nameError          by remember { mutableStateOf(false) }
         var lastAddedName      by remember { mutableStateOf("") }
         var wholesalePriceField by remember { mutableStateOf("") }
+        var barcodeField  by remember { mutableStateOf("") }
+        var showBarcodeScanner by remember { mutableStateOf(false) }
         var imageUrlsList by remember { mutableStateOf<List<String>>(emptyList()) }
         var addUrlField   by remember { mutableStateOf("") }
         var selectedCatId by remember { mutableStateOf("") }
@@ -116,7 +120,7 @@ class ManageProductsScreen : Screen {
 
         fun openAdd() {
             editTarget = null; nameField = ""; priceField = ""; stockField = ""
-            wholesalePriceField = ""; imageUrlsList = emptyList(); addUrlField = ""
+            wholesalePriceField = ""; barcodeField = ""; imageUrlsList = emptyList(); addUrlField = ""
             stockError = false; nameError = false
             selectedCatId = state.categories.firstOrNull()?.id ?: ""
             selectedBrandId = state.brands.firstOrNull { it.categoryId == selectedCatId }?.id ?: ""
@@ -127,6 +131,7 @@ class ManageProductsScreen : Screen {
             editTarget = p; nameField = p.name; priceField = p.price.toString()
             stockField = p.stock.toString(); stockError = false; nameError = false
             wholesalePriceField = p.wholesalePrice?.toString() ?: ""
+            barcodeField = p.barcode ?: ""
             imageUrlsList = p.displayImages; addUrlField = ""
             selectedCatId = p.categoryId; selectedBrandId = p.brandId
             showDialog = true
@@ -427,6 +432,24 @@ class ManageProductsScreen : Screen {
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth()
                         )
+                        // Barcode
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = barcodeField,
+                                onValueChange = { barcodeField = it },
+                                label = { Text("باركود (اختياري)") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = { showBarcodeScanner = true }) {
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = "مسح الباركود",
+                                    tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                         // Images
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (imageUrlsList.isNotEmpty()) {
@@ -591,11 +614,12 @@ class ManageProductsScreen : Screen {
                         if (isDuplicate) { nameError = true; return@Button }
                         if (trimmedName.isNotBlank() && price != null &&
                             selectedCatId.isNotBlank() && selectedBrandId.isNotBlank()) {
+                            val barcode = barcodeField.trim().ifBlank { null }
                             if (editTarget == null) {
-                                vm.addProduct(trimmedName, price, wholesalePrice, stock, selectedBrandId, selectedCatId, imageUrlsList)
+                                vm.addProduct(trimmedName, price, wholesalePrice, stock, selectedBrandId, selectedCatId, imageUrlsList, barcode)
                                 lastAddedName = trimmedName
                             } else {
-                                vm.editProduct(editTarget!!.id, trimmedName, price, wholesalePrice, stock, selectedBrandId, selectedCatId, imageUrlsList)
+                                vm.editProduct(editTarget!!.id, trimmedName, price, wholesalePrice, stock, selectedBrandId, selectedCatId, imageUrlsList, barcode)
                             }
                             showDialog = false
                         }
@@ -604,6 +628,14 @@ class ManageProductsScreen : Screen {
                 dismissButton = {
                     TextButton(onClick = { showDialog = false }) { Text("إلغاء") }
                 }
+            )
+        }
+
+        // ── Barcode scanner ───────────────────────────────────────────────────
+        if (showBarcodeScanner) {
+            BarcodeScannerSheet(
+                onResult  = { code -> barcodeField = code; showBarcodeScanner = false },
+                onDismiss = { showBarcodeScanner = false }
             )
         }
 

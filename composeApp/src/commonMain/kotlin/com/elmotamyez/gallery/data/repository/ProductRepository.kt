@@ -33,7 +33,8 @@ private data class ProductUpdate(
     @SerialName("brand_id")    val brandId: String,
     @SerialName("category_id") val categoryId: String,
     @SerialName("image_url")   val imageUrl: String?,
-    @SerialName("image_urls")  val imageUrls: List<String>
+    @SerialName("image_urls")  val imageUrls: List<String>,
+    val barcode: String?
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,21 +112,22 @@ class ProductRepository {
 
     // ── PRODUCTS ──────────────────────────────────────────────────────────────
 
-    suspend fun insertProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList()) {
+    suspend fun insertProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList(), barcode: String? = null) {
         supabaseClient.from("products").insert(buildJsonObject {
             put("id", id); put("name", name); put("price", price); put("stock", stock)
             put("brand_id", brandId); put("category_id", categoryId)
             if (wholesalePrice != null) put("wholesale_price", wholesalePrice)
             put("image_url", imageUrls.firstOrNull())
             put("image_urls", JsonArray(imageUrls.map { JsonPrimitive(it) }))
+            if (barcode != null) put("barcode", barcode)
         })
         clearCache()
     }
 
-    suspend fun updateProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList()) {
+    suspend fun updateProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList(), barcode: String? = null) {
         supabaseClient.from("products")
             .update(ProductUpdate(name, price, wholesalePrice, stock, brandId, categoryId,
-                imageUrls.firstOrNull(), imageUrls)) { filter { eq("id", id) } }
+                imageUrls.firstOrNull(), imageUrls, barcode)) { filter { eq("id", id) } }
         clearCache()
     }
 

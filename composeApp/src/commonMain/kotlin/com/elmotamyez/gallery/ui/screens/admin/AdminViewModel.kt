@@ -110,14 +110,14 @@ class AdminViewModel(
 
     // ── Products ──────────────────────────────────────────────────────────────
 
-    fun addProduct(name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList()) = viewModelScope.launch {
-        runCatching { repository.insertProduct(newId(), name.trim(), price, wholesalePrice, stock, brandId, categoryId, imageUrls) }
+    fun addProduct(name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList(), barcode: String? = null) = viewModelScope.launch {
+        runCatching { repository.insertProduct(newId(), name.trim(), price, wholesalePrice, stock, brandId, categoryId, imageUrls, barcode) }
             .onSuccess { loadAll(); toast("تم إضافة المنتج") }
             .onFailure { _state.update { s -> s.copy(error = it.message) } }
     }
 
-    fun editProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList()) = viewModelScope.launch {
-        runCatching { repository.updateProduct(id, name.trim(), price, wholesalePrice, stock, brandId, categoryId, imageUrls) }
+    fun editProduct(id: String, name: String, price: Double, wholesalePrice: Double?, stock: Int, brandId: String, categoryId: String, imageUrls: List<String> = emptyList(), barcode: String? = null) = viewModelScope.launch {
+        runCatching { repository.updateProduct(id, name.trim(), price, wholesalePrice, stock, brandId, categoryId, imageUrls, barcode) }
             .onSuccess { loadAll(); toast("تم تعديل المنتج") }
             .onFailure { _state.update { s -> s.copy(error = it.message) } }
     }
