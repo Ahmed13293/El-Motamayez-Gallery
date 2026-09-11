@@ -67,6 +67,7 @@ import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.formatPrice
 import com.elmotamyez.gallery.util.BarcodeScannerSheet
+import com.elmotamyez.gallery.util.normalizeBarcode
 import androidx.compose.material.icons.filled.QrCodeScanner
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -282,11 +283,10 @@ class CategoriesHomeScreen : Screen {
                 BarcodeScannerSheet(
                     onResult = { code ->
                         showBarcodeScanner = false
-                        // Flexible match: trim whitespace, then exact, then strip leading zeros
-                        val trimmedCode = code.trim()
+                        val trimmedCode = code.normalizeBarcode()
                         lastScannedCode = trimmedCode
                         val found = state.allProducts.firstOrNull { p ->
-                            val stored = p.barcode?.trim() ?: return@firstOrNull false
+                            val stored = p.barcode?.normalizeBarcode() ?: return@firstOrNull false
                             stored == trimmedCode ||
                             stored.trimStart('0') == trimmedCode.trimStart('0')
                         }
