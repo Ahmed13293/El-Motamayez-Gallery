@@ -725,7 +725,7 @@ private fun AddProductDialog(
     var query by remember { mutableStateOf("") }
     val filtered = remember(query, allProducts) {
         if (query.isBlank()) allProducts.take(30)
-        else allProducts.filter { query.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) } }.take(30)
+        else allProducts.filter { com.elmotamyez.gallery.util.arabicContains(it.name, query) }.take(30)
     }
 
     AlertDialog(

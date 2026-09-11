@@ -111,7 +111,7 @@ class ManageProductsScreen : Screen {
             state.products
                 .filter {
                     if (searchQuery.isBlank()) true
-                    else searchQuery.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) }
+                    else com.elmotamyez.gallery.util.arabicContains(it.name, searchQuery)
                 }
                 .filter { filterCategoryId == null || it.categoryId == filterCategoryId }
                 .filter { filterBrandId == null || it.brandId == filterBrandId }

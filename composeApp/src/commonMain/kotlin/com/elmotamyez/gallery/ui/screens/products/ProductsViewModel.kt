@@ -8,6 +8,7 @@ import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.model.ProductVariant
 import com.elmotamyez.gallery.data.repository.ProductRepository
 import com.elmotamyez.gallery.data.repository.ProductVariantRepository
+import com.elmotamyez.gallery.util.arabicContains
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -184,8 +185,6 @@ class ProductsViewModel(
         (categoryId == null || p.categoryId == categoryId) &&
         (brandId    == null || p.brandId    == brandId    || p.brandId == subBrandId) &&
         (subBrandId == null || p.brandId    == subBrandId) &&
-        (query.isBlank()    || query.trim().split(Regex("\\s+")).all { word ->
-            p.name.contains(word, ignoreCase = true)
-        })
+        (query.isBlank() || arabicContains(p.name, query))
     }
 }

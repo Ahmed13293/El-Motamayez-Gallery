@@ -141,7 +141,7 @@ class CategoriesHomeScreen : Screen {
         val searchResults: List<Product> = remember(searchQuery, state.allProducts, selectedCategory) {
             if (searchQuery.isBlank()) emptyList()
             else {
-                val byName = state.allProducts.filter { searchQuery.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) } }
+                val byName = state.allProducts.filter { com.elmotamyez.gallery.util.arabicContains(it.name, searchQuery) }
                 if (selectedCategory == null) byName
                 else byName.filter { it.categoryId == selectedCategory!!.id }
             }

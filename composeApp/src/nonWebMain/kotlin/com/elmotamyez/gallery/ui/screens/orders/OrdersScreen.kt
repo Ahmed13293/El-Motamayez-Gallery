@@ -724,7 +724,7 @@ private fun AddStockItemDialog(
     var selected by remember { mutableStateOf<Product?>(null) }
     var qtyText by remember { mutableStateOf("1") }
 
-    val filtered = products.filter { search.isBlank() || search.trim().split(Regex("\\s+")).all { w -> it.name.contains(w, ignoreCase = true) } }
+    val filtered = products.filter { search.isBlank() || com.elmotamyez.gallery.util.arabicContains(it.name, search) }
 
     if (selected == null) {
         AlertDialog(
