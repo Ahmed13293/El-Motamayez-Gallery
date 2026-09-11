@@ -54,53 +54,60 @@ class CartViewModel : ViewModel() {
         _cartItems.value = _slots.value[newIdx]
     }
 
-    fun addToCart(product: Product) {
+    fun addToCart(product: Product, variantId: String? = null, variantName: String? = null, variantStock: Int? = null) {
+        val availableStock = variantStock ?: product.stock
+        val key = CartItem(product, variantId = variantId, variantName = variantName).cartKey
         _cartItems.update { items ->
-            val existing = items.find { it.product.id == product.id }
+            val existing = items.find { it.cartKey == key }
             if (existing != null) {
-                if (existing.quantity >= product.stock) return@update items
-                items.map { if (it.product.id == product.id) it.copy(quantity = it.quantity + 1) else it }
+                if (existing.quantity >= availableStock) return@update items
+                items.map { if (it.cartKey == key) it.copy(quantity = it.quantity + 1) else it }
             } else {
-                if (product.stock <= 0) return@update items
-                items + CartItem(product)
+                if (availableStock <= 0) return@update items
+                items + CartItem(product, variantId = variantId, variantName = variantName)
             }
         }
         persist()
     }
 
-    fun addWithQuantity(product: Product, quantity: Int) {
+    fun addWithQuantity(product: Product, quantity: Int, variantId: String? = null, variantName: String? = null) {
         if (quantity <= 0) return
+        val key = CartItem(product, variantId = variantId, variantName = variantName).cartKey
         _cartItems.update { items ->
-            val existing = items.find { it.product.id == product.id }
+            val existing = items.find { it.cartKey == key }
             if (existing != null) {
-                items.map { if (it.product.id == product.id) it.copy(quantity = it.quantity + quantity) else it }
+                items.map { if (it.cartKey == key) it.copy(quantity = it.quantity + quantity) else it }
             } else {
-                items + CartItem(product, quantity)
+                items + CartItem(product, quantity, variantId, variantName)
             }
         }
         persist()
     }
 
-    fun removeFromCart(productId: String) {
-        _cartItems.update { items -> items.filter { it.product.id != productId } }
+    fun removeFromCart(productId: String, variantId: String? = null) {
+        val key = "${productId}:${variantId ?: ""}"
+        _cartItems.update { items -> items.filter { it.cartKey != key } }
         persist()
     }
 
-    fun increaseQuantity(productId: String) {
+    fun increaseQuantity(productId: String, variantId: String? = null, variantStock: Int? = null) {
+        val key = "${productId}:${variantId ?: ""}"
         _cartItems.update { items ->
             items.map {
-                if (it.product.id == productId && it.quantity < it.product.stock)
-                    it.copy(quantity = it.quantity + 1)
-                else it
+                if (it.cartKey == key) {
+                    val cap = variantStock ?: it.product.stock
+                    if (it.quantity < cap) it.copy(quantity = it.quantity + 1) else it
+                } else it
             }
         }
         persist()
     }
 
-    fun decreaseQuantity(productId: String) {
+    fun decreaseQuantity(productId: String, variantId: String? = null) {
+        val key = "${productId}:${variantId ?: ""}"
         _cartItems.update { items ->
             items.mapNotNull {
-                if (it.product.id == productId) {
+                if (it.cartKey == key) {
                     if (it.quantity > 1) it.copy(quantity = it.quantity - 1) else null
                 } else it
             }
@@ -108,7 +115,15 @@ class CartViewModel : ViewModel() {
         persist()
     }
 
-    fun isInCart(productId: String): Boolean = _cartItems.value.any { it.product.id == productId }
+    fun isInCart(productId: String, variantId: String? = null): Boolean {
+        val key = "${productId}:${variantId ?: ""}"
+        return _cartItems.value.any { it.cartKey == key }
+    }
+
+    fun quantityInCart(productId: String, variantId: String? = null): Int {
+        val key = "${productId}:${variantId ?: ""}"
+        return _cartItems.value.find { it.cartKey == key }?.quantity ?: 0
+    }
 
     fun clearCart() {
         _cartItems.update { emptyList() }

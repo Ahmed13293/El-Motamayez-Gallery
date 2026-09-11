@@ -7,6 +7,7 @@ import com.elmotamyez.gallery.data.model.DailyReconciliation
 import com.elmotamyez.gallery.data.model.Receipt
 import com.elmotamyez.gallery.data.repository.DailyReconciliationRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
+import com.elmotamyez.gallery.data.repository.ProductVariantRepository
 import com.elmotamyez.gallery.data.repository.ReceiptRepository
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.get
@@ -31,6 +32,7 @@ private const val KEY_RECEIPTS_CACHE = "receipts_cache_json"
 class ReceiptViewModel(
     private val repository: ReceiptRepository,
     private val productRepository: ProductRepository,
+    private val variantRepository: ProductVariantRepository,
     private val reconciliationRepository: DailyReconciliationRepository
 ) : ViewModel() {
 
@@ -204,7 +206,13 @@ class ReceiptViewModel(
                         .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
                         .forEach { cartItem ->
                             runCatching {
-                                productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+                                if (cartItem.variantId != null) {
+                                    val variants = variantRepository.fetchForProduct(cartItem.product.id)
+                                    val v = variants.find { it.id == cartItem.variantId }
+                                    if (v != null) variantRepository.updateStock(v.id, maxOf(0, v.stock - cartItem.quantity))
+                                } else {
+                                    productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+                                }
                             }
                         }
                 }

@@ -224,7 +224,13 @@ class ReceiptScreen : Screen {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(item.product.name,            modifier = Modifier.weight(2f))
+                        Column(modifier = Modifier.weight(2f)) {
+                            Text(item.product.name)
+                            if (item.variantName != null) {
+                                Text(item.variantName, style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                         Text("${item.quantity}",           modifier = Modifier.weight(0.5f), textAlign = TextAlign.Center)
                         Text(item.product.price.formatPrice(), modifier = Modifier.weight(1f),   textAlign = TextAlign.End)
                         Text(item.totalPrice.formatPrice(),    modifier = Modifier.weight(1f),   textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold)
@@ -408,11 +414,13 @@ private fun EditReceiptSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        cartItem.product.name,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(cartItem.product.name, style = MaterialTheme.typography.bodyMedium)
+                        if (cartItem.variantName != null) {
+                            Text(cartItem.variantName, style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
                     // Quantity stepper
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

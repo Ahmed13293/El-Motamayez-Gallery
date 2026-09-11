@@ -28,6 +28,7 @@ import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import com.elmotamyez.gallery.ui.components.CartBottomBar
 import com.elmotamyez.gallery.ui.components.GradientDivider
 import com.elmotamyez.gallery.ui.components.ProductCard
+import com.elmotamyez.gallery.ui.components.VariantPickerSheet
 import com.elmotamyez.gallery.util.buildProductPath
 import com.elmotamyez.gallery.ui.screens.cart.CartViewModel
 import com.elmotamyez.gallery.ui.screens.main.CartTab
@@ -50,6 +51,7 @@ data class CategoryProductsScreen(
         val cartItems by cartVm.cartItems.collectAsState()
         val keyboard = LocalSoftwareKeyboardController.current
         var quickEditProduct by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Product?>(null) }
+        var variantPickerProduct by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Product?>(null) }
 
         // Select this category on first composition
         LaunchedEffect(categoryId) {
@@ -228,14 +230,24 @@ data class CategoryProductsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(state.products, key = { it.id }) { product ->
-                        val cartItem = cartItems.find { it.product.id == product.id }
+                        val hasVariants = !state.variantsMap[product.id].isNullOrEmpty()
+                        val totalQty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
                         ProductCard(
                             product = product,
-                            isInCart = cartItem != null,
-                            quantity = cartItem?.quantity ?: 0,
-                            onAddToCart = { cartVm.addToCart(product) },
-                            onIncrease = { cartVm.increaseQuantity(product.id) },
-                            onDecrease = { cartVm.decreaseQuantity(product.id) },
+                            isInCart = totalQty > 0,
+                            quantity = totalQty,
+                            onAddToCart = {
+                                if (hasVariants) variantPickerProduct = product
+                                else cartVm.addToCart(product)
+                            },
+                            onIncrease = {
+                                if (hasVariants) variantPickerProduct = product
+                                else cartVm.increaseQuantity(product.id)
+                            },
+                            onDecrease = {
+                                if (hasVariants) variantPickerProduct = product
+                                else cartVm.decreaseQuantity(product.id)
+                            },
                             categoryPath = buildProductPath(product, state.categories, state.brands),
                             onLongClick = { quickEditProduct = product }
                         )
@@ -252,6 +264,18 @@ data class CategoryProductsScreen(
                     quickEditProduct = null
                 },
                 onDismiss = { quickEditProduct = null }
+            )
+        }
+
+        variantPickerProduct?.let { product ->
+            VariantPickerSheet(
+                product  = product,
+                variants = state.variantsMap[product.id] ?: emptyList(),
+                onAddToCart = { variantId, variantName, qty, _ ->
+                    cartVm.addWithQuantity(product, qty, variantId, variantName)
+                    variantPickerProduct = null
+                },
+                onDismiss = { variantPickerProduct = null }
             )
         }
     }

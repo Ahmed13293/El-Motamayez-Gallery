@@ -51,7 +51,9 @@ import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
+import com.elmotamyez.gallery.data.model.ProductVariant
 import com.elmotamyez.gallery.ui.components.CartBottomBar
+import com.elmotamyez.gallery.ui.components.VariantPickerSheet
 import com.elmotamyez.gallery.ui.components.PrintingButton
 import com.elmotamyez.gallery.ui.components.ProductImageSlider
 import com.elmotamyez.gallery.ui.components.StockBadge
@@ -101,6 +103,7 @@ class CategoriesHomeScreen : Screen {
         var scannedProduct      by remember { mutableStateOf<Product?>(null) }
         var barcodeNotFound     by remember { mutableStateOf(false) }
         var quickEditProduct    by remember { mutableStateOf<Product?>(null) }
+        var variantPickerProduct by remember { mutableStateOf<Product?>(null) }
         val listState = rememberLazyListState()
         val keyboard = LocalSoftwareKeyboardController.current
 
@@ -330,6 +333,18 @@ class CategoriesHomeScreen : Screen {
                     onDismiss = { quickEditProduct = null }
                 )
             }
+
+            variantPickerProduct?.let { product ->
+                VariantPickerSheet(
+                    product  = product,
+                    variants = state.variantsMap[product.id] ?: emptyList(),
+                    onAddToCart = { variantId, variantName, qty, stock ->
+                        cartVm.addWithQuantity(product, qty, variantId, variantName)
+                        variantPickerProduct = null
+                    },
+                    onDismiss = { variantPickerProduct = null }
+                )
+            }
             when {
                 state.isLoading -> Box(
                     Modifier.fillMaxSize().padding(padding),
@@ -386,15 +401,25 @@ class CategoriesHomeScreen : Screen {
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 row.forEach { product ->
-                                    val cartItem = cartItems.find { it.product.id == product.id }
+                                    val hasVariants = !state.variantsMap[product.id].isNullOrEmpty()
+                                    val totalQty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
                                     Box(modifier = Modifier.weight(1f)) {
                                         com.elmotamyez.gallery.ui.components.ProductCard(
                                             product = product,
-                                            isInCart = cartItem != null,
-                                            quantity = cartItem?.quantity ?: 0,
-                                            onAddToCart = { cartVm.addToCart(product) },
-                                            onIncrease = { cartVm.increaseQuantity(product.id) },
-                                            onDecrease = { cartVm.decreaseQuantity(product.id) },
+                                            isInCart = totalQty > 0,
+                                            quantity = totalQty,
+                                            onAddToCart = {
+                                                if (hasVariants) variantPickerProduct = product
+                                                else cartVm.addToCart(product)
+                                            },
+                                            onIncrease = {
+                                                if (hasVariants) variantPickerProduct = product
+                                                else cartVm.increaseQuantity(product.id)
+                                            },
+                                            onDecrease = {
+                                                if (hasVariants) variantPickerProduct = product
+                                                else cartVm.decreaseQuantity(product.id)
+                                            },
                                             categoryPath = buildProductPath(product, state.categories, state.brands),
                                             onLongClick = { quickEditProduct = product }
                                         )
@@ -464,11 +489,21 @@ class CategoriesHomeScreen : Screen {
                             BestSellersPager(
                                 products = bestSellers,
                                 cartItems = cartItems,
+                                variantsMap = state.variantsMap,
                                 categories = state.categories,
                                 brands = state.brands,
-                                onAddToCart = { cartVm.addToCart(it) },
-                                onIncrease = { cartVm.increaseQuantity(it.id) },
-                                onDecrease = { cartVm.decreaseQuantity(it.id) }
+                                onAddToCart = { product ->
+                                    if (!state.variantsMap[product.id].isNullOrEmpty()) variantPickerProduct = product
+                                    else cartVm.addToCart(product)
+                                },
+                                onIncrease = { product ->
+                                    if (!state.variantsMap[product.id].isNullOrEmpty()) variantPickerProduct = product
+                                    else cartVm.increaseQuantity(product.id)
+                                },
+                                onDecrease = { product ->
+                                    if (!state.variantsMap[product.id].isNullOrEmpty()) variantPickerProduct = product
+                                    else cartVm.decreaseQuantity(product.id)
+                                }
                             )
                         }
                     }
@@ -504,6 +539,7 @@ private fun SectionHeader(title: String, trailing: @Composable (() -> Unit)? = n
 private fun BestSellersPager(
     products: List<Product>,
     cartItems: List<CartItem>,
+    variantsMap: Map<String, List<ProductVariant>>,
     categories: List<com.elmotamyez.gallery.data.model.Category>,
     brands: List<com.elmotamyez.gallery.data.model.Brand>,
     onAddToCart: (Product) -> Unit,
@@ -526,11 +562,11 @@ private fun BestSellersPager(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 pages[pageIndex].forEach { product ->
-                    val cartItem = cartItems.find { it.product.id == product.id }
+                    val totalQty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
                     Box(modifier = Modifier.weight(1f)) {
                         BestSellerCard(
                             product = product,
-                            quantity = cartItem?.quantity ?: 0,
+                            quantity = totalQty,
                             categoryPath = buildProductPath(product, categories, brands),
                             onAddToCart = { onAddToCart(product) },
                             onIncrease = { onIncrease(product) },

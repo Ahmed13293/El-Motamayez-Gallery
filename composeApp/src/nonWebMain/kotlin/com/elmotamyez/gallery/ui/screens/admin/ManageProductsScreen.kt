@@ -42,9 +42,12 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.elmotamyez.gallery.data.model.Product
+import com.elmotamyez.gallery.data.repository.ProductVariantRepository
+import com.elmotamyez.gallery.ui.components.VariantManagementSheet
 import com.elmotamyez.gallery.util.buildBrandPath
 import com.elmotamyez.gallery.util.buildProductPath
 import com.elmotamyez.gallery.util.formatPrice
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 class ManageProductsScreen : Screen {
@@ -54,7 +57,9 @@ class ManageProductsScreen : Screen {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val vm: AdminViewModel = koinViewModel()
+        val variantRepository: ProductVariantRepository = koinInject()
         val state by vm.state.collectAsState()
+        var variantManageProduct by remember { mutableStateOf<Product?>(null) }
 
         var showDialog    by remember { mutableStateOf(false) }
         var editTarget    by remember { mutableStateOf<Product?>(null) }
@@ -355,6 +360,10 @@ class ManageProductsScreen : Screen {
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
                                 }
+                                IconButton(onClick = { variantManageProduct = product }) {
+                                    Icon(Icons.Default.Add, contentDescription = "نوعيات",
+                                        tint = MaterialTheme.colorScheme.tertiary)
+                                }
                                 IconButton(onClick = { openEdit(product) }) {
                                     Icon(Icons.Default.Edit, null,
                                         tint = MaterialTheme.colorScheme.primary)
@@ -654,6 +663,14 @@ class ManageProductsScreen : Screen {
                 dismissButton = {
                     TextButton(onClick = { deleteTarget = null }) { Text("إلغاء") }
                 }
+            )
+        }
+
+        variantManageProduct?.let { product ->
+            VariantManagementSheet(
+                product           = product,
+                variantRepository = variantRepository,
+                onDismiss         = { variantManageProduct = null }
             )
         }
     }

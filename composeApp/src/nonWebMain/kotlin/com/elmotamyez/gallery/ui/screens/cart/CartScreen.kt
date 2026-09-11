@@ -230,6 +230,13 @@ class CartScreen : Screen {
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(item.product.name, fontWeight = FontWeight.Bold)
+                                        if (item.variantName != null) {
+                                            Text(
+                                                item.variantName,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
                                         Text("${item.product.price.formatPrice()} للقطعة",
                                             style = MaterialTheme.typography.bodySmall)
                                         Text("الإجمالي: ${item.totalPrice.formatPrice()}",
@@ -246,7 +253,7 @@ class CartScreen : Screen {
                                                 .height(36.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            IconButton(onClick = { cartVm.decreaseQuantity(item.product.id) },
+                                            IconButton(onClick = { cartVm.decreaseQuantity(item.product.id, item.variantId) },
                                                 modifier = Modifier.size(36.dp)) {
                                                 Icon(Icons.Default.Remove, null, modifier = Modifier.size(16.dp),
                                                     tint = MaterialTheme.colorScheme.primary)
@@ -255,7 +262,7 @@ class CartScreen : Screen {
                                                 textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 28.dp),
                                                 style = MaterialTheme.typography.bodyMedium)
                                             val atLimit = item.quantity >= item.product.stock
-                                            IconButton(onClick = { cartVm.increaseQuantity(item.product.id) },
+                                            IconButton(onClick = { cartVm.increaseQuantity(item.product.id, item.variantId) },
                                                 enabled = !atLimit, modifier = Modifier.size(36.dp)) {
                                                 Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp),
                                                     tint = if (atLimit)
@@ -263,7 +270,7 @@ class CartScreen : Screen {
                                                     else MaterialTheme.colorScheme.primary)
                                             }
                                         }
-                                        IconButton(onClick = { cartVm.removeFromCart(item.product.id) },
+                                        IconButton(onClick = { cartVm.removeFromCart(item.product.id, item.variantId) },
                                             modifier = Modifier.size(36.dp)) {
                                             Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error,
                                                 modifier = Modifier.size(20.dp))

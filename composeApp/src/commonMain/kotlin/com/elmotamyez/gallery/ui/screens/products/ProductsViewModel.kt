@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.elmotamyez.gallery.data.model.Brand
 import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
+import com.elmotamyez.gallery.data.model.ProductVariant
 import com.elmotamyez.gallery.data.repository.ProductRepository
+import com.elmotamyez.gallery.data.repository.ProductVariantRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,17 +17,21 @@ import kotlinx.coroutines.launch
 data class ProductsUiState(
     val categories: List<Category> = emptyList(),
     val brands: List<Brand> = emptyList(),
-    val allProducts: List<Product> = emptyList(),   // full catalogue (for best-sellers)
-    val products: List<Product> = emptyList(),       // filtered view
+    val allProducts: List<Product> = emptyList(),
+    val products: List<Product> = emptyList(),
+    val variantsMap: Map<String, List<ProductVariant>> = emptyMap(), // productId → variants
     val selectedCategoryId: String? = null,
-    val selectedBrandId: String? = null,             // Level 2 selection
-    val selectedSubBrandId: String? = null,          // Level 3 selection
+    val selectedBrandId: String? = null,
+    val selectedSubBrandId: String? = null,
     val searchQuery: String = "",
     val isLoading: Boolean = false,
     val error: String? = null
 )
 
-class ProductsViewModel(private val repository: ProductRepository) : ViewModel() {
+class ProductsViewModel(
+    private val repository: ProductRepository,
+    private val variantRepository: ProductVariantRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProductsUiState())
     val uiState: StateFlow<ProductsUiState> = _uiState.asStateFlow()
@@ -124,10 +130,12 @@ class ProductsViewModel(private val repository: ProductRepository) : ViewModel()
             try {
                 repository.clearCache()
                 allProductsCache = repository.getProducts()
+                val variantsMap  = variantRepository.fetchAll().groupBy { it.productId }
                 val s = _uiState.value
                 _uiState.update {
                     it.copy(
                         allProducts = allProductsCache,
+                        variantsMap = variantsMap,
                         products    = filtered(s.selectedCategoryId, s.selectedBrandId, s.selectedSubBrandId, s.searchQuery)
                     )
                 }
@@ -141,9 +149,10 @@ class ProductsViewModel(private val repository: ProductRepository) : ViewModel()
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val categories = repository.getCategories()
-                val brands     = repository.getBrands()
+                val categories   = repository.getCategories()
+                val brands       = repository.getBrands()
                 allProductsCache = repository.getProducts()
+                val variantsMap  = variantRepository.fetchAll().groupBy { it.productId }
 
                 val firstCatId = categories.firstOrNull()?.id
                 _uiState.update {
@@ -151,6 +160,7 @@ class ProductsViewModel(private val repository: ProductRepository) : ViewModel()
                         categories         = categories,
                         brands             = brands,
                         allProducts        = allProductsCache,
+                        variantsMap        = variantsMap,
                         selectedCategoryId = firstCatId,
                         selectedBrandId    = null,
                         selectedSubBrandId = null,

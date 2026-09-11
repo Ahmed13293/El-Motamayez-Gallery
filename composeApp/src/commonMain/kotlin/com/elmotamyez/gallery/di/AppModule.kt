@@ -8,6 +8,7 @@ import com.elmotamyez.gallery.data.repository.ImageUploadRepository
 import com.elmotamyez.gallery.data.repository.ExpenseRepository
 import com.elmotamyez.gallery.data.repository.OrderRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
+import com.elmotamyez.gallery.data.repository.ProductVariantRepository
 import com.elmotamyez.gallery.data.repository.ReceiptRepository
 import com.elmotamyez.gallery.ui.screens.admin.AdminViewModel
 import com.elmotamyez.gallery.ui.screens.admin.AttendanceViewModel
@@ -18,6 +19,7 @@ import com.elmotamyez.gallery.ui.screens.products.ProductsViewModel
 import com.elmotamyez.gallery.ui.screens.orders.OrderViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import org.koin.core.module.dsl.singleOf
+import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
@@ -26,6 +28,7 @@ val appModule = module {
 
     // Repositories
     single { ProductRepository() }
+    single { ProductVariantRepository() }
     single { ReceiptRepository() }
     single { DailyReconciliationRepository() }
     single { OrderRepository() }
@@ -36,13 +39,13 @@ val appModule = module {
 
     // Singletons — shared state across all tabs
     singleOf(::CartViewModel)
-    singleOf(::ReceiptViewModel)
+    single { ReceiptViewModel(get(), get(), get(), get()) }
     single { OrderViewModel(get(), get(), get()) }
     singleOf(::AuthViewModel)
     singleOf(::ExpenseViewModel)
     singleOf(::AttendanceViewModel)
 
     // Per-screen ViewModels
-    viewModelOf(::ProductsViewModel)
+    viewModel { ProductsViewModel(get(), get()) }
     viewModelOf(::AdminViewModel)
 }
