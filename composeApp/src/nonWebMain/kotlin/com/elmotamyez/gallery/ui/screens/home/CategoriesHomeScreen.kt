@@ -102,6 +102,7 @@ class CategoriesHomeScreen : Screen {
         var showBarcodeScanner  by remember { mutableStateOf(false) }
         var scannedProduct      by remember { mutableStateOf<Product?>(null) }
         var barcodeNotFound     by remember { mutableStateOf(false) }
+        var lastScannedCode     by remember { mutableStateOf("") }
         var quickEditProduct    by remember { mutableStateOf<Product?>(null) }
         var variantPickerProduct by remember { mutableStateOf<Product?>(null) }
         val listState = rememberLazyListState()
@@ -281,7 +282,14 @@ class CategoriesHomeScreen : Screen {
                 BarcodeScannerSheet(
                     onResult = { code ->
                         showBarcodeScanner = false
-                        val found = state.allProducts.firstOrNull { it.barcode == code }
+                        lastScannedCode = code
+                        // Flexible match: exact first, then strip leading zeros from either side
+                        val found = state.allProducts.firstOrNull { p ->
+                            p.barcode != null && (
+                                p.barcode == code ||
+                                p.barcode.trimStart('0') == code.trimStart('0')
+                            )
+                        }
                         if (found != null) scannedProduct = found else barcodeNotFound = true
                     },
                     onDismiss = { showBarcodeScanner = false }
@@ -316,7 +324,20 @@ class CategoriesHomeScreen : Screen {
                 AlertDialog(
                     onDismissRequest = { barcodeNotFound = false },
                     title = { Text("لم يتم العثور على المنتج") },
-                    text  = { Text("لا يوجد منتج مرتبط بهذا الباركود. تأكد من إضافة الباركود للمنتج في إدارة المنتجات.") },
+                    text  = {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("لا يوجد منتج مرتبط بهذا الباركود.")
+                            Text(
+                                "الكود المقروء: $lastScannedCode",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                            Text(
+                                "تأكد أن الباركود المحفوظ في إدارة المنتجات يطابق هذا الكود تماماً.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    },
                     confirmButton = {
                         TextButton(onClick = { barcodeNotFound = false }) { Text("حسناً") }
                     }
