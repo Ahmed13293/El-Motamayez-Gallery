@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -389,7 +390,11 @@ class ManageProductsScreen : Screen {
                 properties = androidx.compose.ui.window.DialogProperties(dismissOnClickOutside = false),
                 title = { Text(if (editTarget == null) "إضافة منتج جديد" else "تعديل المنتج") },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier
+                            .verticalScroll(rememberScrollState())
+                    ) {
                         // Name
                         OutlinedTextField(
                             value = nameField,
