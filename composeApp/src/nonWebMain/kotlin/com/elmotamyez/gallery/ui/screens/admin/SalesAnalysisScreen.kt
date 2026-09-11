@@ -31,14 +31,16 @@ import com.elmotamyez.gallery.data.repository.ProductRepository
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.formatPrice
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.*
 import org.koin.compose.koinInject
 
 // ── Group-by mode ─────────────────────────────────────────────────────────────
 
 private enum class GroupBy { CATEGORY, SUB_CATEGORY, PRODUCT }
+
+// ── Period preset ─────────────────────────────────────────────────────────────
+
+private enum class Preset { ALL, TODAY, WEEK, MONTH, CUSTOM }
 
 // ── Result row ────────────────────────────────────────────────────────────────
 
@@ -54,7 +56,7 @@ private data class SalesRow(
 private fun Long.toIsoDate(): String {
     val instant = Instant.fromEpochMilliseconds(this)
     val date    = instant.toLocalDateTime(TimeZone.currentSystemDefault()).date
-    return date.toString()   // "YYYY-MM-DD"
+    return date.toString()
 }
 
 private fun Long.toArabicDate(): String {
@@ -66,6 +68,21 @@ private fun Long.toArabicDate(): String {
     return "$d/$m/$y"
 }
 
+private fun presetMillis(preset: Preset): Pair<Long?, Long?> {
+    if (preset == Preset.ALL || preset == Preset.CUSTOM) return null to null
+    val tz    = TimeZone.currentSystemDefault()
+    val today = Clock.System.now().toLocalDateTime(tz).date
+    val endMs = LocalDateTime(today, LocalTime(23, 59, 59)).toInstant(tz).toEpochMilliseconds()
+    val startDate = when (preset) {
+        Preset.TODAY -> today
+        Preset.WEEK  -> today.minus(DatePeriod(days = 6))
+        Preset.MONTH -> LocalDate(today.year, today.month, 1)
+        else         -> today
+    }
+    val startMs = LocalDateTime(startDate, LocalTime(0, 0, 0)).toInstant(tz).toEpochMilliseconds()
+    return startMs to endMs
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class SalesAnalysisScreen : Screen {
@@ -75,18 +92,32 @@ class SalesAnalysisScreen : Screen {
     override fun Content() {
         val navigator   = LocalNavigator.currentOrThrow
         val receiptVm   = koinInject<ReceiptViewModel>()
+        val expenseVm   = koinInject<ExpenseViewModel>()
         val productRepo = koinInject<ProductRepository>()
         val scope       = rememberCoroutineScope()
 
         val allReceipts by receiptVm.receipts.collectAsState()
+        val allExpenses by expenseVm.expenses.collectAsState()
 
         // ── Filter state ──────────────────────────────────────────────────────
-        var groupBy          by remember { mutableStateOf(GroupBy.CATEGORY) }
-        var showDatePicker   by remember { mutableStateOf(false) }
+        var groupBy        by remember { mutableStateOf(GroupBy.CATEGORY) }
+        var activePreset   by remember { mutableStateOf(Preset.ALL) }
+        var showDatePicker by remember { mutableStateOf(false) }
 
         val dateRangeState = rememberDateRangePickerState()
-        val fromMillis = dateRangeState.selectedStartDateMillis
-        val toMillis   = dateRangeState.selectedEndDateMillis
+
+        // Resolved millis: presets compute directly; CUSTOM uses date picker state
+        val (fromMillis, toMillis) = remember(activePreset,
+            dateRangeState.selectedStartDateMillis,
+            dateRangeState.selectedEndDateMillis) {
+            if (activePreset == Preset.CUSTOM)
+                dateRangeState.selectedStartDateMillis to dateRangeState.selectedEndDateMillis
+            else
+                presetMillis(activePreset)
+        }
+
+        val fromIso = fromMillis?.toIsoDate()
+        val toIso   = toMillis?.toIsoDate()
 
         // ── Lookup maps ───────────────────────────────────────────────────────
         var categories by remember { mutableStateOf<List<Category>>(emptyList()) }
@@ -101,13 +132,20 @@ class SalesAnalysisScreen : Screen {
             }
         }
 
-        // ── Filter receipts by selected date range ────────────────────────────
-        val fromIso = fromMillis?.toIsoDate()
-        val toIso   = toMillis?.toIsoDate()
-
+        // ── Filter: confirmed receipts only, within date range ────────────────
         val filtered = remember(allReceipts, fromIso, toIso) {
             allReceipts.filter { r ->
+                if (r.isQuotation) return@filter false
                 val d = r.createdAt?.take(10) ?: return@filter true
+                val fromOk = fromIso == null || d >= fromIso
+                val toOk   = toIso   == null || d <= toIso
+                fromOk && toOk
+            }
+        }
+
+        val filteredExpenses = remember(allExpenses, fromIso, toIso) {
+            allExpenses.filter { e ->
+                val d = e.createdAt?.take(10) ?: return@filter true
                 val fromOk = fromIso == null || d >= fromIso
                 val toOk   = toIso   == null || d <= toIso
                 fromOk && toOk
@@ -119,34 +157,36 @@ class SalesAnalysisScreen : Screen {
             aggregate(filtered, groupBy, categories, brands)
         }
 
-        val totalRevenue = rows.sumOf { it.revenue }
+        val totalRevenue  = rows.sumOf { it.revenue }
+        val totalExpenses = filteredExpenses.sumOf { it.amount }
+        val netProfit     = totalRevenue - totalExpenses
+
+        val cashTotal     = filtered.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
+        val transferTotal = filtered.filter { it.paymentMethod == "تحويل" }.sumOf { it.total }
 
         // ── Date range picker dialog ──────────────────────────────────────────
         if (showDatePicker) {
             DatePickerDialog(
                 onDismissRequest = { showDatePicker = false },
                 confirmButton = {
-                    TextButton(onClick = { showDatePicker = false }) {
-                        Text("تأكيد", fontWeight = FontWeight.Bold)
-                    }
+                    TextButton(onClick = {
+                        activePreset = Preset.CUSTOM
+                        showDatePicker = false
+                    }) { Text("تأكيد", fontWeight = FontWeight.Bold) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDatePicker = false }) {
-                        Text("إلغاء")
-                    }
+                    TextButton(onClick = { showDatePicker = false }) { Text("إلغاء") }
                 }
             ) {
                 DateRangePicker(
                     state = dateRangeState,
                     title = { Text("اختر الفترة الزمنية", modifier = Modifier.padding(16.dp)) },
                     headline = {
-                        val from = fromMillis?.toArabicDate() ?: "من"
-                        val to   = toMillis?.toArabicDate()   ?: "إلى"
-                        Text(
-                            "$from  ←  $to",
+                        val from = dateRangeState.selectedStartDateMillis?.toArabicDate() ?: "من"
+                        val to   = dateRangeState.selectedEndDateMillis?.toArabicDate()   ?: "إلى"
+                        Text("$from  ←  $to",
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            fontWeight = FontWeight.SemiBold
-                        )
+                            fontWeight = FontWeight.SemiBold)
                     },
                     modifier = Modifier.heightIn(max = 520.dp)
                 )
@@ -172,55 +212,60 @@ class SalesAnalysisScreen : Screen {
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
 
-                // ── Date range selector ───────────────────────────────────────
+                // ── Period presets ────────────────────────────────────────────
                 item {
                     Text("الفترة الزمنية", style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showDatePicker = true },
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        tonalElevation = 1.dp
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(Icons.Default.CalendarMonth, null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(22.dp))
+                        listOf(
+                            Preset.ALL   to "الكل",
+                            Preset.TODAY to "اليوم",
+                            Preset.WEEK  to "أسبوع",
+                            Preset.MONTH to "الشهر"
+                        ).forEach { (p, label) ->
+                            val selected = activePreset == p
+                            FilterChip(
+                                selected = selected,
+                                onClick  = { activePreset = p },
+                                label    = { Text(label, style = MaterialTheme.typography.labelMedium) }
+                            )
+                        }
+                        // Custom date picker chip
+                        FilterChip(
+                            selected = activePreset == Preset.CUSTOM,
+                            onClick  = { showDatePicker = true },
+                            label    = {
+                                Icon(Icons.Default.CalendarMonth, null,
+                                    modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("تخصيص", style = MaterialTheme.typography.labelMedium)
+                            }
+                        )
+                    }
 
-                            if (fromMillis == null && toMillis == null) {
-                                Text("اختر الفترة الزمنية",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.outline,
-                                    modifier = Modifier.weight(1f))
-                            } else {
-                                val from = fromMillis?.toArabicDate() ?: "—"
-                                val to   = toMillis?.toArabicDate()   ?: "—"
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("$from  ←  $to",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold)
-                                    Text("${filtered.size} فاتورة في هذه الفترة",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.outline)
-                                }
-                                IconButton(
-                                    onClick = {
-                                        dateRangeState.setSelection(null, null)
-                                    },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(Icons.Default.Close, null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.outline)
-                                }
+                    // Show selected custom range label
+                    if (activePreset == Preset.CUSTOM && fromMillis != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                "${fromMillis.toArabicDate()}  ←  ${toMillis?.toArabicDate() ?: "—"}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            IconButton(
+                                onClick = { activePreset = Preset.ALL; dateRangeState.setSelection(null, null) },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(Icons.Default.Close, null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.outline)
                             }
                         }
                     }
@@ -265,36 +310,92 @@ class SalesAnalysisScreen : Screen {
                     }
                 }
 
-                // ── Summary card ──────────────────────────────────────────────
+                // ── Summary cards ─────────────────────────────────────────────
                 item {
+                    // Revenue + expenses + net
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text("إجمالي المبيعات",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                Text("${filtered.size} فاتورة  •  ${rows.size} ${
-                                    when (groupBy) {
-                                        GroupBy.CATEGORY     -> "قسم"
-                                        GroupBy.SUB_CATEGORY -> "فئة"
-                                        GroupBy.PRODUCT      -> "منتج"
-                                    }
-                                }",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                        Column(modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text("إجمالي المبيعات",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    Text("${filtered.size} فاتورة  •  ${rows.size} ${
+                                        when (groupBy) {
+                                            GroupBy.CATEGORY     -> "قسم"
+                                            GroupBy.SUB_CATEGORY -> "فئة"
+                                            GroupBy.PRODUCT      -> "منتج"
+                                        }
+                                    }",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                                }
+                                Text("${totalRevenue.formatPrice()} ج",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.primary)
                             }
-                            Text("${totalRevenue.formatPrice()} ج",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.primary)
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f))
+
+                            // Payment split
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("كاش", style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                                    Text("${cashTotal.formatPrice()} ج",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("تحويل", style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                                    Text("${transferTotal.formatPrice()} ج",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                }
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f))
+
+                            // Expenses & net profit
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text("المصروفات", style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                                    Text("- ${totalExpenses.formatPrice()} ج",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFE53935))
+                                }
+                                Column(horizontalAlignment = Alignment.End,
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text("صافي الربح", style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                                    Text("${netProfit.formatPrice()} ج",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (netProfit >= 0) Color(0xFF2E7D32) else Color(0xFFE53935))
+                                }
+                            }
                         }
                     }
                 }
