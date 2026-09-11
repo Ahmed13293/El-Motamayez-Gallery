@@ -41,11 +41,13 @@ import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Expense
 import com.elmotamyez.gallery.data.model.Product
+import com.elmotamyez.gallery.data.model.ProductVariant
 import com.elmotamyez.gallery.data.model.Receipt
 import com.elmotamyez.gallery.data.model.User
 import com.elmotamyez.gallery.data.model.UserRole
 import com.elmotamyez.gallery.data.repository.ImageUploadRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
+import com.elmotamyez.gallery.data.repository.ProductVariantRepository
 import com.elmotamyez.gallery.ui.screens.admin.AdminViewModel
 import com.elmotamyez.gallery.ui.screens.admin.AttendanceViewModel
 import com.elmotamyez.gallery.ui.screens.admin.ExpenseViewModel
@@ -536,9 +538,11 @@ private fun AdminBrandsSection(brands: List<Brand>, categories: List<Category>, 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun AdminProductsSection(products: List<Product>, categories: List<Category>, brands: List<Brand>, adminVm: AdminViewModel, isMobile: Boolean = false) {
+    val variantRepo: ProductVariantRepository = koinInject()
     var showAdd by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<Product?>(null) }
     var deleteTarget by remember { mutableStateOf<Product?>(null) }
+    var variantTarget by remember { mutableStateOf<Product?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var stockFilter by remember { mutableStateOf("all") }
     var selectedCategoryId by remember { mutableStateOf<String?>(null) }
@@ -713,23 +717,26 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
             items(filtered, key = { it.id }) { product ->
                 val brandName = brands.find { it.id == product.brandId }?.name ?: ""
                 val catName   = categories.find { it.id == product.categoryId }?.name ?: ""
-                CrudItemRow(
-                    title = product.name,
-                    subtitle = buildString {
-                        append("$catName / $brandName")
-                        append(" | السعر: ${product.price.fmt2f()} ج")
-                        if (product.wholesalePrice != null) append(" | الجملة: ${product.wholesalePrice.fmt2f()} ج")
-                        append(" | المخزون: ${product.stock}")
-                    },
-                    subtitleColor = when {
-                        product.stock == 0 -> MaterialTheme.colorScheme.error
-                        product.stock <= 2 -> Color(0xFFE65100)
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    onEdit = { editTarget = product },
-                    onDelete = { deleteTarget = product },
-                    thumbnailUrl = product.displayImages.firstOrNull()
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    CrudItemRow(
+                        title = product.name,
+                        subtitle = buildString {
+                            append("$catName / $brandName")
+                            append(" | السعر: ${product.price.fmt2f()} ج")
+                            if (product.wholesalePrice != null) append(" | الجملة: ${product.wholesalePrice.fmt2f()} ج")
+                            append(" | المخزون: ${product.stock}")
+                        },
+                        subtitleColor = when {
+                            product.stock == 0 -> MaterialTheme.colorScheme.error
+                            product.stock <= 2 -> Color(0xFFE65100)
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        onEdit = { editTarget = product },
+                        onDelete = { deleteTarget = product },
+                        onManageVariants = { variantTarget = product },
+                        thumbnailUrl = product.displayImages.firstOrNull()
+                    )
+                }
             }
         }
     }
@@ -767,6 +774,14 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
             message = "هل تريد حذف المنتج \"${product.name}\"؟",
             onConfirm = { adminVm.deleteProduct(product.id); deleteTarget = null },
             onDismiss = { deleteTarget = null }
+        )
+    }
+
+    variantTarget?.let { product ->
+        VariantManagementDialog(
+            product = product,
+            variantRepo = variantRepo,
+            onDismiss = { variantTarget = null }
         )
     }
 }
@@ -901,7 +916,7 @@ private fun SummaryCard(label: String, value: String, icon: ImageVector, modifie
 // ── Shared CRUD Components ────────────────────────────────────────────────────
 
 @Composable
-private fun CrudItemRow(title: String, subtitle: String, onEdit: () -> Unit, onDelete: () -> Unit, subtitleColor: Color? = null, thumbnailUrl: String? = null) {
+private fun CrudItemRow(title: String, subtitle: String, onEdit: () -> Unit, onDelete: () -> Unit, subtitleColor: Color? = null, thumbnailUrl: String? = null, onManageVariants: (() -> Unit)? = null) {
     Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp), modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             if (thumbnailUrl != null) {
@@ -918,6 +933,11 @@ private fun CrudItemRow(title: String, subtitle: String, onEdit: () -> Unit, onD
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = subtitleColor ?: MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (onManageVariants != null) {
+                    IconButton(onClick = onManageVariants, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Add, contentDescription = "إدارة المتغيرات", tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(18.dp))
+                    }
+                }
                 IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                 }
@@ -927,6 +947,183 @@ private fun CrudItemRow(title: String, subtitle: String, onEdit: () -> Unit, onD
             }
         }
     }
+}
+
+// ── Variant Management Dialog ─────────────────────────────────────────────────
+
+@Composable
+private fun VariantManagementDialog(
+    product: Product,
+    variantRepo: ProductVariantRepository,
+    onDismiss: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var variants by remember { mutableStateOf<List<ProductVariant>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMsg  by remember { mutableStateOf<String?>(null) }
+
+    // New variant fields
+    var newName  by remember { mutableStateOf("") }
+    var newStock by remember { mutableStateOf("") }
+
+    // Inline edit state: variantId → Pair(editName, editStock)
+    var editingId    by remember { mutableStateOf<String?>(null) }
+    var editName     by remember { mutableStateOf("") }
+    var editStockStr by remember { mutableStateOf("") }
+
+    fun reload() {
+        scope.launch {
+            isLoading = true
+            errorMsg = null
+            runCatching { variants = variantRepo.fetchForProduct(product.id) }
+                .onFailure { errorMsg = it.message }
+            isLoading = false
+        }
+    }
+
+    LaunchedEffect(product.id) { reload() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("متغيرات: ${product.name}", fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()).heightIn(max = 480.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                errorMsg?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                if (isLoading) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    }
+                } else if (variants.isEmpty()) {
+                    Text("لا توجد متغيرات بعد", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    variants.forEach { variant ->
+                        if (editingId == variant.id) {
+                            // Inline edit row
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = editName, onValueChange = { editName = it },
+                                    label = { Text("الاسم") }, singleLine = true,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                OutlinedTextField(
+                                    value = editStockStr, onValueChange = { editStockStr = it.filter { c -> c.isDigit() } },
+                                    label = { Text("المخزون") }, singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.width(80.dp),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                IconButton(onClick = {
+                                    val s = editStockStr.toIntOrNull() ?: return@IconButton
+                                    scope.launch {
+                                        runCatching { variantRepo.update(variant.id, editName, s) }
+                                        reload()
+                                    }
+                                    editingId = null
+                                }, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                }
+                                IconButton(onClick = { editingId = null }, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        } else {
+                            // Display row
+                            Card(
+                                shape = RoundedCornerShape(8.dp),
+                                elevation = CardDefaults.cardElevation(1.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(variant.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                        Text("مخزون: ${variant.stock}", style = MaterialTheme.typography.labelSmall,
+                                            color = if (variant.stock == 0) MaterialTheme.colorScheme.error
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+                                        IconButton(onClick = {
+                                            editingId = variant.id
+                                            editName = variant.name
+                                            editStockStr = variant.stock.toString()
+                                        }, modifier = Modifier.size(32.dp)) {
+                                            Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                        }
+                                        IconButton(onClick = {
+                                            scope.launch {
+                                                runCatching { variantRepo.delete(variant.id) }
+                                                reload()
+                                            }
+                                        }, modifier = Modifier.size(32.dp)) {
+                                            Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider()
+                Text("إضافة متغير جديد", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = newName, onValueChange = { newName = it },
+                        label = { Text("الاسم") }, singleLine = true,
+                        modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)
+                    )
+                    OutlinedTextField(
+                        value = newStock, onValueChange = { newStock = it.filter { c -> c.isDigit() } },
+                        label = { Text("المخزون") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.width(80.dp), shape = RoundedCornerShape(8.dp)
+                    )
+                    IconButton(
+                        onClick = {
+                            val s = newStock.toIntOrNull() ?: 0
+                            if (newName.isNotBlank()) {
+                                scope.launch {
+                                    runCatching { variantRepo.insert(product.id, newName.trim(), s) }
+                                    newName = ""; newStock = ""
+                                    reload()
+                                }
+                            }
+                        },
+                        enabled = newName.isNotBlank(),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("إغلاق") }
+        },
+        shape = RoundedCornerShape(16.dp)
+    )
 }
 
 @Composable

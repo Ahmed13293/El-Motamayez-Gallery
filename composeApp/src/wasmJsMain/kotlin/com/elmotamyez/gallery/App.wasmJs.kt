@@ -115,6 +115,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.DailyReconciliation
+import com.elmotamyez.gallery.data.model.ProductVariant
 import com.elmotamyez.gallery.data.model.Order
 import com.elmotamyez.gallery.data.model.OrderStatus
 import com.elmotamyez.gallery.data.model.Product
@@ -303,6 +304,7 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
     var currentTab by remember { mutableStateOf(WebTab.HOME) }
     val cartVm: CartViewModel = koinInject()
     val orderVm: OrderViewModel = koinInject()
+    val receiptVm: ReceiptViewModel = koinInject()
 
     // Poll for navigation requests from service worker or URL param
     LaunchedEffect(Unit) {
@@ -344,6 +346,8 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
 
     val cartItems     by cartVm.cartItems.collectAsState()
     val pendingOrders by orderVm.pendingCount.collectAsState()
+    val receipts      by receiptVm.receipts.collectAsState()
+    val pendingQuotationsCount = receipts.count { it.isQuotation }
     val isAdmin = user.role == UserRole.ADMIN
 
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -471,7 +475,11 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                     Tab(
                         selected = currentTab == WebTab.RECEIPTS,
                         onClick = { currentTab = WebTab.RECEIPTS },
-                        icon = { Icon(Icons.Default.Receipt, null, modifier = Modifier.size(20.dp)) },
+                        icon = {
+                            BadgedBox(badge = { if (pendingQuotationsCount > 0) Badge { Text("$pendingQuotationsCount") } }) {
+                                Icon(Icons.Default.Receipt, null, modifier = Modifier.size(20.dp))
+                            }
+                        },
                         text = { Text("الفواتير") }
                     )
                     if (isAdmin) {
@@ -541,7 +549,11 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                     NavigationBarItem(
                         selected = currentTab == WebTab.RECEIPTS,
                         onClick  = { currentTab = WebTab.RECEIPTS },
-                        icon     = { Icon(Icons.Default.Receipt, null) },
+                        icon = {
+                            BadgedBox(badge = { if (pendingQuotationsCount > 0) Badge { Text("$pendingQuotationsCount") } }) {
+                                Icon(Icons.Default.Receipt, null)
+                            }
+                        },
                         label    = { Text("الفواتير", fontSize = 11.sp) }
                     )
                     if (isAdmin) {
@@ -739,12 +751,18 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                         ) {
                             items(state.products) { product ->
-                                val qty = cartItems.find { it.product.id == product.id }?.quantity ?: 0
+                                val qty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
+                                val variants = state.variantsMap[product.id] ?: emptyList()
                                 WebProductCard(
                                     product = product,
                                     quantity = qty,
+                                    variants = variants,
                                     isMobile = true,
                                     onAdd = { focusManager.clearFocus(); cartVm.addToCart(product) },
+                                    onAddVariant = { variantId, variantName, variantQty ->
+                                        focusManager.clearFocus()
+                                        cartVm.addWithQuantity(product, variantQty, variantId, variantName)
+                                    },
                                     onIncrease = { focusManager.clearFocus(); cartVm.increaseQuantity(product.id) },
                                     onDecrease = { focusManager.clearFocus(); cartVm.decreaseQuantity(product.id) })
                             }
@@ -905,12 +923,17 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                 contentPadding = PaddingValues(bottom = 16.dp)
                             ) {
                                 items(state.products) { product ->
-                                    val qty = cartItems.find { it.product.id == product.id }?.quantity ?: 0
+                                    val qty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
+                                    val variants = state.variantsMap[product.id] ?: emptyList()
                                     WebProductCard(
                                         product = product,
                                         quantity = qty,
+                                        variants = variants,
                                         isMobile = false,
                                         onAdd = { cartVm.addToCart(product) },
+                                        onAddVariant = { variantId, variantName, variantQty ->
+                                            cartVm.addWithQuantity(product, variantQty, variantId, variantName)
+                                        },
                                         onIncrease = { cartVm.increaseQuantity(product.id) },
                                         onDecrease = { cartVm.decreaseQuantity(product.id) })
                                 }
@@ -959,14 +982,30 @@ private fun WebBrandCircle(name: String, onClick: () -> Unit) {
 private fun WebProductCard(
     product: Product,
     quantity: Int,
+    variants: List<ProductVariant> = emptyList(),
     isMobile: Boolean = false,
     onAdd: () -> Unit,
+    onAddVariant: (variantId: String, variantName: String, qty: Int) -> Unit = { _, _, _ -> },
     onIncrease: () -> Unit,
     onDecrease: () -> Unit
 ) {
-    val outOfStock = product.stock == 0
+    val outOfStock = product.stock == 0 && variants.all { it.stock == 0 }
+    val hasVariants = variants.isNotEmpty()
     val inCart = quantity > 0
     var lightboxIndex by remember { mutableStateOf(-1) }
+    var showVariantPicker by remember { mutableStateOf(false) }
+
+    if (showVariantPicker) {
+        VariantPickerDialog(
+            product = product,
+            variants = variants,
+            onDismiss = { showVariantPicker = false },
+            onConfirm = { variantId, variantName, qty ->
+                onAddVariant(variantId, variantName, qty)
+                showVariantPicker = false
+            }
+        )
+    }
 
     if (lightboxIndex >= 0 && product.displayImages.isNotEmpty()) {
         ImageLightboxDialog(
@@ -1026,13 +1065,22 @@ private fun WebProductCard(
             }
             if (!inCart) {
                 Button(
-                    onClick = onAdd,
+                    onClick = { if (hasVariants) showVariantPicker = true else onAdd() },
                     enabled = !outOfStock,
                     modifier = Modifier.fillMaxWidth().height(36.dp),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(0.dp)
                 ) {
-                    Text(if (outOfStock) "نفد" else "+ إضافة للسلة", fontSize = 13.sp)
+                    Text(if (outOfStock) "نفد" else if (hasVariants) "اختر مقاس / لون" else "+ إضافة للسلة", fontSize = 13.sp)
+                }
+            } else if (hasVariants) {
+                Button(
+                    onClick = { showVariantPicker = true },
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text("في السلة ($quantity) • إضافة مزيد", fontSize = 12.sp)
                 }
             } else {
                 Row(
@@ -1218,6 +1266,128 @@ private fun OtherProductDialog(
     )
 }
 
+// ── Variant Picker Dialog ─────────────────────────────────────────────────────
+
+@Composable
+private fun VariantPickerDialog(
+    product: Product,
+    variants: List<ProductVariant>,
+    onDismiss: () -> Unit,
+    onConfirm: (variantId: String, variantName: String, qty: Int) -> Unit
+) {
+    var selectedVariant by remember { mutableStateOf<ProductVariant?>(null) }
+    var qty by remember { mutableStateOf(1) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(product.name, fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("اختر المقاس / اللون:", style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                variants.forEach { variant ->
+                    val isSelected = selectedVariant?.id == variant.id
+                    val outOfStock = variant.stock == 0
+                    Surface(
+                        onClick = { if (!outOfStock) { selectedVariant = variant; qty = 1 } },
+                        shape = RoundedCornerShape(10.dp),
+                        color = when {
+                            isSelected -> MaterialTheme.colorScheme.primaryContainer
+                            outOfStock -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                variant.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (outOfStock) MaterialTheme.colorScheme.outline
+                                        else if (isSelected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                if (outOfStock) "نفد" else "متوفر ${variant.stock}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (outOfStock) MaterialTheme.colorScheme.error
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                if (selectedVariant != null) {
+                    HorizontalDivider()
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("الكمية", style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                Modifier.size(32.dp).clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .clickable { if (qty > 1) qty-- },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("−", color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            }
+                            Text("$qty", style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp),
+                                textAlign = TextAlign.Center)
+                            Box(
+                                Modifier.size(32.dp).clip(CircleShape).background(
+                                    if (qty >= (selectedVariant?.stock ?: 0))
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                    else MaterialTheme.colorScheme.primaryContainer
+                                ).clickable(enabled = qty < (selectedVariant?.stock ?: 0)) { qty++ },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("+", color = if (qty >= (selectedVariant?.stock ?: 0))
+                                    MaterialTheme.colorScheme.outline
+                                    else MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val v = selectedVariant
+                    if (v != null) onConfirm(v.id, v.name, qty)
+                },
+                enabled = selectedVariant != null && qty > 0,
+                shape = RoundedCornerShape(10.dp)
+            ) { Text("إضافة للسلة", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("إلغاء") }
+        },
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
 // ── Cart Tab ──────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1343,9 +1513,9 @@ private fun WebCartTab(
                 WebCartItemRow(
                     item = item,
                     isMobile = true,
-                    onIncrease = { cartVm.increaseQuantity(item.product.id) },
-                    onDecrease = { cartVm.decreaseQuantity(item.product.id) },
-                    onRemove = { cartVm.removeFromCart(item.product.id) })
+                    onIncrease = { cartVm.increaseQuantity(item.product.id, item.variantId) },
+                    onDecrease = { cartVm.decreaseQuantity(item.product.id, item.variantId) },
+                    onRemove = { cartVm.removeFromCart(item.product.id, item.variantId) })
             }
             item {
                 Card(
@@ -1498,9 +1668,9 @@ private fun WebCartTab(
                 items(cartItems) { item ->
                     WebCartItemRow(
                         item = item,
-                        onIncrease = { cartVm.increaseQuantity(item.product.id) },
-                        onDecrease = { cartVm.decreaseQuantity(item.product.id) },
-                        onRemove = { cartVm.removeFromCart(item.product.id) })
+                        onIncrease = { cartVm.increaseQuantity(item.product.id, item.variantId) },
+                        onDecrease = { cartVm.decreaseQuantity(item.product.id, item.variantId) },
+                        onRemove = { cartVm.removeFromCart(item.product.id, item.variantId) })
                 }
             }
             Card(
@@ -1728,14 +1898,22 @@ private fun WebCartItemRow(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        item.product.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            item.product.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (!item.variantName.isNullOrBlank()) {
+                            Text(
+                                item.variantName,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     IconButton(onClick = onRemove, modifier = Modifier.size(30.dp)) {
                         Icon(
                             Icons.Default.Close,
@@ -1804,6 +1982,13 @@ private fun WebCartItemRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (!item.variantName.isNullOrBlank()) {
+                        Text(
+                            item.variantName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     Text(
                         "${item.product.price.fmt2f()} ج للقطعة",
                         style = MaterialTheme.typography.bodySmall,
