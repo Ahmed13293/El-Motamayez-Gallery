@@ -16,9 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import com.elmotamyez.gallery.NavigationController
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -105,9 +103,7 @@ class MainScreen : Screen {
 
         val isAdmin = authState.user?.role == UserRole.ADMIN
 
-        // Track how many receipts were visible when user last opened the receipts tab
-        var seenReceiptsCount by remember { mutableIntStateOf(receipts.size) }
-        val newReceiptsCount = (receipts.size - seenReceiptsCount).coerceAtLeast(0)
+        val pendingQuotationsCount = receipts.count { it.isQuotation }
 
         TabNavigator(CategoriesTab) { tabNavigator ->
             val navController: NavigationController = koinInject()
@@ -128,8 +124,7 @@ class MainScreen : Screen {
                         NavItem(CartTab,       Icons.Default.ShoppingCart, tabNavigator,
                                 badgeCount = cartItems.size)
                         NavItem(ReceiptsTab,   Icons.Default.Receipt,    tabNavigator,
-                                badgeCount = newReceiptsCount,
-                                onSelected = { seenReceiptsCount = receipts.size })
+                                badgeCount = pendingQuotationsCount)
                         NavItem(OrdersTab, Icons.AutoMirrored.Filled.ListAlt, tabNavigator, badgeCount = pendingOrders)
                         if (isAdmin) {
                             NavItem(AdminTab, Icons.Default.Person, tabNavigator)
