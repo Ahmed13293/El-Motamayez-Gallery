@@ -100,6 +100,7 @@ class CategoriesHomeScreen : Screen {
         var showBarcodeScanner  by remember { mutableStateOf(false) }
         var scannedProduct      by remember { mutableStateOf<Product?>(null) }
         var barcodeNotFound     by remember { mutableStateOf(false) }
+        var quickEditProduct    by remember { mutableStateOf<Product?>(null) }
         val listState = rememberLazyListState()
         val keyboard = LocalSoftwareKeyboardController.current
 
@@ -318,6 +319,17 @@ class CategoriesHomeScreen : Screen {
                     }
                 )
             }
+
+            quickEditProduct?.let { product ->
+                com.elmotamyez.gallery.ui.components.QuickEditProductSheet(
+                    product  = product,
+                    onSave   = { price, ws, stock ->
+                        vm.quickEditProduct(product, price, ws, stock)
+                        quickEditProduct = null
+                    },
+                    onDismiss = { quickEditProduct = null }
+                )
+            }
             when {
                 state.isLoading -> Box(
                     Modifier.fillMaxSize().padding(padding),
@@ -383,7 +395,8 @@ class CategoriesHomeScreen : Screen {
                                             onAddToCart = { cartVm.addToCart(product) },
                                             onIncrease = { cartVm.increaseQuantity(product.id) },
                                             onDecrease = { cartVm.decreaseQuantity(product.id) },
-                                            categoryPath = buildProductPath(product, state.categories, state.brands)
+                                            categoryPath = buildProductPath(product, state.categories, state.brands),
+                                            onLongClick = { quickEditProduct = product }
                                         )
                                     }
                                 }

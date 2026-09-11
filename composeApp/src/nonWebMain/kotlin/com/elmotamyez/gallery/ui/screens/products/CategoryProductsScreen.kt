@@ -49,6 +49,7 @@ data class CategoryProductsScreen(
         val state by vm.uiState.collectAsState()
         val cartItems by cartVm.cartItems.collectAsState()
         val keyboard = LocalSoftwareKeyboardController.current
+        var quickEditProduct by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Product?>(null) }
 
         // Select this category on first composition
         LaunchedEffect(categoryId) {
@@ -235,11 +236,23 @@ data class CategoryProductsScreen(
                             onAddToCart = { cartVm.addToCart(product) },
                             onIncrease = { cartVm.increaseQuantity(product.id) },
                             onDecrease = { cartVm.decreaseQuantity(product.id) },
-                            categoryPath = buildProductPath(product, state.categories, state.brands)
+                            categoryPath = buildProductPath(product, state.categories, state.brands),
+                            onLongClick = { quickEditProduct = product }
                         )
                     }
                 }
             }
+        }
+
+        quickEditProduct?.let { product ->
+            com.elmotamyez.gallery.ui.components.QuickEditProductSheet(
+                product   = product,
+                onSave    = { price, ws, stock ->
+                    vm.quickEditProduct(product, price, ws, stock)
+                    quickEditProduct = null
+                },
+                onDismiss = { quickEditProduct = null }
+            )
         }
     }
 }

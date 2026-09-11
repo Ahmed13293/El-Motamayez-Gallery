@@ -7,7 +7,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -280,6 +282,7 @@ fun ImageLightboxDialog(
 // ── ProductCard ───────────────────────────────────────────────────────────────
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun ProductCard(
     product: Product,
     isInCart: Boolean,
@@ -288,7 +291,8 @@ fun ProductCard(
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
     modifier: Modifier = Modifier,
-    categoryPath: String = ""   // e.g. "أدوات مكتبية › أقلام" or "cat › parent › sub"
+    categoryPath: String = "",
+    onLongClick: (() -> Unit)? = null
 ) {
     val stockSt = stockState(product.stock)
     var lightboxIndex by remember { mutableStateOf(-1) }
@@ -309,6 +313,11 @@ fun ProductCard(
                 shape = RoundedCornerShape(12.dp),
                 ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.07f),
                 spotColor   = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+            )
+            .then(
+                if (onLongClick != null)
+                    Modifier.combinedClickable(onClick = {}, onLongClick = onLongClick)
+                else Modifier
             ),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),

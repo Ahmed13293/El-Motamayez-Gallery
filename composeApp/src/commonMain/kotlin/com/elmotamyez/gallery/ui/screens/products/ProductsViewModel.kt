@@ -100,6 +100,25 @@ class ProductsViewModel(private val repository: ProductRepository) : ViewModel()
 
     fun retry() = loadData()
 
+    fun quickEditProduct(product: Product, newPrice: Double, newWholesalePrice: Double?, newStock: Int) {
+        viewModelScope.launch {
+            runCatching {
+                repository.updateProduct(
+                    id             = product.id,
+                    name           = product.name,
+                    price          = newPrice,
+                    wholesalePrice = newWholesalePrice,
+                    stock          = newStock,
+                    brandId        = product.brandId,
+                    categoryId     = product.categoryId,
+                    imageUrls      = product.displayImages,
+                    barcode        = product.barcode
+                )
+            }
+            refreshProducts()
+        }
+    }
+
     fun refreshProducts() {
         viewModelScope.launch {
             try {
