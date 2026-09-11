@@ -282,13 +282,13 @@ class CategoriesHomeScreen : Screen {
                 BarcodeScannerSheet(
                     onResult = { code ->
                         showBarcodeScanner = false
-                        lastScannedCode = code
-                        // Flexible match: exact first, then strip leading zeros from either side
+                        // Flexible match: trim whitespace, then exact, then strip leading zeros
+                        val trimmedCode = code.trim()
+                        lastScannedCode = trimmedCode
                         val found = state.allProducts.firstOrNull { p ->
-                            p.barcode != null && (
-                                p.barcode == code ||
-                                p.barcode.trimStart('0') == code.trimStart('0')
-                            )
+                            val stored = p.barcode?.trim() ?: return@firstOrNull false
+                            stored == trimmedCode ||
+                            stored.trimStart('0') == trimmedCode.trimStart('0')
                         }
                         if (found != null) scannedProduct = found else barcodeNotFound = true
                     },
