@@ -297,27 +297,94 @@ class CategoriesHomeScreen : Screen {
             }
 
             scannedProduct?.let { product ->
-                AlertDialog(
-                    onDismissRequest = { scannedProduct = null },
-                    title = { Text(product.name, fontWeight = FontWeight.Bold) },
-                    text  = {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("السعر: ${product.price.formatPrice()} ج",
-                                style = MaterialTheme.typography.bodyMedium)
-                            Text("المخزون: ${product.stock}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline)
+                val variants = state.variantsMap[product.id] ?: emptyList()
+                if (variants.isNotEmpty()) {
+                    // Has variants — use the existing variant picker
+                    VariantPickerSheet(
+                        product  = product,
+                        variants = variants,
+                        onAddToCart = { variantId, variantName, qty, variantStock ->
+                            cartVm.addWithQuantity(product, qty, variantId, variantName)
+                            scannedProduct = null
+                        },
+                        onDismiss = { scannedProduct = null }
+                    )
+                } else {
+                    // No variants — show image + quantity picker dialog
+                    var scanQty by remember { mutableIntStateOf(1) }
+                    val maxStock = product.stock
+                    AlertDialog(
+                        onDismissRequest = { scannedProduct = null },
+                        title = {
+                            Text(product.name, fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium)
+                        },
+                        text = {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                // Product image
+                                val imageUrl = product.displayImages.firstOrNull()
+                                if (imageUrl != null) {
+                                    AsyncImage(
+                                        model = imageUrl,
+                                        contentDescription = product.name,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(160.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                    )
+                                }
+                                // Price + stock
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("السعر: ${product.price.formatPrice()} ج",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold)
+                                    Text("المخزون: $maxStock",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline)
+                                }
+                                // Quantity stepper
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    FilledIconButton(
+                                        onClick = { if (scanQty > 1) scanQty-- },
+                                        enabled = scanQty > 1,
+                                        modifier = Modifier.size(36.dp)
+                                    ) { Text("-", style = MaterialTheme.typography.titleMedium) }
+                                    Text(
+                                        "$scanQty",
+                                        modifier = Modifier.padding(horizontal = 20.dp),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    FilledIconButton(
+                                        onClick = { if (scanQty < maxStock) scanQty++ },
+                                        enabled = scanQty < maxStock,
+                                        modifier = Modifier.size(36.dp)
+                                    ) { Text("+", style = MaterialTheme.typography.titleMedium) }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                cartVm.addWithQuantity(product, scanQty)
+                                scannedProduct = null
+                            }) { Text("إضافة للسلة") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { scannedProduct = null }) { Text("إغلاق") }
                         }
-                    },
-                    confirmButton = {
-                        Button(onClick = { cartVm.addToCart(product); scannedProduct = null }) {
-                            Text("إضافة للسلة")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { scannedProduct = null }) { Text("إغلاق") }
-                    }
-                )
+                    )
+                }
             }
 
             if (barcodeNotFound) {
