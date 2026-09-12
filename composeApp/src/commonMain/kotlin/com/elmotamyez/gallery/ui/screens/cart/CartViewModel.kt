@@ -130,6 +130,12 @@ class CartViewModel : ViewModel() {
         persist()
     }
 
+    /** Replaces the active cart slot with the items from a previous receipt. */
+    fun replicateFromReceipt(items: List<CartItem>) {
+        _cartItems.value = items.map { it.copy() }
+        persist()
+    }
+
     private fun persist() {
         val idx = _activeSlotIndex.value
         persistSlot(idx, _cartItems.value)

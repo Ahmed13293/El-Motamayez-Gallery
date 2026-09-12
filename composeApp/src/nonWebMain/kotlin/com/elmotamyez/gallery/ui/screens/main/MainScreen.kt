@@ -110,10 +110,9 @@ class MainScreen : Screen {
             val pendingTab by navController.pendingTab.collectAsState()
 
             LaunchedEffect(pendingTab) {
-                if (pendingTab == "orders") {
-                    tabNavigator.current = OrdersTab
-                    navController.consume()
-                    orderVm.loadOrders()
+                when (pendingTab) {
+                    "orders" -> { tabNavigator.current = OrdersTab; navController.consume(); orderVm.loadOrders() }
+                    "cart"   -> { tabNavigator.current = CartTab;   navController.consume() }
                 }
             }
 

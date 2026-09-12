@@ -28,11 +28,13 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import androidx.compose.ui.graphics.Color
+import com.elmotamyez.gallery.NavigationController
 import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.model.UserRole
 import com.elmotamyez.gallery.ui.components.GradientDivider
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
+import com.elmotamyez.gallery.ui.screens.cart.CartViewModel
 import com.elmotamyez.gallery.util.exportReceiptToPdf
 import com.elmotamyez.gallery.util.formatPrice
 import com.elmotamyez.gallery.util.twoDigit
@@ -47,6 +49,8 @@ class ReceiptScreen : Screen {
         val navigator  = LocalNavigator.currentOrThrow
         val vm: ReceiptViewModel = koinInject()
         val authVm: AuthViewModel = koinInject()
+        val cartVm: CartViewModel = koinInject()
+        val navController: NavigationController = koinInject()
 
         val receipt        by vm.currentReceipt.collectAsState()
         val isSaving       by vm.isSaving.collectAsState()
@@ -117,6 +121,16 @@ class ReceiptScreen : Screen {
                                         tint = MaterialTheme.colorScheme.error
                                     )
                                 }
+                            }
+                            TextButton(onClick = {
+                                receipt?.let {
+                                    cartVm.replicateFromReceipt(it.items)
+                                    navController.navigateTo("cart")
+                                    navigator.popUntilRoot()
+                                }
+                            }) {
+                                Text("تكرار", style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.tertiary)
                             }
                             TextButton(onClick = {
                                 receipt?.let { exportReceiptToPdf(it, "${it.id}.pdf", it.isQuotation) }
