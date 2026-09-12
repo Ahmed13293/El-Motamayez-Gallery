@@ -242,7 +242,7 @@ class CartScreen : Screen {
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(cartItems, key = { it.product.id }) { item ->
+                        items(cartItems, key = { it.cartKey }) { item ->
                             Card(elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -565,7 +565,7 @@ class CartScreen : Screen {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(signedInUsers) { name ->
+                            items(signedInUsers, key = { it }) { name ->
                                 FilterChip(
                                     selected = assignedUsername == name,
                                     onClick  = { assignedUsername = name },
