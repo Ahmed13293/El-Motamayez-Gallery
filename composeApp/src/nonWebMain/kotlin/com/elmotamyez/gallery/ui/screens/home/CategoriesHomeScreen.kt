@@ -308,7 +308,7 @@ class CategoriesHomeScreen : Screen {
                             scannedProduct = found
                         } else {
                             // Refresh in case barcode was added after this screen last loaded
-                            productsVm.refreshProducts()
+                            vm.refreshProducts()
                             barcodeNotFound = true
                         }
                     },
