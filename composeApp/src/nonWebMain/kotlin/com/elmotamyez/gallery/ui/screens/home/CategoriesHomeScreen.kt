@@ -112,6 +112,20 @@ class CategoriesHomeScreen : Screen {
         val state by vm.uiState.collectAsState()
         val cartItems by cartVm.cartItems.collectAsState()
         val receipts by receiptVm.receipts.collectAsState()
+
+        // Auto-retry barcode lookup after products refresh
+        LaunchedEffect(state.allProducts) {
+            if (barcodeNotFound && lastScannedCode.isNotEmpty()) {
+                val retried = state.allProducts.firstOrNull { p ->
+                    val stored = p.barcode?.normalizeBarcode() ?: return@firstOrNull false
+                    stored == lastScannedCode || stored.trimStart('0') == lastScannedCode.trimStart('0')
+                }
+                if (retried != null) {
+                    barcodeNotFound = false
+                    scannedProduct = retried
+                }
+            }
+        }
         val stockVersion by receiptVm.stockVersion.collectAsState()
 
         // Refresh products whenever stock is updated after a confirmed order
@@ -290,7 +304,13 @@ class CategoriesHomeScreen : Screen {
                             stored == trimmedCode ||
                             stored.trimStart('0') == trimmedCode.trimStart('0')
                         }
-                        if (found != null) scannedProduct = found else barcodeNotFound = true
+                        if (found != null) {
+                            scannedProduct = found
+                        } else {
+                            // Refresh in case barcode was added after this screen last loaded
+                            productsVm.refreshProducts()
+                            barcodeNotFound = true
+                        }
                     },
                     onDismiss = { showBarcodeScanner = false }
                 )
@@ -407,6 +427,12 @@ class CategoriesHomeScreen : Screen {
                     },
                     confirmButton = {
                         TextButton(onClick = { barcodeNotFound = false }) { Text("حسناً") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            barcodeNotFound = false
+                            showBarcodeScanner = true
+                        }) { Text("إعادة المسح") }
                     }
                 )
             }
