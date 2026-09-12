@@ -96,6 +96,13 @@ class AttendanceRepository {
         supabaseClient.from("attendance").delete { filter { eq("id", id) } }
     }
 
+    /** Returns employees currently signed in (check_out IS NULL). */
+    suspend fun getSignedIn(): List<Attendance> =
+        supabaseClient.from("attendance")
+            .select { filter { filter("check_out", FilterOperator.IS, null) } }
+            .decodeList<AttendanceRow>()
+            .map { it.toDomain() }
+
     suspend fun getAll(): List<Attendance> =
         supabaseClient.from("attendance")
             .select { order("check_in", SbOrder.DESCENDING) }

@@ -5,7 +5,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -28,11 +30,13 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.elmotamyez.gallery.data.model.UserRole
+import com.elmotamyez.gallery.data.repository.AttendanceRepository
 import com.elmotamyez.gallery.ui.screens.auth.AuthViewModel
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptScreen
 import com.elmotamyez.gallery.ui.screens.receipt.ReceiptViewModel
 import com.elmotamyez.gallery.util.formatPrice
 import com.elmotamyez.gallery.util.twoDigit
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -48,10 +52,11 @@ class CartScreen : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
-        val navigator   = LocalNavigator.currentOrThrow
-        val cartVm      = koinInject<CartViewModel>()
-        val receiptVm   = koinInject<ReceiptViewModel>()
-        val authVm      = koinInject<AuthViewModel>()
+        val navigator        = LocalNavigator.currentOrThrow
+        val cartVm           = koinInject<CartViewModel>()
+        val receiptVm        = koinInject<ReceiptViewModel>()
+        val authVm           = koinInject<AuthViewModel>()
+        val attendanceRepo   = koinInject<AttendanceRepository>()
         val currentUser by authVm.uiState.collectAsState()
         val cartItems       by cartVm.cartItems.collectAsState()
         val activeSlot      by cartVm.activeSlotIndex.collectAsState()
@@ -84,6 +89,22 @@ class CartScreen : Screen {
         var showDatePicker by remember { mutableStateOf(false) }
         var showCheckoutSheet   by remember { mutableStateOf(false) }
         var showClearDialog     by remember { mutableStateOf(false) }
+
+        // Signed-in employees — loaded for admin to assign receipt
+        val scope = rememberCoroutineScope()
+        var signedInUsers by remember { mutableStateOf<List<String>>(emptyList()) }
+        var assignedUsername by remember { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(isAdmin, showCheckoutSheet) {
+            if (isAdmin && showCheckoutSheet) {
+                scope.launch {
+                    val names = runCatching { attendanceRepo.getSignedIn().map { it.userName } }
+                        .getOrDefault(emptyList())
+                    signedInUsers = names
+                    if (assignedUsername == null && names.isNotEmpty()) assignedUsername = names.first()
+                }
+            }
+        }
 
         val overrideDateLabel = overrideDate?.let { (y, m, d) ->
             "${twoDigit(d)}/${twoDigit(m)}/$y"
@@ -535,6 +556,25 @@ class CartScreen : Screen {
                         }
                     }
 
+                    // ── Assign to employee (admin only) ──────────────────────
+                    if (isAdmin && signedInUsers.isNotEmpty()) {
+                        Text(
+                            "تعيين الفاتورة لـ:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(signedInUsers) { name ->
+                                FilterChip(
+                                    selected = assignedUsername == name,
+                                    onClick  = { assignedUsername = name },
+                                    label    = { Text(name) }
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(Modifier.height(4.dp))
 
                     // ── Action buttons ────────────────────────────────────────
@@ -548,7 +588,7 @@ class CartScreen : Screen {
                                     paymentMethod = selectedMethod.label,
                                     customerPhone = customerPhone,
                                     customerInfo  = customerInfo,
-                                    username      = currentUser.user?.username,
+                                    username      = assignedUsername?.takeIf { isAdmin && it.isNotBlank() } ?: currentUser.user?.username,
                                     overrideDate  = overrideDate
                                 )
                             }
@@ -575,7 +615,7 @@ class CartScreen : Screen {
                                     paymentMethod = selectedMethod.label,
                                     customerPhone = customerPhone.takeIf { it.isNotBlank() },
                                     customerInfo  = customerInfo.takeIf  { it.isNotBlank() },
-                                    username      = currentUser.user?.username
+                                    username      = assignedUsername?.takeIf { isAdmin && it.isNotBlank() } ?: currentUser.user?.username
                                 )
                             }
                         },
