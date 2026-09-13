@@ -77,6 +77,21 @@ class ProductRepository {
         cachedProducts ?: supabaseClient.from("products")
             .select().decodeList<Product>().also { cachedProducts = it }
 
+    /** Fetch one page of products (used by admin screen to avoid loading the whole catalogue). */
+    suspend fun getProductsPage(page: Int, pageSize: Int = 60): List<Product> {
+        val from = page.toLong() * pageSize
+        val to   = from + pageSize - 1
+        return supabaseClient.from("products")
+            .select { range(from, to) }
+            .decodeList<Product>()
+    }
+
+    /** Server-side name search — returns only matching rows, no in-memory scan. */
+    suspend fun searchProductsByName(query: String): List<Product> =
+        supabaseClient.from("products")
+            .select { filter { ilike("name", "%$query%") } }
+            .decodeList<Product>()
+
     // ── CATEGORIES ────────────────────────────────────────────────────────────
 
     suspend fun insertCategory(id: String, name: String) {

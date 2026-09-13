@@ -107,12 +107,15 @@ class ManageProductsScreen : Screen {
             else state.brands.filter { it.categoryId == filterCategoryId && it.parentId == null }
         }
 
-        val filteredProducts = remember(searchQuery, stockFilter, filterCategoryId, filterBrandId, state.products) {
+        // Debounce: send query to server 400 ms after the user stops typing
+        LaunchedEffect(searchQuery) {
+            kotlinx.coroutines.delay(400)
+            vm.searchProducts(searchQuery)
+        }
+
+        // Client-side filters applied on top of whatever the VM loaded/searched
+        val filteredProducts = remember(stockFilter, filterCategoryId, filterBrandId, state.products) {
             state.products
-                .filter {
-                    if (searchQuery.isBlank()) true
-                    else com.elmotamyez.gallery.util.arabicContains(it.name, searchQuery)
-                }
                 .filter { filterCategoryId == null || it.categoryId == filterCategoryId }
                 .filter { filterBrandId == null || it.brandId == filterBrandId }
                 .filter {
@@ -373,6 +376,20 @@ class ManageProductsScreen : Screen {
                                     Icon(Icons.Default.Delete, null,
                                         tint = MaterialTheme.colorScheme.error)
                                 }
+                            }
+                        }
+                    }
+                    // Load-more footer — only shown in browse mode (no active search)
+                    if (state.isLoadingMore) {
+                        item {
+                            Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    } else if (state.hasMoreProducts && searchQuery.isBlank()) {
+                        item {
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                TextButton(onClick = { vm.loadNextPage() }) { Text("تحميل المزيد") }
                             }
                         }
                     }
