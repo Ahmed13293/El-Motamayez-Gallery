@@ -40,8 +40,6 @@ class ProductsViewModel(
     private val _uiState = MutableStateFlow(ProductsUiState())
     val uiState: StateFlow<ProductsUiState> = _uiState.asStateFlow()
 
-    private var allProductsCache: List<Product> = emptyList()
-
     init {
         loadData()
         // Re-fetch whenever AdminViewModel clears the product cache (e.g. after editing a product image)
@@ -59,7 +57,7 @@ class ProductsViewModel(
                 selectedBrandId    = null,
                 selectedSubBrandId = null,
                 searchQuery        = "",
-                products           = filtered(categoryId, null, null, "")
+                products           = filtered(it.allProducts, categoryId, null, null, "")
             )
         }
     }
@@ -69,9 +67,9 @@ class ProductsViewModel(
         _uiState.update {
             it.copy(
                 selectedBrandId    = brandId,
-                selectedSubBrandId = null,   // reset sub-brand when brand changes
+                selectedSubBrandId = null,
                 searchQuery        = "",
-                products           = filtered(catId, brandId, null, "")
+                products           = filtered(it.allProducts, catId, brandId, null, "")
             )
         }
     }
@@ -83,21 +81,20 @@ class ProductsViewModel(
             it.copy(
                 selectedSubBrandId = subBrandId,
                 searchQuery        = "",
-                products           = filtered(catId, s.selectedBrandId, subBrandId, "")
+                products           = filtered(it.allProducts, catId, s.selectedBrandId, subBrandId, "")
             )
         }
     }
 
     fun search(query: String) {
         val s = _uiState.value
-        // Global search across all products when query is active
         val catId   = if (query.isBlank()) s.selectedCategoryId else null
         val brandId = if (query.isBlank()) s.selectedBrandId    else null
         val subId   = if (query.isBlank()) s.selectedSubBrandId else null
         _uiState.update {
             it.copy(
                 searchQuery = query,
-                products    = filtered(catId, brandId, subId, query)
+                products    = filtered(it.allProducts, catId, brandId, subId, query)
             )
         }
     }
@@ -109,7 +106,7 @@ class ProductsViewModel(
                 selectedBrandId    = null,
                 selectedSubBrandId = null,
                 searchQuery        = "",
-                products           = filtered(null, null, null, "")
+                products           = filtered(it.allProducts, null, null, null, "")
             )
         }
     }
@@ -127,7 +124,8 @@ class ProductsViewModel(
         viewModelScope.launch {
             val imageUrls = if (newImageBytes != null) {
                 val url = runCatching { imageRepo.uploadProductImage(newImageBytes) }.getOrNull()
-                if (url != null) listOf(url) + product.displayImages else product.displayImages
+                // Replace the first image (not prepend) so rotating/replacing doesn't add a duplicate
+                if (url != null) listOf(url) + product.displayImages.drop(1) else product.displayImages
             } else product.displayImages
             runCatching {
                 repository.updateProduct(
@@ -157,14 +155,14 @@ class ProductsViewModel(
         viewModelScope.launch {
             try {
                 repository.clearCache()
-                allProductsCache = repository.getProducts()
-                val variantsMap  = variantRepository.fetchAll().groupBy { it.productId }
+                val newProducts = repository.getProducts()
+                val variantsMap = variantRepository.fetchAll().groupBy { it.productId }
                 val s = _uiState.value
                 _uiState.update {
                     it.copy(
-                        allProducts = allProductsCache,
+                        allProducts = newProducts,
                         variantsMap = variantsMap,
-                        products    = filtered(s.selectedCategoryId, s.selectedBrandId, s.selectedSubBrandId, s.searchQuery)
+                        products    = filtered(newProducts, s.selectedCategoryId, s.selectedBrandId, s.selectedSubBrandId, s.searchQuery)
                     )
                 }
             } catch (_: Exception) {}
@@ -177,23 +175,23 @@ class ProductsViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val categories   = repository.getCategories()
-                val brands       = repository.getBrands()
-                allProductsCache = repository.getProducts()
-                val variantsMap  = variantRepository.fetchAll().groupBy { it.productId }
+                val categories  = repository.getCategories()
+                val brands      = repository.getBrands()
+                val allProducts = repository.getProducts()
+                val variantsMap = variantRepository.fetchAll().groupBy { it.productId }
 
                 val firstCatId = categories.firstOrNull()?.id
                 _uiState.update {
                     it.copy(
                         categories         = categories,
                         brands             = brands,
-                        allProducts        = allProductsCache,
+                        allProducts        = allProducts,
                         variantsMap        = variantsMap,
                         selectedCategoryId = firstCatId,
                         selectedBrandId    = null,
                         selectedSubBrandId = null,
                         searchQuery        = "",
-                        products           = filtered(firstCatId, null, null, ""),
+                        products           = filtered(allProducts, firstCatId, null, null, ""),
                         isLoading          = false
                     )
                 }
@@ -204,11 +202,12 @@ class ProductsViewModel(
     }
 
     private fun filtered(
+        source:      List<Product>,
         categoryId:  String?,
         brandId:     String?,
         subBrandId:  String?,
         query:       String
-    ): List<Product> = allProductsCache.filter { p ->
+    ): List<Product> = source.filter { p ->
         (categoryId == null || p.categoryId == categoryId) &&
         (brandId    == null || p.brandId    == brandId    || p.brandId == subBrandId) &&
         (subBrandId == null || p.brandId    == subBrandId) &&
