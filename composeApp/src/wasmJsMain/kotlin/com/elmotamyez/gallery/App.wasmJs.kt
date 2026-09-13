@@ -114,6 +114,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elmotamyez.gallery.data.model.CartItem
+import com.elmotamyez.gallery.data.repository.AttendanceRepository
 import com.elmotamyez.gallery.data.model.DailyReconciliation
 import com.elmotamyez.gallery.data.model.ProductVariant
 import com.elmotamyez.gallery.data.model.Order
@@ -520,7 +521,12 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                         isMobile = isMobile,
                         onOrderConfirmed = { currentTab = WebTab.RECEIPTS })
 
-                    WebTab.RECEIPTS  -> WebReceiptsTab(isAdmin = isAdmin, isMobile = isMobile)
+                    WebTab.RECEIPTS  -> WebReceiptsTab(
+                        isAdmin = isAdmin,
+                        isMobile = isMobile,
+                        cartVm = cartVm,
+                        onNavigateToCart = { currentTab = WebTab.CART }
+                    )
                     WebTab.PRODUCTS  -> WebProductsManagementTab(isMobile = isMobile)
                     WebTab.ORDERS    -> if (isAdmin) WebOrdersTab(user = user)
                     WebTab.ADMIN     -> if (isAdmin) WebAdminTab(user = user, onLogout = onLogout)
@@ -1411,6 +1417,20 @@ private fun WebCartTab(
     var overrideDate   by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
 
+    // Admin: signed-in employees for receipt assignment
+    val attendanceRepo = koinInject<AttendanceRepository>()
+    var signedInUsers  by remember { mutableStateOf<List<String>>(emptyList()) }
+    var assignedUsername by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(isAdmin, showConfirmDialog) {
+        if (isAdmin && showConfirmDialog) {
+            launch(Dispatchers.Default) {
+                val names = runCatching { attendanceRepo.getSignedIn().map { it.userName } }.getOrDefault(emptyList())
+                signedInUsers = names
+                if (assignedUsername == null && names.isNotEmpty()) assignedUsername = names.first()
+            }
+        }
+    }
+
     LaunchedEffect(orderSaved) {
         if (orderSaved) {
             cartVm.clearCart()
@@ -1509,7 +1529,7 @@ private fun WebCartTab(
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
-            items(cartItems) { item ->
+            items(cartItems, key = { it.cartKey }) { item ->
                 WebCartItemRow(
                     item = item,
                     isMobile = true,
@@ -1665,7 +1685,7 @@ private fun WebCartTab(
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
                 }
-                items(cartItems) { item ->
+                items(cartItems, key = { it.cartKey }) { item ->
                     WebCartItemRow(
                         item = item,
                         onIncrease = { cartVm.increaseQuantity(item.product.id, item.variantId) },
@@ -1805,11 +1825,26 @@ private fun WebCartTab(
             onDismissRequest = { showConfirmDialog = false },
             title = { Text("تأكيد الطلب", fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("الإجمالي: ${total.fmt2f()} جنيه")
                     if (discountValue > 0) Text("الخصم: ${discountValue.fmt2f()} جنيه")
                     Text("طريقة الدفع: $paymentMethod")
                     Text("عدد المنتجات: ${cartItems.sumOf { it.quantity }} قطعة")
+                    if (isAdmin && signedInUsers.isNotEmpty()) {
+                        HorizontalDivider()
+                        Text("تعيين الفاتورة لـ:", style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            signedInUsers.forEach { name ->
+                                FilterChip(
+                                    selected = assignedUsername == name,
+                                    onClick  = { assignedUsername = name },
+                                    label    = { Text(name) }
+                                )
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -1821,7 +1856,7 @@ private fun WebCartTab(
                                 total = total,
                                 discount = discountValue,
                                 paymentMethod = paymentMethod,
-                                username = user.name,
+                                username = assignedUsername?.takeIf { isAdmin && it.isNotBlank() } ?: user.name,
                                 overrideDate = overrideDate
                             )
                         }
@@ -2089,7 +2124,12 @@ private fun String.webToArabicMonth(): String {
 }
 
 @Composable
-internal fun WebReceiptsTab(isAdmin: Boolean = false, isMobile: Boolean = false) {
+internal fun WebReceiptsTab(
+    isAdmin: Boolean = false,
+    isMobile: Boolean = false,
+    cartVm: CartViewModel? = null,
+    onNavigateToCart: () -> Unit = {}
+) {
     val receiptVm: ReceiptViewModel = koinInject()
     val authVm: AuthViewModel = koinInject()
     val authState by authVm.uiState.collectAsState()
@@ -2307,7 +2347,11 @@ internal fun WebReceiptsTab(isAdmin: Boolean = false, isMobile: Boolean = false)
                                                 receiptVm.viewReceipt(receipt)
                                                 editingReceipt = receipt
                                             },
-                                            onDelete = { deletingReceipt = receipt }
+                                            onDelete = { deletingReceipt = receipt },
+                                            onReplicate = {
+                                                cartVm?.replicateFromReceipt(receipt.items)
+                                                onNavigateToCart()
+                                            }
                                         )
                                     }
                                     if (!username.isNullOrBlank()) {
@@ -2598,7 +2642,8 @@ internal fun WebReceiptCard(
     isAdmin: Boolean = false,
     onConfirmQuotation: () -> Unit = {},
     onEdit: () -> Unit = {},
-    onDelete: () -> Unit = {}
+    onDelete: () -> Unit = {},
+    onReplicate: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
     val discount = receipt.discount
@@ -2905,6 +2950,15 @@ internal fun WebReceiptCard(
                                 Text("تأكيد عرض السعر")
                             }
                         }
+                    }
+
+                    // Replicate receipt to cart
+                    TextButton(
+                        onClick = onReplicate,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("تكرار", color = MaterialTheme.colorScheme.tertiary)
                     }
 
                     // PDF export button
