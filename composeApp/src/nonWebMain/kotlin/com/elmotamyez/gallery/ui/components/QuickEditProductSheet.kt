@@ -4,17 +4,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -24,6 +27,12 @@ import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.model.ProductVariant
 import com.elmotamyez.gallery.util.rememberCameraLauncher
 import com.elmotamyez.gallery.util.rememberImagePickerLauncher
+import com.elmotamyez.gallery.util.rotateImage90CW
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +56,11 @@ fun QuickEditProductSheet(
 
     val galleryLauncher = rememberImagePickerLauncher { bytes -> pendingImageBytes = bytes }
     val cameraLauncher  = rememberCameraLauncher     { bytes -> pendingImageBytes = bytes }
+
+    var isRotating by remember { mutableStateOf(false) }
+    val scope      = rememberCoroutineScope()
+    val httpClient = remember { HttpClient() }
+    DisposableEffect(Unit) { onDispose { httpClient.close() } }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -87,6 +101,30 @@ fun QuickEditProductSheet(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
+                        // Rotate 90° CW — downloads existing URL into pendingImageBytes first if needed
+                        IconButton(
+                            onClick = {
+                                if (isRotating) return@IconButton
+                                scope.launch(Dispatchers.IO) {
+                                    isRotating = true
+                                    val src = pendingImageBytes
+                                        ?: product.imageUrl?.let { url ->
+                                            runCatching { httpClient.get(url).body<ByteArray>() }.getOrNull()
+                                        }
+                                    if (src != null) pendingImageBytes = rotateImage90CW(src)
+                                    isRotating = false
+                                }
+                            },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(26.dp)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), CircleShape)
+                        ) {
+                            if (isRotating)
+                                CircularProgressIndicator(Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
+                            else
+                                Icon(Icons.Default.RotateRight, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
