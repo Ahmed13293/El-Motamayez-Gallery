@@ -28,6 +28,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -110,15 +111,22 @@ class ReceiptsListScreen : Screen {
         val currentUsername  = authState.user?.username
         val reconciliations  by vm.reconciliations.collectAsState()
 
+        // Receipt type tab: 0 = confirmed, 1 = quotations
+        var receiptTypeTab by rememberSaveable { mutableIntStateOf(0) }
+        val confirmedReceipts = remember(receipts) { receipts.filter { !it.isQuotation } }
+        val quotationReceipts = remember(receipts) {
+            receipts.filter { it.isQuotation }.sortedByDescending { it.orderNumber }
+        }
+
         // Current month key e.g. "2026-07"
         val currentMonthKey = remember {
             val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
             "${now.year}-${twoDigit(now.monthNumber)}"
         }
 
-        // Distinct months sorted newest first
-        val months = remember(receipts) {
-            receipts.map { it.monthKey() }.filter { it != "unknown" }.distinct().sortedDescending()
+        // Distinct months sorted newest first (based on confirmed only)
+        val months = remember(confirmedReceipts) {
+            confirmedReceipts.map { it.monthKey() }.filter { it != "unknown" }.distinct().sortedDescending()
         }
 
         // Selected month tab index — default to current month, fallback to newest
@@ -129,8 +137,8 @@ class ReceiptsListScreen : Screen {
         val selectedMonth = months.getOrNull(selectedMonthIndex) ?: currentMonthKey
 
         // Group by date, filtered to selected month, newest day first
-        val grouped = remember(receipts, selectedMonth) {
-            receipts
+        val grouped = remember(confirmedReceipts, selectedMonth) {
+            confirmedReceipts
                 .filter { it.monthKey() == selectedMonth }
                 .sortedByDescending { it.orderNumber }
                 .groupBy { it.dateKey() }
@@ -138,7 +146,7 @@ class ReceiptsListScreen : Screen {
                 .sortedByDescending { it.key }
         }
 
-        val monthTotal = remember(grouped) { grouped.sumOf { it.value.filter { r -> !r.isQuotation }.sumOf { r -> r.total } } }
+        val monthTotal = remember(grouped) { grouped.sumOf { it.value.sumOf { r -> r.total } } }
         val monthCount = remember(grouped) { grouped.sumOf { it.value.size } }
 
         // Expanded state lives in the VM so it survives back-navigation
@@ -165,24 +173,52 @@ class ReceiptsListScreen : Screen {
 
         Scaffold(
             topBar = {
-                if (months.isNotEmpty()) {
-                    ScrollableTabRow(
-                        selectedTabIndex = selectedMonthIndex,
-                        edgePadding = 0.dp
-                    ) {
-                        months.forEachIndexed { index, monthKey ->
-                            Tab(
-                                selected = index == selectedMonthIndex,
-                                onClick  = { selectedMonthIndex = index },
-                                text     = {
-                                    Text(
-                                        monthKey.toArabicMonth(),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = if (index == selectedMonthIndex)
-                                            FontWeight.Bold else FontWeight.Normal
-                                    )
-                                }
-                            )
+                Column {
+                    // Type tabs: Receipts | Quotations
+                    TabRow(selectedTabIndex = receiptTypeTab) {
+                        Tab(
+                            selected = receiptTypeTab == 0,
+                            onClick  = { receiptTypeTab = 0 },
+                            text = {
+                                Text(
+                                    "الفواتير",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (receiptTypeTab == 0) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        )
+                        Tab(
+                            selected = receiptTypeTab == 1,
+                            onClick  = { receiptTypeTab = 1 },
+                            text = {
+                                Text(
+                                    "عروض السعر",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (receiptTypeTab == 1) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        )
+                    }
+                    // Month tabs — only for confirmed receipts tab
+                    if (receiptTypeTab == 0 && months.isNotEmpty()) {
+                        ScrollableTabRow(
+                            selectedTabIndex = selectedMonthIndex,
+                            edgePadding = 0.dp
+                        ) {
+                            months.forEachIndexed { index, monthKey ->
+                                Tab(
+                                    selected = index == selectedMonthIndex,
+                                    onClick  = { selectedMonthIndex = index },
+                                    text     = {
+                                        Text(
+                                            monthKey.toArabicMonth(),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = if (index == selectedMonthIndex)
+                                                FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -193,7 +229,41 @@ class ReceiptsListScreen : Screen {
                 onRefresh    = { vm.loadReceipts() },
                 modifier     = Modifier.padding(padding).fillMaxSize()
             ) {
-                if (receipts.isEmpty() && !isLoading) {
+                if (receiptTypeTab == 1) {
+                    // ── Quotations tab ────────────────────────────────────────
+                    if (quotationReceipts.isEmpty() && !isLoading) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("📋", style = MaterialTheme.typography.displayMedium)
+                                Spacer(Modifier.height(12.dp))
+                                Text("لا توجد عروض سعر",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(quotationReceipts, key = { it.id }) { receipt ->
+                                ReceiptCard(
+                                    receipt            = receipt,
+                                    dayIndex           = 0,
+                                    onConfirmQuotation = { vm.confirmQuotation(receipt) },
+                                    onClick            = {
+                                        vm.listScrollIndex  = 0
+                                        vm.listScrollOffset = 0
+                                        vm.viewReceipt(receipt)
+                                        (navigator.parent ?: navigator).push(ReceiptScreen())
+                                    }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                // ── Confirmed receipts tab ────────────────────────────────────
+                if (confirmedReceipts.isEmpty() && !isLoading) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("🧾", style = MaterialTheme.typography.displayMedium)
@@ -331,16 +401,15 @@ class ReceiptsListScreen : Screen {
 
                         grouped.forEach { (dateKey, dayReceipts) ->
                             val isOpen = expandedDays[dateKey] == true
-                            val confirmed = dayReceipts.filter { !it.isQuotation }
-                            val dayTotal    = confirmed.sumOf { it.total }
-                            val cashTotal   = confirmed.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
-                            val transferTotal = confirmed.filter { it.paymentMethod == "تحويل" }.sumOf { it.total }
+                            val dayTotal      = dayReceipts.sumOf { it.total }
+                            val cashTotal     = dayReceipts.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
+                            val transferTotal = dayReceipts.filter { it.paymentMethod == "تحويل" }.sumOf { it.total }
 
                             // ── Day header ────────────────────────────────────
                             item(key = "header_$dateKey") {
                                 DayHeader(
                                     dateKey            = dateKey,
-                                    count              = confirmed.size,
+                                    count              = dayReceipts.size,
                                     dayTotal           = dayTotal,
                                     cashTotal          = cashTotal,
                                     transferTotal      = transferTotal,
@@ -392,7 +461,8 @@ class ReceiptsListScreen : Screen {
                             }
                         }
                     }
-                }
+                } // end confirmed tab else
+                } // end receiptTypeTab when
             }
         }
     }

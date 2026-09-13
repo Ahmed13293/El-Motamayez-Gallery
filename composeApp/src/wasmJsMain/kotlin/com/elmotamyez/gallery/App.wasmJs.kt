@@ -2143,15 +2143,22 @@ internal fun WebReceiptsTab(
     var editingReceipt  by remember { mutableStateOf<Receipt?>(null) }
     var deletingReceipt by remember { mutableStateOf<Receipt?>(null) }
 
+    // Receipt type tab: 0 = confirmed, 1 = quotations
+    var receiptTypeTab by remember { mutableIntStateOf(0) }
+    val confirmedReceipts = remember(receipts) { receipts.filter { !it.isQuotation } }
+    val quotationReceipts = remember(receipts) {
+        receipts.filter { it.isQuotation }.sortedByDescending { it.orderNumber }
+    }
+
     // Current month key e.g. "2026-07"
     val currentMonthKey = remember {
         val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
         "${now.year}-${twoDigit(now.monthNumber)}"
     }
 
-    // Distinct months sorted newest first
-    val months = remember(receipts) {
-        receipts.map { it.webMonthKey() }.filter { it != "unknown" }.distinct().sortedDescending()
+    // Distinct months sorted newest first (confirmed only)
+    val months = remember(confirmedReceipts) {
+        confirmedReceipts.map { it.webMonthKey() }.filter { it != "unknown" }.distinct().sortedDescending()
     }
 
     var selectedMonthIndex by remember(months) {
@@ -2160,13 +2167,13 @@ internal fun WebReceiptsTab(
     }
     val selectedMonth = months.getOrNull(selectedMonthIndex) ?: currentMonthKey
 
-    // Group by date filtered to selected month, newest day first
-    val grouped = remember(receipts, selectedMonth) {
-        receipts.filter { it.webMonthKey() == selectedMonth }.sortedByDescending { it.orderNumber }
+    // Group by date filtered to selected month, newest day first (confirmed only)
+    val grouped = remember(confirmedReceipts, selectedMonth) {
+        confirmedReceipts.filter { it.webMonthKey() == selectedMonth }.sortedByDescending { it.orderNumber }
             .groupBy { it.dateKey() }.entries.sortedByDescending { it.key }
     }
 
-    val monthTotal = remember(grouped) { grouped.sumOf { it.value.filter { r -> !r.isQuotation }.sumOf { r -> r.total } } }
+    val monthTotal = remember(grouped) { grouped.sumOf { it.value.sumOf { r -> r.total } } }
     val monthCount = remember(grouped) { grouped.sumOf { it.value.size } }
 
     // Newest day starts expanded
@@ -2206,8 +2213,18 @@ internal fun WebReceiptsTab(
             }
         }
 
-        // ── Month tabs ────────────────────────────────────────────────────────
-        if (months.isNotEmpty()) {
+        // ── Type tabs: Receipts | Quotations ─────────────────────────────────
+        TabRow(selectedTabIndex = receiptTypeTab) {
+            Tab(selected = receiptTypeTab == 0, onClick = { receiptTypeTab = 0 },
+                text = { Text("الفواتير", style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (receiptTypeTab == 0) FontWeight.Bold else FontWeight.Normal) })
+            Tab(selected = receiptTypeTab == 1, onClick = { receiptTypeTab = 1 },
+                text = { Text("عروض السعر", style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (receiptTypeTab == 1) FontWeight.Bold else FontWeight.Normal) })
+        }
+
+        // ── Month tabs (confirmed tab only) ───────────────────────────────────
+        if (receiptTypeTab == 0 && months.isNotEmpty()) {
             ScrollableTabRow(selectedTabIndex = selectedMonthIndex, edgePadding = 0.dp) {
                 months.forEachIndexed { index, monthKey ->
                     Tab(
@@ -2224,13 +2241,49 @@ internal fun WebReceiptsTab(
             }
         }
 
+        if (receiptTypeTab == 1) {
+            // ── Quotations tab ────────────────────────────────────────────────
+            if (isLoading && quotationReceipts.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else if (quotationReceipts.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("لا توجد عروض سعر", style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(if (isMobile) 8.dp else 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (isMobile) 8.dp else 10.dp)
+                ) {
+                    items(quotationReceipts, key = { it.id }) { receipt ->
+                        WebReceiptCard(
+                            receipt            = receipt,
+                            dayIndex           = 0,
+                            isAdmin            = isAdmin,
+                            onConfirmQuotation = { receiptVm.confirmQuotation(receipt) },
+                            onEdit = {
+                                receiptVm.loadProductsForEdit()
+                                receiptVm.viewReceipt(receipt)
+                                editingReceipt = receipt
+                            },
+                            onDelete = { deletingReceipt = receipt },
+                            onReplicate = {
+                                cartVm?.replicateFromReceipt(receipt.items)
+                                onNavigateToCart()
+                            }
+                        )
+                    }
+                }
+            }
+        } else {
+        // ── Confirmed receipts tab ────────────────────────────────────────────
         when {
-            isLoading && receipts.isEmpty() -> Box(
+            isLoading && confirmedReceipts.isEmpty() -> Box(
                 Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) { CircularProgressIndicator() }
 
-            receipts.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            confirmedReceipts.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -2303,10 +2356,9 @@ internal fun WebReceiptsTab(
 
                 grouped.forEach { (dateKey, dayReceipts) ->
                     val isOpen = expandedMap[dateKey] == true
-                    val confirmed = dayReceipts.filter { !it.isQuotation }
-                    val dayTotal = confirmed.sumOf { it.total }
-                    val cashTotal = confirmed.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
-                    val transferTotal = confirmed.filter { it.paymentMethod == "تحويل" }.sumOf { it.total }
+                    val dayTotal = dayReceipts.sumOf { it.total }
+                    val cashTotal = dayReceipts.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
+                    val transferTotal = dayReceipts.filter { it.paymentMethod == "تحويل" }.sumOf { it.total }
 
                     item(key = "header_$dateKey") {
                         ReceiptDayHeader(
@@ -2366,7 +2418,8 @@ internal fun WebReceiptsTab(
                     }
                 }
             }
-        }
+        } // end confirmed receipts tab else (when)
+        } // end receiptTypeTab when
     }
 
     deleteError?.let { err ->
