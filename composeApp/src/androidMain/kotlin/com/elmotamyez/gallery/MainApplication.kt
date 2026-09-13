@@ -8,6 +8,7 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import com.elmotamyez.gallery.di.appModule
 import com.elmotamyez.gallery.util.ApplicationContextHolder
+import kotlinx.coroutines.Dispatchers
 import okio.Path.Companion.toOkioPath
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -26,8 +27,8 @@ class MainApplication : Application(), SingletonImageLoader.Factory {
         }
     }
 
-    // Coil default is 25% of heap — too much for a product grid on low-memory devices.
-    // Cap at 10% and add disk cache so images survive scrolling without re-downloading.
+    // Coil defaults: 25% heap cache + up to 64 concurrent downloads → OOM on low-memory devices.
+    // Fix: cap memory cache at 10%, add 50MB disk cache, limit concurrent fetches/decodes.
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
             .memoryCache {
@@ -41,5 +42,9 @@ class MainApplication : Application(), SingletonImageLoader.Factory {
                     .maxSizeBytes(50L * 1024 * 1024)
                     .build()
             }
+            // Limit how many images are in-flight at once; each in-flight image holds
+            // its full compressed bytes + decoded bitmap in memory simultaneously.
+            .fetcherCoroutineContext(Dispatchers.IO.limitedParallelism(4))
+            .decoderCoroutineContext(Dispatchers.IO.limitedParallelism(2))
             .build()
 }
