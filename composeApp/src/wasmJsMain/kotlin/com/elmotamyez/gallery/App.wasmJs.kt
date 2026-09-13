@@ -349,7 +349,8 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
     val cartItems     by cartVm.cartItems.collectAsState()
     val pendingOrders by orderVm.pendingCount.collectAsState()
     val receipts      by receiptVm.receipts.collectAsState()
-    val pendingQuotationsCount = receipts.count { it.isQuotation }
+    val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+    val todayConfirmedCount = receipts.count { !it.isQuotation && it.createdAt?.startsWith(today) == true }
     val isAdmin = user.role == UserRole.ADMIN
 
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -478,7 +479,7 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                         selected = currentTab == WebTab.RECEIPTS,
                         onClick = { currentTab = WebTab.RECEIPTS },
                         icon = {
-                            BadgedBox(badge = { if (pendingQuotationsCount > 0) Badge { Text("$pendingQuotationsCount") } }) {
+                            BadgedBox(badge = { if (todayConfirmedCount > 0) Badge { Text("$todayConfirmedCount") } }) {
                                 Icon(Icons.Default.Receipt, null, modifier = Modifier.size(20.dp))
                             }
                         },
@@ -557,7 +558,7 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                         selected = currentTab == WebTab.RECEIPTS,
                         onClick  = { currentTab = WebTab.RECEIPTS },
                         icon = {
-                            BadgedBox(badge = { if (pendingQuotationsCount > 0) Badge { Text("$pendingQuotationsCount") } }) {
+                            BadgedBox(badge = { if (todayConfirmedCount > 0) Badge { Text("$todayConfirmedCount") } }) {
                                 Icon(Icons.Default.Receipt, null)
                             }
                         },
@@ -2150,6 +2151,10 @@ internal fun WebReceiptsTab(
     val quotationReceipts = remember(receipts) {
         receipts.filter { it.isQuotation }.sortedByDescending { it.orderNumber }
     }
+    val todayKey = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString() }
+    val todayConfirmedTabCount = remember(confirmedReceipts) {
+        confirmedReceipts.count { it.createdAt?.startsWith(todayKey) == true }
+    }
 
     // Current month key e.g. "2026-07"
     val currentMonthKey = remember {
@@ -2217,11 +2222,23 @@ internal fun WebReceiptsTab(
         // ── Type tabs: Receipts | Quotations ─────────────────────────────────
         TabRow(selectedTabIndex = receiptTypeTab) {
             Tab(selected = receiptTypeTab == 0, onClick = { receiptTypeTab = 0 },
-                text = { Text("الفواتير", style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (receiptTypeTab == 0) FontWeight.Bold else FontWeight.Normal) })
+                text = {
+                    BadgedBox(badge = {
+                        if (todayConfirmedTabCount > 0) Badge { Text("$todayConfirmedTabCount") }
+                    }) {
+                        Text("الفواتير", style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (receiptTypeTab == 0) FontWeight.Bold else FontWeight.Normal)
+                    }
+                })
             Tab(selected = receiptTypeTab == 1, onClick = { receiptTypeTab = 1 },
-                text = { Text("عروض السعر", style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (receiptTypeTab == 1) FontWeight.Bold else FontWeight.Normal) })
+                text = {
+                    BadgedBox(badge = {
+                        if (quotationReceipts.isNotEmpty()) Badge { Text("${quotationReceipts.size}") }
+                    }) {
+                        Text("عروض السعر", style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (receiptTypeTab == 1) FontWeight.Bold else FontWeight.Normal)
+                    }
+                })
         }
 
         // ── Month tabs (confirmed tab only) ───────────────────────────────────

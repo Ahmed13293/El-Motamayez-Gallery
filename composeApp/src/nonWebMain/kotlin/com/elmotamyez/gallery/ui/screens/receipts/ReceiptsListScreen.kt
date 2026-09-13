@@ -123,6 +123,13 @@ class ReceiptsListScreen : Screen {
             val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
             "${now.year}-${twoDigit(now.monthNumber)}"
         }
+        val todayKey = remember {
+            val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+            "${now.year}-${twoDigit(now.monthNumber)}-${twoDigit(now.dayOfMonth)}"
+        }
+        val todayConfirmedCount = remember(confirmedReceipts) {
+            confirmedReceipts.count { it.dateKey() == todayKey }
+        }
 
         // Distinct months sorted newest first (based on confirmed only)
         val months = remember(confirmedReceipts) {
@@ -180,22 +187,31 @@ class ReceiptsListScreen : Screen {
                             selected = receiptTypeTab == 0,
                             onClick  = { receiptTypeTab = 0 },
                             text = {
-                                Text(
-                                    "الفواتير",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (receiptTypeTab == 0) FontWeight.Bold else FontWeight.Normal
-                                )
+                                BadgedBox(badge = {
+                                    if (todayConfirmedCount > 0) Badge { Text("$todayConfirmedCount") }
+                                }) {
+                                    Text(
+                                        "الفواتير",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (receiptTypeTab == 0) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
                             }
                         )
                         Tab(
                             selected = receiptTypeTab == 1,
                             onClick  = { receiptTypeTab = 1 },
                             text = {
-                                Text(
-                                    "عروض السعر",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (receiptTypeTab == 1) FontWeight.Bold else FontWeight.Normal
-                                )
+                                BadgedBox(badge = {
+                                    if (quotationReceipts.isNotEmpty())
+                                        Badge { Text("${quotationReceipts.size}") }
+                                }) {
+                                    Text(
+                                        "عروض السعر",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (receiptTypeTab == 1) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
                             }
                         )
                     }
