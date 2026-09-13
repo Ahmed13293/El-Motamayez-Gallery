@@ -159,8 +159,9 @@ class AdminScreen : Screen {
             }
 
             // ── Logout ────────────────────────────────────────────────────────
+            var showLogoutConfirm by remember { mutableStateOf(false) }
             Button(
-                onClick = { authVm.logout() },
+                onClick = { showLogoutConfirm = true },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -169,6 +170,23 @@ class AdminScreen : Screen {
                 Icon(Icons.AutoMirrored.Filled.Logout, null, tint = Color.White)
                 Spacer(Modifier.width(8.dp))
                 Text("تسجيل الخروج", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+            if (showLogoutConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showLogoutConfirm = false },
+                    title = { Text("تسجيل الخروج") },
+                    text  = { Text("هل أنت متأكد أنك تريد تسجيل الخروج؟") },
+                    confirmButton = {
+                        TextButton(onClick = { authVm.logout() }) {
+                            Text("خروج", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showLogoutConfirm = false }) {
+                            Text("إلغاء")
+                        }
+                    }
+                )
             }
         }
     }

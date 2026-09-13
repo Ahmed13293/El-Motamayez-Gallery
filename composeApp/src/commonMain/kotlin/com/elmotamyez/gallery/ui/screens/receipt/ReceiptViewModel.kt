@@ -151,7 +151,7 @@ class ReceiptViewModel(
         viewModelScope.launch {
             while (isActive) {
                 delay(30_000)
-                if (!_isLoading.value) loadReceipts()
+                if (!_isLoading.value) loadReceipts(reportError = false)
             }
         }
     }
@@ -178,13 +178,15 @@ class ReceiptViewModel(
         }
     }
 
-    /** Reload all receipts from the cloud (called on init and on pull-to-refresh). */
-    fun loadReceipts() {
+    /** Reload all receipts from the cloud (called on init and on pull-to-refresh).
+     *  [reportError] = false for silent background polls — don't overwrite the error banner
+     *  when we already have cached data displayed. */
+    fun loadReceipts(reportError: Boolean = true) {
         viewModelScope.launch {
             _isLoading.value = true
             runCatching { repository.fetchAll() }
                 .onSuccess { result ->
-                    _loadError.value = result.firstError
+                    if (reportError) _loadError.value = result.firstError
                     val fresh = result.receipts
                     runCatching {
                         val freshIds = fresh.map { it.id }.toSet()
@@ -201,7 +203,11 @@ class ReceiptViewModel(
                         persistCache(merged)
                     }.onFailure { _loadError.value = "merge: ${it.message}" }
                 }
-                .onFailure { _loadError.value = it.message ?: it.toString() }
+                .onFailure { e ->
+                    // Only surface the error if caller asked AND we have no data to show
+                    if (reportError || _receipts.value.isEmpty())
+                        _loadError.value = e.message ?: e.toString()
+                }
             _isLoading.value = false
             // Attempt to sync any receipts that failed to save previously
             syncPendingReceipts()

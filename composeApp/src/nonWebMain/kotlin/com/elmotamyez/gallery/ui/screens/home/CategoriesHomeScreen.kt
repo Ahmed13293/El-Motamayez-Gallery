@@ -192,9 +192,10 @@ class CategoriesHomeScreen : Screen {
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color.Gray
                             )
+                            var showLogoutConfirm by remember { mutableStateOf(false) }
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable { authVm.logout() }
+                                modifier = Modifier.clickable { showLogoutConfirm = true }
                             ) {
                                 Text(
                                     "تسجيل الخروج",
@@ -207,6 +208,23 @@ class CategoriesHomeScreen : Screen {
                                     contentDescription = "تسجيل الخروج",
                                     tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            if (showLogoutConfirm) {
+                                AlertDialog(
+                                    onDismissRequest = { showLogoutConfirm = false },
+                                    title = { Text("تسجيل الخروج") },
+                                    text  = { Text("هل أنت متأكد أنك تريد تسجيل الخروج؟") },
+                                    confirmButton = {
+                                        TextButton(onClick = { authVm.logout() }) {
+                                            Text("خروج", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                                        }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { showLogoutConfirm = false }) {
+                                            Text("إلغاء")
+                                        }
+                                    }
                                 )
                             }
                         }

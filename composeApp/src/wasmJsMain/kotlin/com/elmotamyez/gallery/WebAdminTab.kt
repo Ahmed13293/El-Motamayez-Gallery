@@ -323,8 +323,9 @@ private fun AdminHubPage(
 
             // Logout
             item {
+                var showLogoutConfirm by remember { mutableStateOf(false) }
                 Button(
-                    onClick = onLogout,
+                    onClick = { showLogoutConfirm = true },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().height(50.dp)
@@ -332,6 +333,23 @@ private fun AdminHubPage(
                     Icon(Icons.Default.Logout, null, tint = Color.White)
                     Spacer(Modifier.width(8.dp))
                     Text("تسجيل الخروج", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                if (showLogoutConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { showLogoutConfirm = false },
+                        title = { Text("تسجيل الخروج") },
+                        text  = { Text("هل أنت متأكد أنك تريد تسجيل الخروج؟") },
+                        confirmButton = {
+                            TextButton(onClick = onLogout) {
+                                Text("خروج", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showLogoutConfirm = false }) {
+                                Text("إلغاء")
+                            }
+                        }
+                    )
                 }
             }
 
