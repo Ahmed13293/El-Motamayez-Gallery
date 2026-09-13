@@ -121,7 +121,8 @@ class ProductsViewModel(
         newPrice: Double,
         newWholesalePrice: Double?,
         newStock: Int,
-        newImageBytes: ByteArray? = null
+        newImageBytes: ByteArray? = null,
+        variantStocks: Map<String, Int> = emptyMap()
     ) {
         viewModelScope.launch {
             val imageUrls = if (newImageBytes != null) {
@@ -140,6 +141,13 @@ class ProductsViewModel(
                     imageUrls      = imageUrls,
                     barcode        = product.barcode
                 )
+            }
+            // Update each variant's stock independently
+            variantStocks.forEach { (variantId, stock) ->
+                val variant = _uiState.value.variantsMap[product.id]?.find { it.id == variantId }
+                if (variant != null) {
+                    runCatching { variantRepository.update(variantId, variant.name, stock) }
+                }
             }
             refreshProducts()
         }

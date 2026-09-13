@@ -3,8 +3,10 @@ package com.elmotamyez.gallery.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -19,6 +21,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.elmotamyez.gallery.data.model.Product
+import com.elmotamyez.gallery.data.model.ProductVariant
 import com.elmotamyez.gallery.util.rememberCameraLauncher
 import com.elmotamyez.gallery.util.rememberImagePickerLauncher
 
@@ -26,13 +29,21 @@ import com.elmotamyez.gallery.util.rememberImagePickerLauncher
 @Composable
 fun QuickEditProductSheet(
     product: Product,
-    onSave: (price: Double, wholesalePrice: Double?, stock: Int, newImageBytes: ByteArray?) -> Unit,
+    variants: List<ProductVariant> = emptyList(),
+    onSave: (price: Double, wholesalePrice: Double?, stock: Int, newImageBytes: ByteArray?, variantStocks: Map<String, Int>) -> Unit,
     onDismiss: () -> Unit
 ) {
     var priceText by remember { mutableStateOf(product.price.toString()) }
     var wsText    by remember { mutableStateOf(product.wholesalePrice?.toString() ?: "") }
     var stockText by remember { mutableStateOf(product.stock.toString()) }
     var pendingImageBytes by remember { mutableStateOf<ByteArray?>(null) }
+
+    // Mutable per-variant stock text — keyed by variant id
+    val variantStockTexts = remember(variants) {
+        mutableStateMapOf<String, String>().also { map ->
+            variants.forEach { v -> map[v.id] = v.stock.toString() }
+        }
+    }
 
     val galleryLauncher = rememberImagePickerLauncher { bytes -> pendingImageBytes = bytes }
     val cameraLauncher  = rememberCameraLauncher     { bytes -> pendingImageBytes = bytes }
@@ -41,6 +52,7 @@ fun QuickEditProductSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -77,20 +89,14 @@ fun QuickEditProductSheet(
                         )
                     }
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = galleryLauncher,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                    OutlinedButton(onClick = galleryLauncher, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.PhotoLibrary, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("اختر من المعرض")
                     }
                     if (cameraLauncher != null) {
-                        OutlinedButton(
-                            onClick = cameraLauncher,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
+                        OutlinedButton(onClick = cameraLauncher, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Default.AddAPhoto, null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("التقط صورة")
@@ -99,6 +105,7 @@ fun QuickEditProductSheet(
                 }
             }
 
+            // ── Pricing ───────────────────────────────────────────────────────
             OutlinedTextField(
                 value = priceText,
                 onValueChange = { priceText = it },
@@ -115,14 +122,33 @@ fun QuickEditProductSheet(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth()
             )
-            OutlinedTextField(
-                value = stockText,
-                onValueChange = { stockText = it },
-                label = { Text("المخزون") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
+
+            // ── Stock — either base product or per variant ────────────────────
+            if (variants.isEmpty()) {
+                OutlinedTextField(
+                    value = stockText,
+                    onValueChange = { stockText = it },
+                    label = { Text("المخزون") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                Text("المخزون بالنوعيات",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary)
+                variants.forEach { variant ->
+                    OutlinedTextField(
+                        value = variantStockTexts[variant.id] ?: "",
+                        onValueChange = { variantStockTexts[variant.id] = it },
+                        label = { Text(variant.name) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -135,8 +161,11 @@ fun QuickEditProductSheet(
                     onClick = {
                         val price = priceText.toDoubleOrNull() ?: return@Button
                         val ws    = wsText.trim().toDoubleOrNull()
-                        val stock = stockText.toIntOrNull() ?: return@Button
-                        onSave(price, ws, stock, pendingImageBytes)
+                        val stock = if (variants.isEmpty()) stockText.toIntOrNull() ?: return@Button else product.stock
+                        val variantStocks = variantStockTexts.mapNotNull { (id, text) ->
+                            text.toIntOrNull()?.let { id to it }
+                        }.toMap()
+                        onSave(price, ws, stock, pendingImageBytes, variantStocks)
                     },
                     modifier = Modifier.weight(1f)
                 ) { Text("حفظ") }
