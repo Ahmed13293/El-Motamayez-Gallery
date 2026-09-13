@@ -27,7 +27,8 @@ import com.elmotamyez.gallery.util.dateTimeString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-private const val KEY_RECEIPTS_CACHE = "receipts_cache_json"
+private const val KEY_RECEIPTS_CACHE       = "receipts_cache_json"
+private const val KEY_LAST_SEEN_ORDER      = "last_seen_confirmed_order"
 
 class ReceiptViewModel(
     private val repository: ReceiptRepository,
@@ -98,6 +99,22 @@ class ReceiptViewModel(
         }
     }
 
+    // Unseen confirmed-receipt count — persisted across sessions via Settings
+    private val _newReceiptsCount = MutableStateFlow(0)
+    val newReceiptsCount: StateFlow<Int> = _newReceiptsCount.asStateFlow()
+
+    private fun recomputeNewCount() {
+        val lastSeen = settings.getInt(KEY_LAST_SEEN_ORDER, 0)
+        _newReceiptsCount.value = _receipts.value.count { !it.isQuotation && it.orderNumber > lastSeen }
+    }
+
+    /** Called when the user opens the receipts tab — marks all current receipts as seen. */
+    fun markReceiptsSeen() {
+        val maxOrder = _receipts.value.filter { !it.isQuotation }.maxOfOrNull { it.orderNumber } ?: 0
+        settings.putInt(KEY_LAST_SEEN_ORDER, maxOrder)
+        _newReceiptsCount.value = 0
+    }
+
     // Full history — seeded from local cache instantly, then refreshed from Supabase
     private val _receipts = MutableStateFlow<List<Receipt>>(emptyList())
     val receipts: StateFlow<List<Receipt>> = _receipts.asStateFlow()
@@ -124,6 +141,7 @@ class ReceiptViewModel(
         if (cached.isNotEmpty()) {
             runCatching {
                 _receipts.value = json.decodeFromString<List<Receipt>>(cached)
+                recomputeNewCount()
             }
         }
         // Then sync latest from Supabase in the background
@@ -179,6 +197,7 @@ class ReceiptViewModel(
                         }
                         val merged = (fresh + localOnly).sortedByDescending { it.createdAt ?: "" }
                         _receipts.value = merged
+                        recomputeNewCount()
                         persistCache(merged)
                     }.onFailure { _loadError.value = "merge: ${it.message}" }
                 }

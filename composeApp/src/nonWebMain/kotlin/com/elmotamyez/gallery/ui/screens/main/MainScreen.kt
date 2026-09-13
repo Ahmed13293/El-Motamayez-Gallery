@@ -18,9 +18,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.elmotamyez.gallery.NavigationController
-import kotlinx.datetime.Clock
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -106,11 +103,7 @@ class MainScreen : Screen {
 
         val isAdmin = authState.user?.role == UserRole.ADMIN
 
-        val today = remember {
-            val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-            "${now.year}-${now.monthNumber.toString().padStart(2, '0')}-${now.dayOfMonth.toString().padStart(2, '0')}"
-        }
-        val todayConfirmedCount = receipts.count { !it.isQuotation && it.createdAt?.startsWith(today) == true }
+        val newReceiptsCount by receiptVm.newReceiptsCount.collectAsState()
 
         TabNavigator(CategoriesTab) { tabNavigator ->
             val navController: NavigationController = koinInject()
@@ -129,7 +122,7 @@ class MainScreen : Screen {
                         NavItem(CategoriesTab, Icons.Default.Home,       tabNavigator)
                         NavItem(CartTab,       Icons.Default.ShoppingCart, tabNavigator,
                                 badgeCount = cartItems.size)
-                        NavItem(ReceiptsTab,   Icons.Default.Receipt,    tabNavigator, badgeCount = todayConfirmedCount)
+                        NavItem(ReceiptsTab,   Icons.Default.Receipt,    tabNavigator, badgeCount = newReceiptsCount)
                         NavItem(OrdersTab, Icons.AutoMirrored.Filled.ListAlt, tabNavigator, badgeCount = pendingOrders)
                         if (isAdmin) {
                             NavItem(AdminTab, Icons.Default.Person, tabNavigator)

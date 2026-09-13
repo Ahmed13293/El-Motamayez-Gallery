@@ -349,8 +349,7 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
     val cartItems     by cartVm.cartItems.collectAsState()
     val pendingOrders by orderVm.pendingCount.collectAsState()
     val receipts      by receiptVm.receipts.collectAsState()
-    val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
-    val todayConfirmedCount = receipts.count { !it.isQuotation && it.createdAt?.startsWith(today) == true }
+    val newReceiptsCount by receiptVm.newReceiptsCount.collectAsState()
     val isAdmin = user.role == UserRole.ADMIN
 
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -479,7 +478,7 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                         selected = currentTab == WebTab.RECEIPTS,
                         onClick = { currentTab = WebTab.RECEIPTS },
                         icon = {
-                            BadgedBox(badge = { if (todayConfirmedCount > 0) Badge { Text("$todayConfirmedCount") } }) {
+                            BadgedBox(badge = { if (newReceiptsCount > 0) Badge { Text("$newReceiptsCount") } }) {
                                 Icon(Icons.Default.Receipt, null, modifier = Modifier.size(20.dp))
                             }
                         },
@@ -558,7 +557,7 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                         selected = currentTab == WebTab.RECEIPTS,
                         onClick  = { currentTab = WebTab.RECEIPTS },
                         icon = {
-                            BadgedBox(badge = { if (todayConfirmedCount > 0) Badge { Text("$todayConfirmedCount") } }) {
+                            BadgedBox(badge = { if (newReceiptsCount > 0) Badge { Text("$newReceiptsCount") } }) {
                                 Icon(Icons.Default.Receipt, null)
                             }
                         },
@@ -2151,10 +2150,12 @@ internal fun WebReceiptsTab(
     val quotationReceipts = remember(receipts) {
         receipts.filter { it.isQuotation }.sortedByDescending { it.orderNumber }
     }
-    val todayKey = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString() }
-    val todayConfirmedTabCount = remember(confirmedReceipts) {
-        confirmedReceipts.count { it.createdAt?.startsWith(todayKey) == true }
+    val newReceiptsTabCount by receiptVm.newReceiptsCount.collectAsState()
+    LaunchedEffect(receiptTypeTab) {
+        if (receiptTypeTab == 0) receiptVm.markReceiptsSeen()
     }
+    // Mark seen immediately on first open (tab 0 is default)
+    LaunchedEffect(Unit) { receiptVm.markReceiptsSeen() }
 
     // Current month key e.g. "2026-07"
     val currentMonthKey = remember {
@@ -2223,20 +2224,24 @@ internal fun WebReceiptsTab(
         TabRow(selectedTabIndex = receiptTypeTab) {
             Tab(selected = receiptTypeTab == 0, onClick = { receiptTypeTab = 0 },
                 text = {
-                    BadgedBox(badge = {
-                        if (todayConfirmedTabCount > 0) Badge { Text("$todayConfirmedTabCount") }
-                    }) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                         Text("الفواتير", style = MaterialTheme.typography.labelMedium,
                             fontWeight = if (receiptTypeTab == 0) FontWeight.Bold else FontWeight.Normal)
+                        if (newReceiptsTabCount > 0) {
+                            Spacer(Modifier.width(4.dp))
+                            Badge { Text("$newReceiptsTabCount") }
+                        }
                     }
                 })
             Tab(selected = receiptTypeTab == 1, onClick = { receiptTypeTab = 1 },
                 text = {
-                    BadgedBox(badge = {
-                        if (quotationReceipts.isNotEmpty()) Badge { Text("${quotationReceipts.size}") }
-                    }) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                         Text("عروض السعر", style = MaterialTheme.typography.labelMedium,
                             fontWeight = if (receiptTypeTab == 1) FontWeight.Bold else FontWeight.Normal)
+                        if (quotationReceipts.isNotEmpty()) {
+                            Spacer(Modifier.width(4.dp))
+                            Badge { Text("${quotationReceipts.size}") }
+                        }
                     }
                 })
         }

@@ -123,12 +123,9 @@ class ReceiptsListScreen : Screen {
             val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
             "${now.year}-${twoDigit(now.monthNumber)}"
         }
-        val todayKey = remember {
-            val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-            "${now.year}-${twoDigit(now.monthNumber)}-${twoDigit(now.dayOfMonth)}"
-        }
-        val todayConfirmedCount = remember(confirmedReceipts) {
-            confirmedReceipts.count { it.dateKey() == todayKey }
+        val newReceiptsCount by vm.newReceiptsCount.collectAsState()
+        LaunchedEffect(receiptTypeTab) {
+            if (receiptTypeTab == 0) vm.markReceiptsSeen()
         }
 
         // Distinct months sorted newest first (based on confirmed only)
@@ -187,14 +184,19 @@ class ReceiptsListScreen : Screen {
                             selected = receiptTypeTab == 0,
                             onClick  = { receiptTypeTab = 0 },
                             text = {
-                                BadgedBox(badge = {
-                                    if (todayConfirmedCount > 0) Badge { Text("$todayConfirmedCount") }
-                                }) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
                                     Text(
                                         "الفواتير",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (receiptTypeTab == 0) FontWeight.Bold else FontWeight.Normal
                                     )
+                                    if (newReceiptsCount > 0) {
+                                        Spacer(Modifier.width(4.dp))
+                                        Badge { Text("$newReceiptsCount") }
+                                    }
                                 }
                             }
                         )
@@ -202,15 +204,19 @@ class ReceiptsListScreen : Screen {
                             selected = receiptTypeTab == 1,
                             onClick  = { receiptTypeTab = 1 },
                             text = {
-                                BadgedBox(badge = {
-                                    if (quotationReceipts.isNotEmpty())
-                                        Badge { Text("${quotationReceipts.size}") }
-                                }) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
                                     Text(
                                         "عروض السعر",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = if (receiptTypeTab == 1) FontWeight.Bold else FontWeight.Normal
                                     )
+                                    if (quotationReceipts.isNotEmpty()) {
+                                        Spacer(Modifier.width(4.dp))
+                                        Badge { Text("${quotationReceipts.size}") }
+                                    }
                                 }
                             }
                         )
