@@ -260,8 +260,8 @@ data class CategoryProductsScreen(
             com.elmotamyez.gallery.ui.components.QuickEditProductSheet(
                 product   = product,
                 variants  = state.variantsMap[product.id] ?: emptyList(),
-                onSave    = { price, ws, stock, imageBytes, variantStocks ->
-                    vm.quickEditProduct(product, price, ws, stock, imageBytes, variantStocks)
+                onSave    = { price, ws, stock, imageBytes, remainingUrls, variantStocks ->
+                    vm.quickEditProduct(product, price, ws, stock, imageBytes, remainingUrls, variantStocks)
                     quickEditProduct = null
                 },
                 onDismiss = { quickEditProduct = null }

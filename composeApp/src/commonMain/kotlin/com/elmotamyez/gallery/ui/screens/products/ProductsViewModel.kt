@@ -119,14 +119,14 @@ class ProductsViewModel(
         newWholesalePrice: Double?,
         newStock: Int,
         newImageBytes: ByteArray? = null,
+        remainingImageUrls: List<String> = product.displayImages,
         variantStocks: Map<String, Int> = emptyMap()
     ) {
         viewModelScope.launch {
             val imageUrls = if (newImageBytes != null) {
                 val url = runCatching { imageRepo.uploadProductImage(newImageBytes) }.getOrNull()
-                // Replace the first image (not prepend) so rotating/replacing doesn't add a duplicate
-                if (url != null) listOf(url) + product.displayImages.drop(1) else product.displayImages
-            } else product.displayImages
+                if (url != null) listOf(url) + remainingImageUrls else remainingImageUrls
+            } else remainingImageUrls
             runCatching {
                 repository.updateProduct(
                     id             = product.id,

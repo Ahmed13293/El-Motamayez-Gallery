@@ -2,6 +2,8 @@ package com.elmotamyez.gallery.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -10,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material3.*
@@ -39,7 +42,7 @@ import kotlinx.coroutines.launch
 fun QuickEditProductSheet(
     product: Product,
     variants: List<ProductVariant> = emptyList(),
-    onSave: (price: Double, wholesalePrice: Double?, stock: Int, newImageBytes: ByteArray?, variantStocks: Map<String, Int>) -> Unit,
+    onSave: (price: Double, wholesalePrice: Double?, stock: Int, newImageBytes: ByteArray?, remainingImageUrls: List<String>, variantStocks: Map<String, Int>) -> Unit,
     onDismiss: () -> Unit
 ) {
     var priceText by remember { mutableStateOf(product.price.toString()) }
@@ -47,7 +50,9 @@ fun QuickEditProductSheet(
     var stockText by remember { mutableStateOf(product.stock.toString()) }
     var pendingImageBytes by remember { mutableStateOf<ByteArray?>(null) }
 
-    // Mutable per-variant stock text — keyed by variant id
+    // Existing URLs — user can remove individual entries
+    val imageUrlsList = remember { mutableStateListOf(*product.displayImages.toTypedArray()) }
+
     val variantStockTexts = remember(variants) {
         mutableStateMapOf<String, String>().also { map ->
             variants.forEach { v -> map[v.id] = v.stock.toString() }
@@ -75,70 +80,131 @@ fun QuickEditProductSheet(
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleMedium)
 
-            // ── Image preview + picker buttons ────────────────────────────────
-            val previewModel: Any? = when {
-                pendingImageBytes != null -> pendingImageBytes
-                !product.imageUrl.isNullOrBlank() -> product.imageUrl
-                else -> null
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box(
+            // ── Image section ─────────────────────────────────────────────────
+            // Horizontal row: new-image preview (if picked) + all existing URLs
+            val hasAnyImage = pendingImageBytes != null || imageUrlsList.isNotEmpty()
+            if (hasAnyImage) {
+                Row(
                     modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (previewModel != null) {
-                        AsyncImage(
-                            model = previewModel,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        // Rotate 90° CW — downloads existing URL into pendingImageBytes first if needed
-                        IconButton(
-                            onClick = {
-                                if (isRotating) return@IconButton
-                                scope.launch(Dispatchers.IO) {
-                                    isRotating = true
-                                    val src = pendingImageBytes
-                                        ?: product.imageUrl?.let { url ->
-                                            runCatching { httpClient.get(url).body<ByteArray>() }.getOrNull()
-                                        }
-                                    if (src != null) pendingImageBytes = rotateImage90CW(src)
-                                    isRotating = false
-                                }
-                            },
+                    // Pending new image (from gallery/camera) — rotate only
+                    if (pendingImageBytes != null) {
+                        Box(
                             modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(26.dp)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), CircleShape)
+                                .size(80.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
                         ) {
-                            if (isRotating)
-                                CircularProgressIndicator(Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
-                            else
-                                Icon(Icons.Default.RotateRight, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            AsyncImage(
+                                model = pendingImageBytes,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            // Remove new image
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .align(Alignment.TopEnd)
+                                    .background(Color.Black.copy(alpha = 0.55f), CircleShape)
+                                    .clickable { pendingImageBytes = null },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                            }
+                            // Rotate new image
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .align(Alignment.BottomEnd)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), CircleShape)
+                                    .clickable(enabled = !isRotating) {
+                                        scope.launch(Dispatchers.IO) {
+                                            isRotating = true
+                                            val src = pendingImageBytes
+                                            if (src != null) pendingImageBytes = rotateImage90CW(src)
+                                            isRotating = false
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isRotating)
+                                    CircularProgressIndicator(Modifier.size(12.dp), color = Color.White, strokeWidth = 1.5.dp)
+                                else
+                                    Icon(Icons.Default.RotateRight, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                            }
+                        }
+                    }
+
+                    // Existing URL images — remove + rotate
+                    imageUrlsList.forEachIndexed { idx, url ->
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        ) {
+                            AsyncImage(
+                                model = url,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            // Remove this URL
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .align(Alignment.TopEnd)
+                                    .background(Color.Black.copy(alpha = 0.55f), CircleShape)
+                                    .clickable { imageUrlsList.removeAt(idx) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                            }
+                            // Rotate existing URL — download → rotate → set as pendingImageBytes + remove this URL slot
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .align(Alignment.BottomEnd)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), CircleShape)
+                                    .clickable(enabled = !isRotating) {
+                                        scope.launch(Dispatchers.IO) {
+                                            isRotating = true
+                                            val bytes = runCatching { httpClient.get(url).body<ByteArray>() }.getOrNull()
+                                            if (bytes != null) {
+                                                pendingImageBytes = rotateImage90CW(bytes)
+                                                imageUrlsList.removeAt(idx)
+                                            }
+                                            isRotating = false
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isRotating)
+                                    CircularProgressIndicator(Modifier.size(12.dp), color = Color.White, strokeWidth = 1.5.dp)
+                                else
+                                    Icon(Icons.Default.RotateRight, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                            }
                         }
                     }
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                    OutlinedButton(onClick = galleryLauncher, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.PhotoLibrary, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("اختر من المعرض")
-                    }
-                    if (cameraLauncher != null) {
-                        OutlinedButton(onClick = cameraLauncher, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.AddAPhoto, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("التقط صورة")
-                        }
+            }
+
+            // Gallery + camera buttons
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = galleryLauncher, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.PhotoLibrary, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("المعرض")
+                }
+                if (cameraLauncher != null) {
+                    OutlinedButton(onClick = cameraLauncher, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.AddAPhoto, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("كاميرا")
                     }
                 }
             }
@@ -161,7 +227,7 @@ fun QuickEditProductSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // ── Stock — either base product or per variant ────────────────────
+            // ── Stock ─────────────────────────────────────────────────────────
             if (variants.isEmpty()) {
                 OutlinedTextField(
                     value = stockText,
@@ -192,9 +258,7 @@ fun QuickEditProductSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                    Text("إلغاء")
-                }
+                TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("إلغاء") }
                 Button(
                     onClick = {
                         val price = priceText.toDoubleOrNull() ?: return@Button
@@ -203,7 +267,7 @@ fun QuickEditProductSheet(
                         val variantStocks = variantStockTexts.mapNotNull { (id, text) ->
                             text.toIntOrNull()?.let { id to it }
                         }.toMap()
-                        onSave(price, ws, stock, pendingImageBytes, variantStocks)
+                        onSave(price, ws, stock, pendingImageBytes, imageUrlsList.toList(), variantStocks)
                     },
                     modifier = Modifier.weight(1f)
                 ) { Text("حفظ") }
