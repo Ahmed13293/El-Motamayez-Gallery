@@ -81,6 +81,9 @@ private fun rotate90CW(original: BufferedImage, @Suppress("UNUSED_PARAMETER") fa
 }
 
 @Composable
+actual fun rememberCameraLauncher(onImageCaptured: (ByteArray) -> Unit): (() -> Unit)? = null
+
+@Composable
 actual fun rememberImagePickerLauncher(onImagePicked: (ByteArray) -> Unit): () -> Unit {
     val scope = rememberCoroutineScope()
     return {

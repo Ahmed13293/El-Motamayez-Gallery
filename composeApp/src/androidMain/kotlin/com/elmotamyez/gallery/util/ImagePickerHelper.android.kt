@@ -9,11 +9,17 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
+import java.io.File
 
 private fun processImage(context: Context, uri: Uri, maxDimension: Int = 1200, quality: Int = 80): ByteArray? {
     val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
@@ -66,6 +72,30 @@ actual fun rememberImagePickerLauncher(onImagePicked: (ByteArray) -> Unit): () -
     }
 
     return { launcher.launch("image/*") }
+}
+
+@Composable
+actual fun rememberCameraLauncher(onImageCaptured: (ByteArray) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val scope   = rememberCoroutineScope()
+    // Hold the URI we'll write the photo into; recreated when launcher fires
+    var photoUri by remember { mutableStateOf<Uri?>(null) }
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) {
+            val uri = photoUri ?: return@rememberLauncherForActivityResult
+            scope.launch(Dispatchers.IO) {
+                processImage(context, uri)?.let { onImageCaptured(it) }
+            }
+        }
+    }
+
+    return {
+        val tmpFile = File.createTempFile("cam_", ".jpg", context.cacheDir)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", tmpFile)
+        photoUri = uri
+        launcher.launch(uri)
+    }
 }
 
 /** Rotate a landscape image 90° CW to portrait. Returns original bytes unchanged if already portrait. */

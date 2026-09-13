@@ -6,12 +6,14 @@ import com.elmotamyez.gallery.data.model.Brand
 import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.model.ProductVariant
+import com.elmotamyez.gallery.data.repository.ImageUploadRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
 import com.elmotamyez.gallery.data.repository.ProductVariantRepository
 import com.elmotamyez.gallery.util.arabicContains
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -31,7 +33,8 @@ data class ProductsUiState(
 
 class ProductsViewModel(
     private val repository: ProductRepository,
-    private val variantRepository: ProductVariantRepository
+    private val variantRepository: ProductVariantRepository,
+    private val imageRepo: ImageUploadRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProductsUiState())
@@ -39,7 +42,13 @@ class ProductsViewModel(
 
     private var allProductsCache: List<Product> = emptyList()
 
-    init { loadData() }
+    init {
+        loadData()
+        // Re-fetch whenever AdminViewModel clears the product cache (e.g. after editing a product image)
+        viewModelScope.launch {
+            repository.modifiedVersion.drop(1).collect { refreshProducts() }
+        }
+    }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -107,8 +116,18 @@ class ProductsViewModel(
 
     fun retry() = loadData()
 
-    fun quickEditProduct(product: Product, newPrice: Double, newWholesalePrice: Double?, newStock: Int) {
+    fun quickEditProduct(
+        product: Product,
+        newPrice: Double,
+        newWholesalePrice: Double?,
+        newStock: Int,
+        newImageBytes: ByteArray? = null
+    ) {
         viewModelScope.launch {
+            val imageUrls = if (newImageBytes != null) {
+                val url = runCatching { imageRepo.uploadProductImage(newImageBytes) }.getOrNull()
+                if (url != null) listOf(url) + product.displayImages else product.displayImages
+            } else product.displayImages
             runCatching {
                 repository.updateProduct(
                     id             = product.id,
@@ -118,7 +137,7 @@ class ProductsViewModel(
                     stock          = newStock,
                     brandId        = product.brandId,
                     categoryId     = product.categoryId,
-                    imageUrls      = product.displayImages,
+                    imageUrls      = imageUrls,
                     barcode        = product.barcode
                 )
             }

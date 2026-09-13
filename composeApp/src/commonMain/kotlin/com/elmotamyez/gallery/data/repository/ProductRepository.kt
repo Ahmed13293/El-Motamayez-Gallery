@@ -5,6 +5,9 @@ import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.remote.supabaseClient
 import io.github.jan.supabase.postgrest.from
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -45,10 +48,15 @@ class ProductRepository {
     private var cachedBrands:     List<Brand>?    = null
     private var cachedProducts:   List<Product>?  = null
 
+    // Increments whenever the cache is cleared so observers can re-fetch
+    private val _modifiedVersion = MutableStateFlow(0)
+    val modifiedVersion: StateFlow<Int> = _modifiedVersion.asStateFlow()
+
     fun clearCache() {
         cachedCategories = null
         cachedBrands     = null
         cachedProducts   = null
+        _modifiedVersion.value++
     }
 
     // ── READ ──────────────────────────────────────────────────────────────────

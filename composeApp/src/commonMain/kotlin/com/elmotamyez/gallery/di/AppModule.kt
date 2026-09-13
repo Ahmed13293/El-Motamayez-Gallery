@@ -46,6 +46,6 @@ val appModule = module {
     singleOf(::AttendanceViewModel)
 
     // Per-screen ViewModels
-    viewModel { ProductsViewModel(get(), get()) }
+    viewModel { ProductsViewModel(get(), get(), get()) }
     viewModelOf(::AdminViewModel)
 }
