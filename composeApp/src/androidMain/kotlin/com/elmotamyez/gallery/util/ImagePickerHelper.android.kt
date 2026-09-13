@@ -75,7 +75,7 @@ actual fun rememberImagePickerLauncher(onImagePicked: (ByteArray) -> Unit): () -
 }
 
 @Composable
-actual fun rememberCameraLauncher(onImageCaptured: (ByteArray) -> Unit): () -> Unit {
+actual fun rememberCameraLauncher(onImageCaptured: (ByteArray) -> Unit): (() -> Unit)? {
     val context = LocalContext.current
     val scope   = rememberCoroutineScope()
     // Hold the URI we'll write the photo into; recreated when launcher fires
