@@ -5,6 +5,7 @@ import com.elmotamyez.gallery.data.model.Category
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.remote.supabaseClient
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +27,9 @@ private data class BrandUpdate(
     @SerialName("category_id") val categoryId: String,
     @SerialName("parent_id")   val parentId: String?
 )
+
+@Serializable
+private data class StockOnly(val stock: Int = 0)
 
 @Serializable
 private data class ProductUpdate(
@@ -161,8 +165,8 @@ class ProductRepository {
 
     suspend fun decrementStock(productId: String, quantity: Int) {
         val current = supabaseClient.from("products")
-            .select { filter { eq("id", productId) } }
-            .decodeList<Product>()
+            .select(Columns.list("stock")) { filter { eq("id", productId) } }
+            .decodeList<StockOnly>()
             .firstOrNull()?.stock ?: return
         val newStock = (current - quantity).coerceAtLeast(0)
         supabaseClient.from("products")
@@ -174,8 +178,8 @@ class ProductRepository {
 
     suspend fun incrementStock(productId: String, quantity: Int) {
         val current = supabaseClient.from("products")
-            .select { filter { eq("id", productId) } }
-            .decodeList<Product>()
+            .select(Columns.list("stock")) { filter { eq("id", productId) } }
+            .decodeList<StockOnly>()
             .firstOrNull()?.stock ?: return
         supabaseClient.from("products")
             .update(buildJsonObject { put("stock", current + quantity) }) {

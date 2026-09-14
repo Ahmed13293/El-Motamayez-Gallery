@@ -9,7 +9,11 @@ import com.elmotamyez.gallery.data.model.ProductVariant
 import com.elmotamyez.gallery.data.repository.ImageUploadRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
 import com.elmotamyez.gallery.data.repository.ProductVariantRepository
+import com.elmotamyez.gallery.ui.model.PendingImage
 import com.elmotamyez.gallery.util.arabicContains
+import com.russhwolf.settings.Settings
+import com.russhwolf.settings.get
+import com.russhwolf.settings.set
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,6 +43,25 @@ class ProductsViewModel(
 
     private val _uiState = MutableStateFlow(ProductsUiState())
     val uiState: StateFlow<ProductsUiState> = _uiState.asStateFlow()
+
+    // Persistent search history
+    private val settings = Settings()
+    private val historyKey = "search_history_v2"
+
+    private val _searchHistory = MutableStateFlow(
+        settings.getString(historyKey, "")
+            .split("\n")
+            .filter { it.isNotBlank() }
+    )
+    val searchHistory: StateFlow<List<String>> = _searchHistory.asStateFlow()
+
+    fun addToSearchHistory(query: String) {
+        val q = query.trim()
+        if (q.isBlank()) return
+        val updated = (listOf(q) + _searchHistory.value.filter { it != q }).take(10)
+        _searchHistory.value = updated
+        settings[historyKey] = updated.joinToString("\n")
+    }
 
     init {
         loadData()
@@ -118,15 +141,17 @@ class ProductsViewModel(
         newPrice: Double,
         newWholesalePrice: Double?,
         newStock: Int,
-        newImageBytes: ByteArray? = null,
-        remainingImageUrls: List<String> = product.displayImages,
+        images: List<PendingImage> = product.displayImages.map { PendingImage.Remote(it) },
         variantStocks: Map<String, Int> = emptyMap()
     ) {
         viewModelScope.launch {
-            val imageUrls = if (newImageBytes != null) {
-                val url = runCatching { imageRepo.uploadProductImage(newImageBytes) }.getOrNull()
-                if (url != null) listOf(url) + remainingImageUrls else remainingImageUrls
-            } else remainingImageUrls
+            // Upload any local images; keep remote URLs as-is — order is preserved
+            val imageUrls = images.mapNotNull { img ->
+                when (img) {
+                    is PendingImage.Remote -> img.url
+                    is PendingImage.Local  -> runCatching { imageRepo.uploadProductImage(img.bytes) }.getOrNull()
+                }
+            }
             runCatching {
                 repository.updateProduct(
                     id             = product.id,
@@ -139,6 +164,17 @@ class ProductsViewModel(
                     imageUrls      = imageUrls,
                     barcode        = product.barcode
                 )
+            }.onSuccess {
+                // Patch local state immediately so the UI reflects the change
+                val updated = product.copy(price = newPrice, wholesalePrice = newWholesalePrice, stock = newStock, imageUrls = imageUrls)
+                val newAll  = _uiState.value.allProducts.map { if (it.id == product.id) updated else it }
+                val s = _uiState.value
+                _uiState.update {
+                    it.copy(
+                        allProducts = newAll,
+                        products    = filtered(newAll, s.selectedCategoryId, s.selectedBrandId, s.selectedSubBrandId, s.searchQuery)
+                    )
+                }
             }
             // Update each variant's stock independently
             variantStocks.forEach { (variantId, stock) ->
@@ -147,14 +183,25 @@ class ProductsViewModel(
                     runCatching { variantRepository.update(variantId, variant.name, stock) }
                 }
             }
-            refreshProducts()
+            // Patch variant stocks in local state
+            if (variantStocks.isNotEmpty()) {
+                val updatedVariants = _uiState.value.variantsMap[product.id]?.map { v ->
+                    variantStocks[v.id]?.let { s -> v.copy(stock = s) } ?: v
+                }
+                if (updatedVariants != null) {
+                    _uiState.update { it.copy(variantsMap = it.variantsMap + (product.id to updatedVariants)) }
+                }
+            }
+            // No refreshProducts() here — updateProduct() already clears the cache and bumps
+            // modifiedVersion, which the observer below picks up and calls refreshProducts() once.
         }
     }
 
     fun refreshProducts() {
         viewModelScope.launch {
             try {
-                repository.clearCache()
+                // Do NOT call clearCache() here — updateProduct() already did it, and calling
+                // it again would re-increment modifiedVersion, causing an infinite observer loop.
                 val newProducts = repository.getProducts()
                 val variantsMap = variantRepository.fetchAll().groupBy { it.productId }
                 val s = _uiState.value

@@ -332,8 +332,8 @@ class ReceiptScreen : Screen {
         if (showDeleteDialog && receipt != null) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
-                title = { Text("حذف الفاتورة", fontWeight = FontWeight.Bold) },
-                text = { Text("هل أنت متأكد من حذف الفاتورة ${receipt!!.id}؟\nسيتم استعادة المخزون تلقائياً.") },
+                title = { Text("نقل إلى المحذوفات", fontWeight = FontWeight.Bold) },
+                text = { Text("سيتم نقل الفاتورة #${receipt!!.orderNumber} إلى المحذوفات واستعادة المخزون تلقائياً.\nيمكن استعادتها خلال 7 أيام من قائمة المحذوفات.") },
                 confirmButton = {
                     Button(
                         onClick = {

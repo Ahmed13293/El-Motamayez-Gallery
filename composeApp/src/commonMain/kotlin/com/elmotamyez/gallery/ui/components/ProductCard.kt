@@ -292,9 +292,10 @@ fun ProductCard(
     onDecrease: () -> Unit,
     modifier: Modifier = Modifier,
     categoryPath: String = "",
-    onLongClick: (() -> Unit)? = null
+    onLongClick: (() -> Unit)? = null,
+    effectiveStock: Int = product.stock,
 ) {
-    val stockSt = stockState(product.stock)
+    val stockSt = stockState(effectiveStock)
     var lightboxIndex by remember { mutableStateOf(-1) }
 
     if (lightboxIndex >= 0 && product.displayImages.isNotEmpty()) {
@@ -360,7 +361,7 @@ fun ProductCard(
                     letterSpacing = 0.sp
                 )
                 // ── Stock badge ───────────────────────────────────────────────
-                StockBadge(stock = product.stock)
+                StockBadge(stock = effectiveStock)
                 // ── Category path ─────────────────────────────────────────────
                 if (categoryPath.isNotBlank()) {
                     Text(
@@ -426,7 +427,7 @@ fun ProductCard(
                                 Text("$quantity", color = Color.White, fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp, modifier = Modifier.widthIn(min = 20.dp),
                                     textAlign = TextAlign.Center)
-                                val atStockLimit = quantity >= product.stock
+                                val atStockLimit = quantity >= effectiveStock
                                 Box(
                                     modifier = Modifier
                                         .size(24.dp)

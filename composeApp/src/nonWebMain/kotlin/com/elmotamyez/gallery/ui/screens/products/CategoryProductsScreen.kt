@@ -11,10 +11,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -52,10 +54,23 @@ data class CategoryProductsScreen(
         val keyboard = LocalSoftwareKeyboardController.current
         var quickEditProduct by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Product?>(null) }
         var variantPickerProduct by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Product?>(null) }
+        var searchHistory by remember { mutableStateOf(listOf<String>()) }
+        var isSearchFocused by remember { mutableStateOf(false) }
 
         // Select this category on first composition
         LaunchedEffect(categoryId) {
             vm.selectCategory(categoryId)
+        }
+
+        // Auto-save non-blank search queries to history after user stops typing
+        LaunchedEffect(state.searchQuery) {
+            val q = state.searchQuery.trim()
+            if (q.isNotBlank()) {
+                kotlinx.coroutines.delay(1200)
+                if (state.searchQuery.trim() == q) {
+                    searchHistory = (listOf(q) + searchHistory.filter { it != q }).take(6)
+                }
+            }
         }
 
         // Level-2: top-level sub-categories (no parent)
@@ -97,7 +112,7 @@ data class CategoryProductsScreen(
                     OutlinedTextField(
                         value = state.searchQuery,
                         onValueChange = { vm.search(it) },
-                        placeholder = { Text("Search in $categoryName…") },
+                        placeholder = { Text("ابحث في $categoryName…") },
                         leadingIcon = {
                             Icon(Icons.Default.Search, contentDescription = null)
                         },
@@ -115,7 +130,30 @@ data class CategoryProductsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .onFocusChanged { isSearchFocused = it.isFocused }
                     )
+
+                    // ── Search history chips ──────────────────────────────────
+                    if (isSearchFocused && state.searchQuery.isBlank() && searchHistory.isNotEmpty()) {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(searchHistory) { entry ->
+                                SuggestionChip(
+                                    onClick = {
+                                        vm.search(entry)
+                                        keyboard?.hide()
+                                    },
+                                    label = { Text(entry) },
+                                    icon = {
+                                        Icon(Icons.Default.History, contentDescription = null,
+                                            modifier = Modifier.size(16.dp))
+                                    }
+                                )
+                            }
+                        }
+                    }
 
                     // ── Brand filter chips ───────────────────────────────────
                     if (brandsForCat.isNotEmpty()) {
@@ -230,12 +268,15 @@ data class CategoryProductsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(state.products, key = { it.id }) { product ->
-                        val hasVariants = !state.variantsMap[product.id].isNullOrEmpty()
+                        val variants = state.variantsMap[product.id]
+                        val hasVariants = !variants.isNullOrEmpty()
+                        val effectiveStock = if (hasVariants) variants!!.sumOf { it.stock } else product.stock
                         val totalQty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
                         ProductCard(
                             product = product,
                             isInCart = totalQty > 0,
                             quantity = totalQty,
+                            effectiveStock = effectiveStock,
                             onAddToCart = {
                                 if (hasVariants) variantPickerProduct = product
                                 else cartVm.addToCart(product)
@@ -260,8 +301,8 @@ data class CategoryProductsScreen(
             com.elmotamyez.gallery.ui.components.QuickEditProductSheet(
                 product   = product,
                 variants  = state.variantsMap[product.id] ?: emptyList(),
-                onSave    = { price, ws, stock, imageBytes, remainingUrls, variantStocks ->
-                    vm.quickEditProduct(product, price, ws, stock, imageBytes, remainingUrls, variantStocks)
+                onSave    = { price, ws, stock, images, variantStocks ->
+                    vm.quickEditProduct(product, price, ws, stock, images, variantStocks)
                     quickEditProduct = null
                 },
                 onDismiss = { quickEditProduct = null }

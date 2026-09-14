@@ -19,5 +19,7 @@ data class Receipt(
     @SerialName("is_quotation")  val isQuotation:  Boolean = false,
     // Local-only flag — true when the Supabase insert hasn't succeeded yet.
     // Never sent to Supabase (not in ReceiptInsert DTO). Cleared on successful sync.
-    val pendingSave: Boolean = false
+    val pendingSave: Boolean = false,
+    // Set by Supabase when the receipt is soft-deleted. Null = active.
+    @SerialName("deleted_at") val deletedAt: String? = null
 )

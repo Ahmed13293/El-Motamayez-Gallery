@@ -20,7 +20,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.*
@@ -69,8 +71,38 @@ import com.elmotamyez.gallery.util.formatPrice
 import com.elmotamyez.gallery.util.BarcodeScannerSheet
 import com.elmotamyez.gallery.util.normalizeBarcode
 import androidx.compose.material.icons.filled.QrCodeScanner
+import kotlinx.serialization.encodeToString
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+
+// Emoji icon for a category based on keywords in its Arabic name; null → fall back to first letter
+private fun categoryEmoji(name: String): String? = when {
+    "مكتب" in name || "قرطاسية" in name || "قلم" in name                          -> "✏️"
+    "لعاب" in name || "ألعاب" in name || "العاب" in name                          -> "🎮"
+    "شنط" in name || "حقيب" in name || "بوكس" in name                            -> "👜"
+    "تجميل" in name || "مكياج" in name || "عناية" in name                        -> "💄"
+    "ميلاد" in name || "عيد" in name || "مناسب" in name                          -> "🎂"
+    "أكسوار" in name || "اكسسوار" in name || "تول" in name                       -> "🎀"
+    "مدرس" in name || "مدرسي" in name                                             -> "🎒"
+    "رسم" in name || "ألوان" in name || "الوان" in name || "لوان" in name         -> "🎨"
+    "كهرب" in name || "إلكترون" in name || "الكترون" in name                     -> "🔌"
+    "ملابس" in name || "أزياء" in name || "موضة" in name                         -> "👗"
+    "أطفال" in name || "طفل" in name || "بيبي" in name                           -> "🍼"
+    "منزل" in name || "مطبخ" in name                                              -> "🏠"
+    "دفاتر" in name || "دفتر" in name || "أوراق" in name || "ورق" in name        -> "📓"
+    "طباعة" in name || "طابع" in name                                             -> "🖨️"
+    "رياضة" in name || "رياضي" in name                                            -> "⚽"
+    "ساعة" in name || "ساعات" in name                                             -> "⌚"
+    "صحة" in name || "طب" in name || "دواء" in name                              -> "💊"
+    "هدية" in name || "هدايا" in name                                             -> "🎁"
+    "موبايل" in name || "هاتف" in name || "جوال" in name                         -> "📱"
+    "كمبيوتر" in name || "لاب" in name || "حاسوب" in name                        -> "💻"
+    "كاميرا" in name || "تصوير" in name                                           -> "📷"
+    "موسيقى" in name || "موسيق" in name                                           -> "🎵"
+    "طعام" in name || "أكل" in name || "مأكول" in name                           -> "🍔"
+    "حيوان" in name                                                               -> "🐾"
+    else -> null
+}
 
 // Light pastel palette — pairs with the white/light-blue-gray theme
 private val categoryPalette = listOf(
@@ -136,9 +168,20 @@ class CategoriesHomeScreen : Screen {
         // Global search query (local — doesn't affect category filter)
         var searchQuery by remember { mutableStateOf("") }
         var selectedCategory by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Category?>(null) }
+        var isSearchFocused by remember { mutableStateOf(false) }
 
-        // Reset category selection when search is cleared
-        LaunchedEffect(searchQuery) { if (searchQuery.isBlank()) selectedCategory = null }
+        val searchHistory by vm.searchHistory.collectAsState()
+
+        // Reset category when search cleared; auto-save queries to history after typing stops
+        LaunchedEffect(searchQuery) {
+            if (searchQuery.isBlank()) {
+                selectedCategory = null
+            } else {
+                kotlinx.coroutines.delay(600)
+                val q = searchQuery.trim()
+                if (q.isNotBlank()) vm.addToSearchHistory(q)
+            }
+        }
 
         // Compute best-sellers from receipt history
         val bestSellers: List<Product> = remember(receipts, state.allProducts) {
@@ -249,12 +292,35 @@ class CategoriesHomeScreen : Screen {
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                 keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
                                 shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .onFocusChanged { isSearchFocused = it.isFocused }
                             )
                             IconButton(onClick = { showBarcodeScanner = true }) {
                                 Icon(Icons.Default.QrCodeScanner,
                                     contentDescription = "مسح الباركود",
                                     tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        // ── Search history chips ──────────────────────────────
+                        if (isSearchFocused && searchQuery.isBlank() && searchHistory.isNotEmpty()) {
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(searchHistory) { entry ->
+                                    SuggestionChip(
+                                        onClick = {
+                                            searchQuery = entry
+                                            keyboard?.hide()
+                                        },
+                                        label = { Text(entry) },
+                                        icon = {
+                                            Icon(Icons.Default.History, contentDescription = null,
+                                                modifier = Modifier.size(16.dp))
+                                        }
+                                    )
+                                }
                             }
                         }
                         if (searchQuery.isNotBlank() && state.categories.isNotEmpty()) {
@@ -459,8 +525,8 @@ class CategoriesHomeScreen : Screen {
                 com.elmotamyez.gallery.ui.components.QuickEditProductSheet(
                     product  = product,
                     variants = state.variantsMap[product.id] ?: emptyList(),
-                    onSave   = { price, ws, stock, imageBytes, remainingUrls, variantStocks ->
-                        vm.quickEditProduct(product, price, ws, stock, imageBytes, remainingUrls, variantStocks)
+                    onSave   = { price, ws, stock, images, variantStocks ->
+                        vm.quickEditProduct(product, price, ws, stock, images, variantStocks)
                         quickEditProduct = null
                     },
                     onDismiss = { quickEditProduct = null }
@@ -534,13 +600,16 @@ class CategoriesHomeScreen : Screen {
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 row.forEach { product ->
-                                    val hasVariants = !state.variantsMap[product.id].isNullOrEmpty()
+                                    val variants = state.variantsMap[product.id]
+                                    val hasVariants = !variants.isNullOrEmpty()
+                                    val effectiveStock = if (hasVariants) variants!!.sumOf { it.stock } else product.stock
                                     val totalQty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
                                     Box(modifier = Modifier.weight(1f)) {
                                         com.elmotamyez.gallery.ui.components.ProductCard(
                                             product = product,
                                             isInCart = totalQty > 0,
                                             quantity = totalQty,
+                                            effectiveStock = effectiveStock,
                                             onAddToCart = {
                                                 if (hasVariants) variantPickerProduct = product
                                                 else cartVm.addToCart(product)
@@ -791,6 +860,7 @@ private fun CategoryGrid(
 
 @Composable
 private fun CategoryTile(category: Category, color: Color, onClick: () -> Unit) {
+    val emoji = categoryEmoji(category.name)
     Column(
         modifier = Modifier
             .padding(4.dp)
@@ -805,12 +875,16 @@ private fun CategoryTile(category: Category, color: Color, onClick: () -> Unit) 
                 .background(color),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = category.name.take(1),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF08396C).copy(alpha = 0.75f)
-            )
+            if (emoji != null) {
+                Text(text = emoji, fontSize = 30.sp)
+            } else {
+                Text(
+                    text = category.name.take(1),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF08396C).copy(alpha = 0.75f)
+                )
+            }
         }
         Spacer(Modifier.height(4.dp))
         Text(

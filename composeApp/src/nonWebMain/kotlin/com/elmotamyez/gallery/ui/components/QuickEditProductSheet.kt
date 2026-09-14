@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.elmotamyez.gallery.data.model.Product
 import com.elmotamyez.gallery.data.model.ProductVariant
+import com.elmotamyez.gallery.ui.model.PendingImage
 import com.elmotamyez.gallery.util.rememberCameraLauncher
 import com.elmotamyez.gallery.util.rememberImagePickerLauncher
 import com.elmotamyez.gallery.util.rotateImage90CW
@@ -42,16 +43,18 @@ import kotlinx.coroutines.launch
 fun QuickEditProductSheet(
     product: Product,
     variants: List<ProductVariant> = emptyList(),
-    onSave: (price: Double, wholesalePrice: Double?, stock: Int, newImageBytes: ByteArray?, remainingImageUrls: List<String>, variantStocks: Map<String, Int>) -> Unit,
+    onSave: (price: Double, wholesalePrice: Double?, stock: Int, images: List<PendingImage>, variantStocks: Map<String, Int>) -> Unit,
     onDismiss: () -> Unit
 ) {
     var priceText by remember { mutableStateOf(product.price.toString()) }
     var wsText    by remember { mutableStateOf(product.wholesalePrice?.toString() ?: "") }
     var stockText by remember { mutableStateOf(product.stock.toString()) }
-    var pendingImageBytes by remember { mutableStateOf<ByteArray?>(null) }
 
-    // Existing URLs — user can remove individual entries
-    val imageUrlsList = remember { mutableStateListOf(*product.displayImages.toTypedArray()) }
+    // Single ordered list: each slot is either a remote URL or local bytes.
+    // This preserves order when rotating URL images (they become Local in-place).
+    val images = remember {
+        mutableStateListOf(*product.displayImages.map { PendingImage.Remote(it) as PendingImage }.toTypedArray())
+    }
 
     val variantStockTexts = remember(variants) {
         mutableStateMapOf<String, String>().also { map ->
@@ -59,8 +62,8 @@ fun QuickEditProductSheet(
         }
     }
 
-    val galleryLauncher = rememberImagePickerLauncher { bytes -> pendingImageBytes = bytes }
-    val cameraLauncher  = rememberCameraLauncher     { bytes -> pendingImageBytes = bytes }
+    val galleryLauncher = rememberImagePickerLauncher { bytes -> images.add(0, PendingImage.Local(bytes)) }
+    val cameraLauncher  = rememberCameraLauncher     { bytes -> images.add(0, PendingImage.Local(bytes)) }
 
     var isRotating by remember { mutableStateOf(false) }
     val scope      = rememberCoroutineScope()
@@ -81,41 +84,47 @@ fun QuickEditProductSheet(
                 style = MaterialTheme.typography.titleMedium)
 
             // ── Image section ─────────────────────────────────────────────────
-            // Horizontal row: new-image preview (if picked) + all existing URLs
-            val hasAnyImage = pendingImageBytes != null || imageUrlsList.isNotEmpty()
-            if (hasAnyImage) {
+            if (images.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Pending new image (from gallery/camera) — rotate only
-                    if (pendingImageBytes != null) {
+                    images.forEachIndexed { idx, img ->
+                        val isLocal = img is PendingImage.Local
                         Box(
                             modifier = Modifier
                                 .size(80.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                                .border(
+                                    1.dp,
+                                    if (isLocal) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                                    RoundedCornerShape(8.dp)
+                                )
                         ) {
                             AsyncImage(
-                                model = pendingImageBytes,
+                                model = when (img) {
+                                    is PendingImage.Local  -> img.bytes
+                                    is PendingImage.Remote -> img.url
+                                },
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
-                            // Remove new image
+                            // Remove
                             Box(
                                 modifier = Modifier
                                     .size(20.dp)
                                     .align(Alignment.TopEnd)
                                     .background(Color.Black.copy(alpha = 0.55f), CircleShape)
-                                    .clickable { pendingImageBytes = null },
+                                    .clickable { images.removeAt(idx) },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(12.dp))
                             }
-                            // Rotate new image
+                            // Rotate — replaces the slot in-place so ordering is preserved
                             Box(
                                 modifier = Modifier
                                     .size(20.dp)
@@ -124,59 +133,13 @@ fun QuickEditProductSheet(
                                     .clickable(enabled = !isRotating) {
                                         scope.launch(Dispatchers.IO) {
                                             isRotating = true
-                                            val src = pendingImageBytes
-                                            if (src != null) pendingImageBytes = rotateImage90CW(src)
-                                            isRotating = false
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isRotating)
-                                    CircularProgressIndicator(Modifier.size(12.dp), color = Color.White, strokeWidth = 1.5.dp)
-                                else
-                                    Icon(Icons.Default.RotateRight, null, tint = Color.White, modifier = Modifier.size(12.dp))
-                            }
-                        }
-                    }
-
-                    // Existing URL images — remove + rotate
-                    imageUrlsList.forEachIndexed { idx, url ->
-                        Box(
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                        ) {
-                            AsyncImage(
-                                model = url,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            // Remove this URL
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .align(Alignment.TopEnd)
-                                    .background(Color.Black.copy(alpha = 0.55f), CircleShape)
-                                    .clickable { imageUrlsList.removeAt(idx) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(12.dp))
-                            }
-                            // Rotate existing URL — download → rotate → set as pendingImageBytes + remove this URL slot
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .align(Alignment.BottomEnd)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), CircleShape)
-                                    .clickable(enabled = !isRotating) {
-                                        scope.launch(Dispatchers.IO) {
-                                            isRotating = true
-                                            val bytes = runCatching { httpClient.get(url).body<ByteArray>() }.getOrNull()
-                                            if (bytes != null) {
-                                                pendingImageBytes = rotateImage90CW(bytes)
-                                                imageUrlsList.removeAt(idx)
+                                            val src: ByteArray? = when (val current = images.getOrNull(idx)) {
+                                                is PendingImage.Local  -> current.bytes
+                                                is PendingImage.Remote -> runCatching { httpClient.get(current.url).body<ByteArray>() }.getOrNull()
+                                                null -> null
+                                            }
+                                            if (src != null) {
+                                                images[idx] = PendingImage.Local(rotateImage90CW(src))
                                             }
                                             isRotating = false
                                         }
@@ -267,7 +230,7 @@ fun QuickEditProductSheet(
                         val variantStocks = variantStockTexts.mapNotNull { (id, text) ->
                             text.toIntOrNull()?.let { id to it }
                         }.toMap()
-                        onSave(price, ws, stock, pendingImageBytes, imageUrlsList.toList(), variantStocks)
+                        onSave(price, ws, stock, images.toList(), variantStocks)
                     },
                     modifier = Modifier.weight(1f)
                 ) { Text("حفظ") }

@@ -231,13 +231,10 @@ class ReceiptViewModel(
                         .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
                         .forEach { cartItem ->
                             runCatching {
-                                if (cartItem.variantId != null) {
-                                    val variants = variantRepository.fetchForProduct(cartItem.product.id)
-                                    val v = variants.find { it.id == cartItem.variantId }
-                                    if (v != null) variantRepository.updateStock(v.id, maxOf(0, v.stock - cartItem.quantity))
-                                } else {
+                                if (cartItem.variantId != null)
+                                    variantRepository.decrementStock(cartItem.variantId, cartItem.quantity)
+                                else
                                     productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
-                                }
                             }
                         }
                 }
@@ -319,7 +316,10 @@ class ReceiptViewModel(
                     .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
                     .forEach { cartItem ->
                         runCatching {
-                            productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+                            if (cartItem.variantId != null)
+                                variantRepository.decrementStock(cartItem.variantId, cartItem.quantity)
+                            else
+                                productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
                         }
                     }
                 _stockVersion.value += 1
@@ -397,7 +397,12 @@ class ReceiptViewModel(
             receipt.items
                 .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
                 .forEach { cartItem ->
-                    runCatching { productRepository.decrementStock(cartItem.product.id, cartItem.quantity) }
+                    runCatching {
+                        if (cartItem.variantId != null)
+                            variantRepository.decrementStock(cartItem.variantId, cartItem.quantity)
+                        else
+                            productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+                    }
                 }
             _stockVersion.value += 1
             val confirmed = receipt.copy(isQuotation = false)
@@ -435,18 +440,28 @@ class ReceiptViewModel(
             _isSaving.value = true
 
             if (!receipt.isQuotation) {
-                val oldQtyMap = receipt.items
-                    .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
-                    .associate { it.product.id to it.quantity }
-                val newQtyMap = newItems
-                    .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
-                    .associate { it.product.id to it.quantity }
+                // Key on variantId when present so two variants of the same product don't merge
+                data class StockKey(val productId: String, val variantId: String?)
+                fun CartItem.stockKey() = StockKey(product.id, variantId)
 
-                (oldQtyMap.keys + newQtyMap.keys).toSet().forEach { id ->
-                    val diff = (newQtyMap[id] ?: 0) - (oldQtyMap[id] ?: 0)
+                val oldMap = receipt.items
+                    .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
+                    .associate { it.stockKey() to it.quantity }
+                val newMap = newItems
+                    .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
+                    .associate { it.stockKey() to it.quantity }
+
+                (oldMap.keys + newMap.keys).toSet().forEach { key ->
+                    val diff = (newMap[key] ?: 0) - (oldMap[key] ?: 0)
                     when {
-                        diff > 0 -> runCatching { productRepository.decrementStock(id, diff) }
-                        diff < 0 -> runCatching { productRepository.incrementStock(id, -diff) }
+                        diff > 0 -> runCatching {
+                            if (key.variantId != null) variantRepository.decrementStock(key.variantId, diff)
+                            else productRepository.decrementStock(key.productId, diff)
+                        }
+                        diff < 0 -> runCatching {
+                            if (key.variantId != null) variantRepository.incrementStock(key.variantId, -diff)
+                            else productRepository.incrementStock(key.productId, -diff)
+                        }
                     }
                 }
             }
@@ -463,24 +478,34 @@ class ReceiptViewModel(
         }
     }
 
-    /** Restores stock for all items in the receipt, then deletes it from Supabase and local cache.
-     *  Pending receipts (never saved to Supabase) are removed locally without a network call. */
+    /** Soft-delete: moves receipt to trash and restores stock immediately.
+     *  Pending receipts (never saved to Supabase) are just removed locally — no stock change. */
     fun deleteReceipt(receipt: Receipt, onDone: () -> Unit = {}) {
         viewModelScope.launch {
             _isSaving.value = true
-            val deleted = if (receipt.pendingSave) {
-                // Not in Supabase yet — just remove locally, no stock to restore
-                true
+            val moved = if (receipt.pendingSave) {
+                true // never reached Supabase; nothing to soft-delete there
             } else {
-                val result = runCatching { repository.delete(receipt.id) }
+                val result = runCatching { repository.softDelete(receipt.id) }
                 if (!result.isSuccess) _deleteError.value = result.exceptionOrNull()?.message ?: "فشل الحذف"
                 result.isSuccess
             }
-            if (deleted) {
+            if (moved) {
                 if (!receipt.pendingSave && !receipt.isQuotation) {
+                    val stockErrors = mutableListOf<String>()
                     receipt.items
                         .filter { !it.product.id.startsWith("other_") && it.product.categoryId.isNotBlank() }
-                        .forEach { runCatching { productRepository.incrementStock(it.product.id, it.quantity) } }
+                        .forEach { item ->
+                            runCatching {
+                                if (item.variantId != null)
+                                    variantRepository.incrementStock(item.variantId, item.quantity)
+                                else
+                                    productRepository.incrementStock(item.product.id, item.quantity)
+                            }.onFailure { e -> stockErrors += "${item.product.name}: ${e.message}" }
+                        }
+                    if (stockErrors.isNotEmpty()) {
+                        _deleteError.value = "تم نقل الفاتورة للمحذوفات لكن فشل استعادة المخزون لبعض المنتجات:\n${stockErrors.joinToString("\n")}"
+                    }
                     _stockVersion.value += 1
                 }
                 val updatedList = _receipts.value.filter { it.id != receipt.id }
