@@ -53,7 +53,9 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LocalContentColor
@@ -601,8 +603,19 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
     val productsVm: ProductsViewModel = koinViewModel()
     val state by productsVm.uiState.collectAsState()
     val cartItems by cartVm.cartItems.collectAsState()
+    val searchHistory by productsVm.searchHistory.collectAsState()
+    var isSearchFocused by remember { mutableStateOf(false) }
     var showOtherDialog by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+
+    // Save query to history after 600ms of no typing
+    LaunchedEffect(state.searchQuery) {
+        if (state.searchQuery.isNotBlank()) {
+            kotlinx.coroutines.delay(600)
+            val q = state.searchQuery.trim()
+            if (q.isNotBlank()) productsVm.addToSearchHistory(q)
+        }
+    }
 
     val subcategoriesForCategory = remember(state.selectedCategoryId, state.brands) {
         state.brands.filter { it.categoryId == state.selectedCategoryId && it.parentId == null }
@@ -658,7 +671,23 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+                            .onFocusChanged { isSearchFocused = it.isFocused }
                     )
+                    if (isSearchFocused && state.searchQuery.isBlank() && searchHistory.isNotEmpty()) {
+                        androidx.compose.foundation.lazy.LazyRow(
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                        ) {
+                            items(searchHistory) { entry ->
+                                SuggestionChip(
+                                    onClick = { productsVm.search(entry); focusManager.clearFocus() },
+                                    label = { Text(entry) },
+                                    icon = { Icon(Icons.Default.History, null, Modifier.size(16.dp)) }
+                                )
+                            }
+                        }
+                    }
                 }
                 // Category chips row
                 androidx.compose.foundation.lazy.LazyRow(
@@ -887,7 +916,22 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
+                                .onFocusChanged { isSearchFocused = it.isFocused }
                         )
+                        if (isSearchFocused && state.searchQuery.isBlank() && searchHistory.isNotEmpty()) {
+                            androidx.compose.foundation.lazy.LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(searchHistory) { entry ->
+                                    SuggestionChip(
+                                        onClick = { productsVm.search(entry); focusManager.clearFocus() },
+                                        label = { Text(entry) },
+                                        icon = { Icon(Icons.Default.History, null, Modifier.size(16.dp)) }
+                                    )
+                                }
+                            }
+                        }
                         // 50/50 row: Other product | Printing
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -996,8 +1040,9 @@ private fun WebProductCard(
     onIncrease: () -> Unit,
     onDecrease: () -> Unit
 ) {
-    val outOfStock = product.stock == 0 && variants.all { it.stock == 0 }
     val hasVariants = variants.isNotEmpty()
+    val effectiveStock = if (hasVariants) variants.sumOf { it.stock } else product.stock
+    val outOfStock = effectiveStock == 0
     val inCart = quantity > 0
     var lightboxIndex by remember { mutableStateOf(-1) }
     var showVariantPicker by remember { mutableStateOf(false) }
@@ -1063,7 +1108,7 @@ private fun WebProductCard(
                     color = if (outOfStock) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
                 ) {
                     Text(
-                        if (outOfStock) "نفد" else "متوفر ${product.stock}",
+                        if (outOfStock) "نفد" else "متوفر $effectiveStock",
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         style = MaterialTheme.typography.labelSmall,
                         color = if (outOfStock) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
@@ -1114,15 +1159,15 @@ private fun WebProductCard(
                     )
                     Box(
                         Modifier.size(32.dp).clip(CircleShape).background(
-                                if (quantity >= product.stock) MaterialTheme.colorScheme.outline.copy(
+                                if (quantity >= effectiveStock) MaterialTheme.colorScheme.outline.copy(
                                     alpha = 0.3f
                                 ) else MaterialTheme.colorScheme.primaryContainer
-                            ).clickable(enabled = quantity < product.stock) { onIncrease() },
+                            ).clickable(enabled = quantity < effectiveStock) { onIncrease() },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             "+",
-                            color = if (quantity >= product.stock) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
+                            color = if (quantity >= effectiveStock) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
                         )
