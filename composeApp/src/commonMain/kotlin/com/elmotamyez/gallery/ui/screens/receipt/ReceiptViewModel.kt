@@ -69,6 +69,10 @@ class ReceiptViewModel(
     val orderSaved: StateFlow<Boolean> = _orderSaved.asStateFlow()
     fun resetOrderSaved() { _orderSaved.value = false }
 
+    private val _orderError = MutableStateFlow<String?>(null)
+    val orderError: StateFlow<String?> = _orderError.asStateFlow()
+    fun clearOrderError() { _orderError.value = null }
+
     // Currently viewed receipt (shown in ReceiptScreen)
     private val _currentReceipt = MutableStateFlow<Receipt?>(null)
     val currentReceipt: StateFlow<Receipt?> = _currentReceipt.asStateFlow()
@@ -294,25 +298,16 @@ class ReceiptViewModel(
                 username      = username.takeIf      { !it.isNullOrBlank() }
             )
 
-            // Optimistic local update so ReceiptScreen has data immediately
-            val updated = _receipts.value + receipt
-            _receipts.value = updated
-            _currentReceipt.value = receipt
-            persistCache(updated)
-
-            // Push to Supabase — 2 attempts, 1.5 s between them
+            // Push to Supabase — 3 attempts, 2 s apart. Do NOT navigate until confirmed saved.
             var insertResult = runCatching { repository.insert(receipt) }
-            if (!insertResult.isSuccess) {
-                delay(1500)
-                insertResult = runCatching { repository.insert(receipt) }
-            }
-            val inserted = insertResult.isSuccess
-            if (!inserted) {
-                _insertError.value = insertResult.exceptionOrNull()?.message ?: insertResult.exceptionOrNull()?.toString()
-            }
+            if (!insertResult.isSuccess) { delay(2000); insertResult = runCatching { repository.insert(receipt) } }
+            if (!insertResult.isSuccess) { delay(2000); insertResult = runCatching { repository.insert(receipt) } }
 
-            if (inserted) {
-                // Decrement stock only after the receipt is confirmed saved
+            if (insertResult.isSuccess) {
+                val updated = _receipts.value + receipt
+                _receipts.value = updated
+                _currentReceipt.value = receipt
+                persistCache(updated)
                 items
                     .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
                     .forEach { cartItem ->
@@ -325,18 +320,10 @@ class ReceiptViewModel(
                     }
                 _stockVersion.value += 1
                 loadReceipts()
+                _orderSaved.value = true
             } else {
-                // Keep receipt locally with pendingSave flag — evidence is preserved.
-                // Auto-sync runs on next loadReceipts() call (app launch / pull-to-refresh).
-                _receipts.value = _receipts.value.map {
-                    if (it.id == receipt.id) it.copy(pendingSave = true) else it
-                }
-                _currentReceipt.value = receipt.copy(pendingSave = true)
-                persistCache(_receipts.value)
+                _orderError.value = "فشل حفظ الفاتورة بعد 3 محاولات. تحقق من الاتصال بالإنترنت وحاول مرة أخرى."
             }
-
-            // Always navigate — order was placed (locally at minimum)
-            _orderSaved.value = true
             _orderSaving.value = false
         }
     }

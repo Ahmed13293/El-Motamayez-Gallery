@@ -64,6 +64,7 @@ class CartScreen : Screen {
         val isAdmin         = currentUser.user?.role == UserRole.ADMIN
         val orderSaving    by receiptVm.orderSaving.collectAsState()
         val orderSaved     by receiptVm.orderSaved.collectAsState()
+        val orderError     by receiptVm.orderError.collectAsState()
         val quotationSaving by receiptVm.quotationSaving.collectAsState()
         val quotationSaved  by receiptVm.quotationSaved.collectAsState()
 
@@ -73,6 +74,19 @@ class CartScreen : Screen {
                 receiptVm.resetOrderSaved()
                 (navigator.parent ?: navigator).push(ReceiptScreen())
             }
+        }
+
+        if (orderError != null) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { receiptVm.clearOrderError() },
+                title = { androidx.compose.material3.Text("فشل حفظ الفاتورة") },
+                text  = { androidx.compose.material3.Text(orderError ?: "") },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { receiptVm.clearOrderError() }) {
+                        androidx.compose.material3.Text("حسناً")
+                    }
+                }
+            )
         }
 
         LaunchedEffect(quotationSaved) {
