@@ -261,6 +261,8 @@ class ReceiptViewModel(
         username: String? = null,
         overrideDate: Triple<Int, Int, Int>? = null
     ) {
+        if (_orderSaving.value) return
+        _orderSaving.value = true
         val isPaid = paymentMethod != "آجل"
         viewModelScope.launch {
             val tz       = TimeZone.currentSystemDefault()
@@ -291,7 +293,6 @@ class ReceiptViewModel(
                 customerInfo  = customerInfo.takeIf  { !it.isNullOrBlank() },
                 username      = username.takeIf      { !it.isNullOrBlank() }
             )
-            _orderSaving.value = true
 
             // Optimistic local update so ReceiptScreen has data immediately
             val updated = _receipts.value + receipt
@@ -350,8 +351,9 @@ class ReceiptViewModel(
         customerInfo: String? = null,
         username: String? = null
     ) {
+        if (_quotationSaving.value) return
+        _quotationSaving.value = true
         viewModelScope.launch {
-            _quotationSaving.value = true
             val tz      = TimeZone.currentSystemDefault()
             val instant = Clock.System.now()
             val now     = instant.toLocalDateTime(tz)
