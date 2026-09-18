@@ -674,7 +674,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
                             .onFocusChanged { isSearchFocused = it.isFocused }
                     )
-                    if (isSearchFocused && state.searchQuery.isBlank() && searchHistory.isNotEmpty()) {
+                    if (state.searchQuery.isBlank() && searchHistory.isNotEmpty()) {
                         androidx.compose.foundation.lazy.LazyRow(
                             contentPadding = PaddingValues(horizontal = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -919,7 +919,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             modifier = Modifier.fillMaxWidth()
                                 .onFocusChanged { isSearchFocused = it.isFocused }
                         )
-                        if (isSearchFocused && state.searchQuery.isBlank() && searchHistory.isNotEmpty()) {
+                        if (state.searchQuery.isBlank() && searchHistory.isNotEmpty()) {
                             androidx.compose.foundation.lazy.LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.fillMaxWidth()

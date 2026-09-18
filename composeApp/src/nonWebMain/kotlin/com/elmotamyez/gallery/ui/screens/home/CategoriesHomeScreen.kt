@@ -303,7 +303,7 @@ class CategoriesHomeScreen : Screen {
                             }
                         }
                         // ── Search history chips ──────────────────────────────
-                        if (isSearchFocused && searchQuery.isBlank() && searchHistory.isNotEmpty()) {
+                        if (searchQuery.isBlank() && searchHistory.isNotEmpty()) {
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.fillMaxWidth()
