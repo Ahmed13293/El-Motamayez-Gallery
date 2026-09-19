@@ -225,7 +225,7 @@ class ReceiptScreen : Screen {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("المنتج",   fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f))
-                        Text("الكمية",   fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.5f), textAlign = TextAlign.Center)
+                        Text("الكمية",   fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center, maxLines = 1)
                         Text("السعر",    fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f),   textAlign = TextAlign.End)
                         Text("الإجمالي", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f),   textAlign = TextAlign.End)
                     }
@@ -245,7 +245,7 @@ class ReceiptScreen : Screen {
                                     color = MaterialTheme.colorScheme.primary)
                             }
                         }
-                        Text("${item.quantity}",           modifier = Modifier.weight(0.5f), textAlign = TextAlign.Center)
+                        Text("${item.quantity}",           modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
                         Text(item.product.price.formatPrice(), modifier = Modifier.weight(1f),   textAlign = TextAlign.End)
                         Text(item.totalPrice.formatPrice(),    modifier = Modifier.weight(1f),   textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold)
                     }
