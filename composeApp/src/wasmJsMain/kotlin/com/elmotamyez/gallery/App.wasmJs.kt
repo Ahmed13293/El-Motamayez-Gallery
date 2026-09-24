@@ -307,6 +307,7 @@ actual fun App() {
 @Composable
 private fun WebApp(user: User, onLogout: () -> Unit) {
     var currentTab by remember { mutableStateOf(WebTab.HOME) }
+    var showLogoutConfirm by remember { mutableStateOf(false) }
     val cartVm: CartViewModel = koinInject()
     val orderVm: OrderViewModel = koinInject()
     val receiptVm: ReceiptViewModel = koinInject()
@@ -438,7 +439,7 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                             )
                         }
                         OutlinedButton(
-                            onClick = onLogout,
+                            onClick = { showLogoutConfirm = true },
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = if (isMobile) PaddingValues(
                                 horizontal = 10.dp,
@@ -594,6 +595,21 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
                 }
             }
         }
+    }
+
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirm = false },
+            title = { Text("تسجيل الخروج") },
+            text  = { Text("هل أنت متأكد من تسجيل الخروج؟") },
+            confirmButton = {
+                Button(
+                    onClick = { showLogoutConfirm = false; onLogout() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("خروج") }
+            },
+            dismissButton = { TextButton(onClick = { showLogoutConfirm = false }) { Text("إلغاء") } }
+        )
     }
 }
 
@@ -1452,15 +1468,24 @@ private fun WebCartTab(
     onOrderConfirmed: () -> Unit
 ) {
     val receiptVm: ReceiptViewModel = koinInject()
+    val productsVm: ProductsViewModel = koinViewModel()
+    val productsState by productsVm.uiState.collectAsState()
+    val variantsMap = productsState.variantsMap
     val cartItems      by cartVm.cartItems.collectAsState()
     val activeSlot     by cartVm.activeSlotIndex.collectAsState()
     val slots          by cartVm.slots.collectAsState()
     val isAdmin        = user.role == UserRole.ADMIN
     val orderSaving    by receiptVm.orderSaving.collectAsState()
     val orderSaved     by receiptVm.orderSaved.collectAsState()
+    val orderError     by receiptVm.orderError.collectAsState()
+    val quotationSaving by receiptVm.quotationSaving.collectAsState()
+    val quotationSaved  by receiptVm.quotationSaved.collectAsState()
     var discount by remember { mutableStateOf("") }
     var paymentMethod by remember { mutableStateOf("كاش") }
     var showConfirmDialog by remember { mutableStateOf(false) }
+    var showClearConfirm  by remember { mutableStateOf(false) }
+    var customerPhone  by remember { mutableStateOf("") }
+    var customerInfo   by remember { mutableStateOf("") }
     var overrideDate   by remember { mutableStateOf<Triple<Int, Int, Int>?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -1483,7 +1508,19 @@ private fun WebCartTab(
             cartVm.clearCart()
             receiptVm.resetOrderSaved()
             showConfirmDialog = false
+            customerPhone = ""
+            customerInfo  = ""
             onOrderConfirmed()
+        }
+    }
+
+    LaunchedEffect(quotationSaved) {
+        if (quotationSaved) {
+            cartVm.clearCart()
+            receiptVm.resetQuotationSaved()
+            showConfirmDialog = false
+            customerPhone = ""
+            customerInfo  = ""
         }
     }
     val overrideDateLabel = overrideDate?.let { (y, m, d) ->
@@ -1577,9 +1614,11 @@ private fun WebCartTab(
                 )
             }
             items(cartItems, key = { it.cartKey }) { item ->
+                val effectiveStock = if (item.variantId != null) variantsMap[item.product.id]?.find { it.id == item.variantId }?.stock ?: item.product.stock else item.product.stock
                 WebCartItemRow(
                     item = item,
                     isMobile = true,
+                    atStockLimit = item.quantity >= effectiveStock,
                     onIncrease = { cartVm.increaseQuantity(item.product.id, item.variantId) },
                     onDecrease = { cartVm.decreaseQuantity(item.product.id, item.variantId) },
                     onRemove = { cartVm.removeFromCart(item.product.id, item.variantId) })
@@ -1703,7 +1742,7 @@ private fun WebCartTab(
                             Text("اطلب عبر واتساب", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                         OutlinedButton(
-                            onClick = { cartVm.clearCart() },
+                            onClick = { showClearConfirm = true },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp)
                         ) {
@@ -1733,8 +1772,10 @@ private fun WebCartTab(
                     )
                 }
                 items(cartItems, key = { it.cartKey }) { item ->
+                    val effectiveStock = if (item.variantId != null) variantsMap[item.product.id]?.find { it.id == item.variantId }?.stock ?: item.product.stock else item.product.stock
                     WebCartItemRow(
                         item = item,
+                        atStockLimit = item.quantity >= effectiveStock,
                         onIncrease = { cartVm.increaseQuantity(item.product.id, item.variantId) },
                         onDecrease = { cartVm.decreaseQuantity(item.product.id, item.variantId) },
                         onRemove = { cartVm.removeFromCart(item.product.id, item.variantId) })
@@ -1856,7 +1897,7 @@ private fun WebCartTab(
                         Text("اطلب عبر واتساب", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                     OutlinedButton(
-                        onClick = { cartVm.clearCart() },
+                        onClick = { showClearConfirm = true },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp)
                     ) {
@@ -1865,6 +1906,32 @@ private fun WebCartTab(
                 }
             }
         }
+    }
+
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            title = { Text("مسح السلة") },
+            text  = { Text("هل أنت متأكد من مسح جميع عناصر السلة؟") },
+            confirmButton = {
+                Button(
+                    onClick = { cartVm.clearCart(); showClearConfirm = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("مسح") }
+            },
+            dismissButton = { TextButton(onClick = { showClearConfirm = false }) { Text("إلغاء") } }
+        )
+    }
+
+    if (orderError != null) {
+        AlertDialog(
+            onDismissRequest = { receiptVm.clearOrderError() },
+            title = { Text("فشل حفظ الفاتورة") },
+            text  = { Text(orderError ?: "") },
+            confirmButton = {
+                TextButton(onClick = { receiptVm.clearOrderError() }) { Text("حسناً") }
+            }
+        )
     }
 
     if (showConfirmDialog) {
@@ -1877,6 +1944,23 @@ private fun WebCartTab(
                     if (discountValue > 0) Text("الخصم: ${discountValue.fmt2f()} جنيه")
                     Text("طريقة الدفع: $paymentMethod")
                     Text("عدد المنتجات: ${cartItems.sumOf { it.quantity }} قطعة")
+                    OutlinedTextField(
+                        value = customerPhone,
+                        onValueChange = { customerPhone = it },
+                        label = { Text("رقم العميل (اختياري)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = customerInfo,
+                        onValueChange = { customerInfo = it },
+                        label = { Text("معلومات العميل (اختياري)") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     if (isAdmin && signedInUsers.isNotEmpty()) {
                         HorizontalDivider()
                         Text("تعيين الفاتورة لـ:", style = MaterialTheme.typography.labelMedium,
@@ -1903,7 +1987,9 @@ private fun WebCartTab(
                                 total = total,
                                 discount = discountValue,
                                 paymentMethod = paymentMethod,
-                                username = assignedUsername?.takeIf { isAdmin && it.isNotBlank() } ?: user.name,
+                                customerPhone = customerPhone.takeIf { it.isNotBlank() },
+                                customerInfo  = customerInfo.takeIf  { it.isNotBlank() },
+                                username = assignedUsername?.takeIf { isAdmin && it.isNotBlank() } ?: user.username,
                                 overrideDate = overrideDate
                             )
                         }
@@ -1922,10 +2008,29 @@ private fun WebCartTab(
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = { showConfirmDialog = false },
-                    enabled = !orderSaving
-                ) { Text("إلغاء") }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(
+                        onClick = { showConfirmDialog = false },
+                        enabled = !orderSaving && !quotationSaving
+                    ) { Text("إلغاء") }
+                    TextButton(
+                        onClick = {
+                            if (!quotationSaving) receiptVm.saveQuotation(
+                                items = cartItems,
+                                total = total,
+                                discount = discountValue,
+                                paymentMethod = paymentMethod,
+                                customerPhone = customerPhone.takeIf { it.isNotBlank() },
+                                customerInfo  = customerInfo.takeIf  { it.isNotBlank() },
+                                username = assignedUsername?.takeIf { isAdmin && it.isNotBlank() } ?: user.username
+                            )
+                        },
+                        enabled = !orderSaving && !quotationSaving
+                    ) {
+                        if (quotationSaving) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        else Text("حفظ كعرض سعر")
+                    }
+                }
             })
     }
 
@@ -1965,6 +2070,7 @@ private fun WebCartTab(
 private fun WebCartItemRow(
     item: CartItem,
     isMobile: Boolean = false,
+    atStockLimit: Boolean = false,
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
     onRemove: () -> Unit
@@ -2033,12 +2139,12 @@ private fun WebCartItemRow(
                         )
                         Box(
                             Modifier.size(28.dp).clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                .clickable { onIncrease() }, contentAlignment = Alignment.Center
+                                .background(if (atStockLimit) MaterialTheme.colorScheme.outline.copy(alpha = 0.3f) else MaterialTheme.colorScheme.primaryContainer)
+                                .clickable(enabled = !atStockLimit) { onIncrease() }, contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "+",
-                                color = MaterialTheme.colorScheme.primary,
+                                color = if (atStockLimit) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -2101,12 +2207,12 @@ private fun WebCartItemRow(
                     )
                     Box(
                         Modifier.size(28.dp).clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .clickable { onIncrease() }, contentAlignment = Alignment.Center
+                            .background(if (atStockLimit) MaterialTheme.colorScheme.outline.copy(alpha = 0.3f) else MaterialTheme.colorScheme.primaryContainer)
+                            .clickable(enabled = !atStockLimit) { onIncrease() }, contentAlignment = Alignment.Center
                     ) {
                         Text(
                             "+",
-                            color = MaterialTheme.colorScheme.primary,
+                            color = if (atStockLimit) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -2374,8 +2480,8 @@ internal fun WebReceiptsTab(
                 contentPadding = PaddingValues(if (isMobile) 8.dp else 16.dp),
                 verticalArrangement = Arrangement.spacedBy(if (isMobile) 8.dp else 10.dp)
             ) {
-                // ── Monthly summary card ──────────────────────────────────────
-                item(key = "month_summary") {
+                // ── Monthly summary card (admin only) ────────────────────────
+                if (isAdmin) item(key = "month_summary") {
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.primaryContainer,
@@ -2504,7 +2610,7 @@ internal fun WebReceiptsTab(
         AlertDialog(
             onDismissRequest = { deletingReceipt = null },
             title = { Text("حذف الفاتورة", fontWeight = FontWeight.Bold) },
-            text = { Text("هل أنت متأكد من حذف الفاتورة ${receipt.id}؟\nسيتم استعادة المخزون تلقائياً.") },
+            text = { Text("هل أنت متأكد من حذف الفاتورة #${receipt.orderNumber}؟\nسيتم استعادة المخزون تلقائياً.") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -3128,7 +3234,7 @@ private fun WebEditReceiptDialog(
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
-        title = { Text("تعديل الفاتورة ${receipt.id}", fontWeight = FontWeight.Bold) },
+        title = { Text("تعديل الفاتورة #${receipt.orderNumber}", fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
