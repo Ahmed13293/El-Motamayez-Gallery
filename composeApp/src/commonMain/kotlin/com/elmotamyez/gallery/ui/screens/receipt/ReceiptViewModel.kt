@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.DailyReconciliation
 import com.elmotamyez.gallery.data.model.Receipt
+import com.elmotamyez.gallery.data.model.idMonthKey
 import com.elmotamyez.gallery.data.repository.DailyReconciliationRepository
 import com.elmotamyez.gallery.data.repository.ProductRepository
 import com.elmotamyez.gallery.data.repository.ProductVariantRepository
@@ -197,7 +198,14 @@ class ReceiptViewModel(
                     // Mark months fully covered by this fetch — exclude the oldest month because
                     // fetchAll may have been cut off mid-month (boundary month is partially loaded).
                     // Use receipt ID prefix (local date) not created_at (UTC) for consistency.
-                    val monthsInFetch = fresh.map { it.idMonthKey() }.filter { it != "unknown" }.distinct().sortedDescending()
+                    val monthsInFetch = fresh.map { r ->
+                        val id = r.id
+                        when {
+                            id.length >= 4 && id[0].isDigit() && id[1].isDigit() && id[2].isDigit() && id[3].isDigit() && id.length >= 7 && id.getOrNull(4) == '-' -> id.take(7)
+                            id.length >= 6 && id[0].isDigit() && id[1].isDigit() && id[2].isDigit() && id[3].isDigit() -> "${id.take(4)}-${id.substring(4, 6)}"
+                            else -> "unknown"
+                        }
+                    }.filter { it != "unknown" }.distinct().sortedDescending()
                     val fullyLoaded = if (monthsInFetch.size > 1) monthsInFetch.dropLast(1) else emptyList()
                     fullyLoaded.forEach { loadedMonths.add(it) }
                     runCatching {

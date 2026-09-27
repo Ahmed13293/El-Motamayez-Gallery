@@ -823,7 +823,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                         )
                         androidx.compose.foundation.lazy.LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, bottom = 4.dp)
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                         ) {
                             items(bestSellers) { product ->
                                 val qty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
