@@ -91,6 +91,24 @@ class ReceiptRepository {
         return parseRows(raw)
     }
 
+    /** Returns distinct YYYY-MM keys for every month that has at least one receipt.
+     *  Fetches only the created_at column — very lightweight regardless of total receipt count. */
+    suspend fun fetchAllMonthKeys(): List<String> {
+        val raw = supabaseClient.from("receipts")
+            .select(columns = Columns.list("created_at")) {
+                filter { filter("deleted_at", FilterOperator.IS, null) }
+                order("created_at", Order.DESCENDING)
+            }.data
+        return runCatching {
+            json.parseToJsonElement(raw).jsonArray
+                .mapNotNull { it.jsonObject["created_at"]?.jsonPrimitive?.contentOrNull }
+                .filter { it.length >= 7 }
+                .map { it.substring(0, 7) }
+                .distinct()
+                .sortedDescending()
+        }.getOrElse { emptyList() }
+    }
+
     /** Fetch all receipts for a specific month (e.g. "2026-09"). No row limit — returns
      *  every receipt in that month so older months load completely on demand. */
     suspend fun fetchByMonth(yearMonth: String): FetchResult {

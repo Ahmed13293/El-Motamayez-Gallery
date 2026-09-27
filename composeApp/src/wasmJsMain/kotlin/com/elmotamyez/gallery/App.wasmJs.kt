@@ -2492,8 +2492,10 @@ internal fun WebReceiptsTab(
         "${now.year}-${twoDigit(now.monthNumber)}"
     }
 
-    // Distinct months sorted newest first (confirmed only)
-    val months = remember(confirmedReceipts) {
+    // Month tabs: prefer availableMonths (fetched independently) so older months are shown
+    // even if their receipts haven't been lazy-loaded yet.
+    val availableMonths by receiptVm.availableMonths.collectAsState()
+    val months = availableMonths.ifEmpty {
         confirmedReceipts.map { it.webMonthKey() }.filter { it != "unknown" }.distinct().sortedDescending()
     }
 

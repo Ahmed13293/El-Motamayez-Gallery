@@ -151,6 +151,7 @@ class ReceiptViewModel(
         // Then sync latest from Supabase in the background
         loadReceipts()
         loadReconciliations()
+        loadAvailableMonths()
         // Keep both devices in sync — re-fetch from Supabase every 30 seconds
         viewModelScope.launch {
             while (isActive) {
@@ -192,6 +193,8 @@ class ReceiptViewModel(
                 .onSuccess { result ->
                     if (reportError) _loadError.value = result.firstError
                     val fresh = result.receipts
+                    // Mark months already covered by this fetch so ensureMonthLoaded skips them
+                    fresh.mapNotNull { it.createdAt?.take(7) }.distinct().forEach { loadedMonths.add(it) }
                     runCatching {
                         val freshIds = fresh.map { it.id }.toSet()
                         // Oldest date covered by this fetch — receipts older than this are historical
@@ -215,6 +218,17 @@ class ReceiptViewModel(
             _isLoading.value = false
             // Attempt to sync any receipts that failed to save previously
             syncPendingReceipts()
+        }
+    }
+
+    // All months that have at least one receipt in Supabase — drives the month tab list
+    private val _availableMonths = MutableStateFlow<List<String>>(emptyList())
+    val availableMonths: StateFlow<List<String>> = _availableMonths.asStateFlow()
+
+    private fun loadAvailableMonths() {
+        viewModelScope.launch {
+            runCatching { repository.fetchAllMonthKeys() }
+                .onSuccess { months -> if (months.isNotEmpty()) _availableMonths.value = months }
         }
     }
 

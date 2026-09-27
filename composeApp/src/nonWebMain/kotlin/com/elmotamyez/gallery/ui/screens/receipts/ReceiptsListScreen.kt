@@ -128,8 +128,10 @@ class ReceiptsListScreen : Screen {
             if (receiptTypeTab == 0) vm.markReceiptsSeen()
         }
 
-        // Distinct months sorted newest first (based on confirmed only)
-        val months = remember(confirmedReceipts) {
+        // Month tabs: prefer availableMonths (fetched independently) so older months are shown
+        // even if their receipts haven't been lazy-loaded yet.
+        val availableMonths by vm.availableMonths.collectAsState()
+        val months = availableMonths.ifEmpty {
             confirmedReceipts.map { it.monthKey() }.filter { it != "unknown" }.distinct().sortedDescending()
         }
 
