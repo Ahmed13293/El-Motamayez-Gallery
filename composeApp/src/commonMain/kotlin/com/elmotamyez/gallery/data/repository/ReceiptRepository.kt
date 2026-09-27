@@ -55,7 +55,8 @@ private data class ReceiptInsert(
     val customer_phone: String? = null,
     val customer_info: String? = null,
     val username: String? = null,
-    val is_quotation: Boolean = false
+    val is_quotation: Boolean = false,
+    val deleted_at: String? = null  // always null on insert — clears any stale soft-delete on upsert conflict
 )
 
 @Serializable

@@ -5,6 +5,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -618,12 +620,24 @@ private fun WebApp(user: User, onLogout: () -> Unit) {
 @Composable
 private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
     val productsVm: ProductsViewModel = koinViewModel()
+    val receiptVm: ReceiptViewModel = koinInject()
     val state by productsVm.uiState.collectAsState()
     val cartItems by cartVm.cartItems.collectAsState()
+    val receipts by receiptVm.receipts.collectAsState()
     val searchHistory by productsVm.searchHistory.collectAsState()
     var isSearchFocused by remember { mutableStateOf(false) }
     var showOtherDialog by remember { mutableStateOf(false) }
+    var quickEditProduct by remember { mutableStateOf<Product?>(null) }
     val focusManager = LocalFocusManager.current
+
+    val bestSellers: List<Product> = remember(receipts, state.allProducts) {
+        if (receipts.isEmpty() || state.allProducts.isEmpty()) return@remember emptyList()
+        val salesMap = receipts.filter { !it.isQuotation }
+            .flatMap { it.items }.groupBy { it.product.id }
+            .mapValues { (_, items) -> items.sumOf { it.quantity } }
+        state.allProducts.filter { (salesMap[it.id] ?: 0) > 0 }
+            .sortedByDescending { salesMap[it.id] ?: 0 }.take(12)
+    }
 
     // Save query to history after 600ms of no typing
     LaunchedEffect(state.searchQuery) {
@@ -649,6 +663,15 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                 cartVm.addWithQuantity(product, qty)
                 showOtherDialog = false
             }
+        )
+    }
+
+    quickEditProduct?.let { p ->
+        WebQuickEditDialog(
+            product = p,
+            variants = state.variantsMap[p.id] ?: emptyList(),
+            productsVm = productsVm,
+            onDismiss = { quickEditProduct = null }
         )
     }
 
@@ -791,6 +814,41 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             modifier = Modifier.weight(1f)
                         )
                     }
+                    // Best-sellers horizontal strip (mobile)
+                    if (bestSellers.isNotEmpty() && state.searchQuery.isBlank() && state.selectedBrandId == null) {
+                        Text(
+                            "الأكثر مبيعاً",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        )
+                        androidx.compose.foundation.lazy.LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, bottom = 4.dp)
+                        ) {
+                            items(bestSellers) { product ->
+                                val qty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
+                                val variants = state.variantsMap[product.id] ?: emptyList()
+                                Box(Modifier.width(130.dp)) {
+                                    WebProductCard(
+                                        product = product,
+                                        quantity = qty,
+                                        variants = variants,
+                                        isMobile = true,
+                                        onAdd = { focusManager.clearFocus(); cartVm.addToCart(product) },
+                                        onAddVariant = { variantId, variantName, variantQty ->
+                                            focusManager.clearFocus()
+                                            cartVm.addWithQuantity(product, variantQty, variantId, variantName)
+                                        },
+                                        onIncrease = { focusManager.clearFocus(); cartVm.increaseQuantity(product.id) },
+                                        onDecrease = { focusManager.clearFocus(); cartVm.decreaseQuantity(product.id) },
+                                        onLongPress = { quickEditProduct = it })
+                                }
+                            }
+                        }
+                        HorizontalDivider(Modifier.padding(horizontal = 12.dp, vertical = 2.dp))
+                    }
                     // Products grid
                     if (state.products.isEmpty()) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -817,7 +875,8 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                         cartVm.addWithQuantity(product, variantQty, variantId, variantName)
                                     },
                                     onIncrease = { focusManager.clearFocus(); cartVm.increaseQuantity(product.id) },
-                                    onDecrease = { focusManager.clearFocus(); cartVm.decreaseQuantity(product.id) })
+                                    onDecrease = { focusManager.clearFocus(); cartVm.decreaseQuantity(product.id) },
+                                    onLongPress = { quickEditProduct = it })
                             }
                         }
                     }
@@ -976,6 +1035,39 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                 modifier = Modifier.weight(1f)
                             )
                         }
+                        // Best-sellers horizontal strip (desktop)
+                        if (bestSellers.isNotEmpty() && state.searchQuery.isBlank() && state.selectedBrandId == null) {
+                            Text(
+                                "الأكثر مبيعاً",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            androidx.compose.foundation.lazy.LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                contentPadding = PaddingValues(bottom = 4.dp)
+                            ) {
+                                items(bestSellers) { product ->
+                                    val qty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
+                                    val variants = state.variantsMap[product.id] ?: emptyList()
+                                    Box(Modifier.width(170.dp)) {
+                                        WebProductCard(
+                                            product = product,
+                                            quantity = qty,
+                                            variants = variants,
+                                            isMobile = false,
+                                            onAdd = { cartVm.addToCart(product) },
+                                            onAddVariant = { variantId, variantName, variantQty ->
+                                                cartVm.addWithQuantity(product, variantQty, variantId, variantName)
+                                            },
+                                            onIncrease = { cartVm.increaseQuantity(product.id) },
+                                            onDecrease = { cartVm.decreaseQuantity(product.id) },
+                                            onLongPress = { quickEditProduct = it })
+                                    }
+                                }
+                            }
+                            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                        }
                         if (state.products.isEmpty()) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text(
@@ -1003,7 +1095,8 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                             cartVm.addWithQuantity(product, variantQty, variantId, variantName)
                                         },
                                         onIncrease = { cartVm.increaseQuantity(product.id) },
-                                        onDecrease = { cartVm.decreaseQuantity(product.id) })
+                                        onDecrease = { cartVm.decreaseQuantity(product.id) },
+                                        onLongPress = { quickEditProduct = it })
                                 }
                             }
                         }
@@ -1012,6 +1105,85 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
             }
         }
     }
+}
+
+@Composable
+private fun WebQuickEditDialog(
+    product: Product,
+    variants: List<ProductVariant>,
+    productsVm: ProductsViewModel,
+    onDismiss: () -> Unit
+) {
+    var price by remember { mutableStateOf(product.price.fmt2f()) }
+    var wholesale by remember { mutableStateOf(product.wholesalePrice?.fmt2f() ?: "") }
+    var stock by remember { mutableStateOf(product.stock.toString()) }
+    val variantStocks = remember {
+        mutableStateMapOf<String, String>().also { map ->
+            variants.forEach { v -> map[v.id] = v.stock.toString() }
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(product.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                OutlinedTextField(
+                    value = price,
+                    onValueChange = { price = it },
+                    label = { Text("السعر") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = wholesale,
+                    onValueChange = { wholesale = it },
+                    label = { Text("سعر الجملة") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (variants.isEmpty()) {
+                    OutlinedTextField(
+                        value = stock,
+                        onValueChange = { stock = it },
+                        label = { Text("المخزون") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text("مخزون المتغيرات", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    variants.forEach { v ->
+                        OutlinedTextField(
+                            value = variantStocks[v.id] ?: "",
+                            onValueChange = { variantStocks[v.id] = it },
+                            label = { Text(v.name) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                productsVm.quickEditProduct(
+                    product = product,
+                    newPrice = price.toDoubleOrNull() ?: product.price,
+                    newWholesalePrice = wholesale.toDoubleOrNull(),
+                    newStock = if (variants.isEmpty()) stock.toIntOrNull() ?: product.stock else product.stock,
+                    variantStocks = variantStocks.mapValues { it.value.toIntOrNull() ?: 0 }
+                )
+                onDismiss()
+            }) { Text("حفظ") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
+    )
 }
 
 @Composable
@@ -1055,7 +1227,8 @@ private fun WebProductCard(
     onAdd: () -> Unit,
     onAddVariant: (variantId: String, variantName: String, qty: Int) -> Unit = { _, _, _ -> },
     onIncrease: () -> Unit,
-    onDecrease: () -> Unit
+    onDecrease: () -> Unit,
+    onLongPress: ((Product) -> Unit)? = null
 ) {
     val hasVariants = variants.isNotEmpty()
     val effectiveStock = if (hasVariants) variants.sumOf { it.stock } else product.stock
@@ -1087,7 +1260,11 @@ private fun WebProductCard(
     Card(
         shape = RoundedCornerShape(14.dp),
         elevation = CardDefaults.cardElevation(2.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().then(
+            if (onLongPress != null) Modifier.pointerInput(product.id) {
+                detectTapGestures(onLongPress = { onLongPress(product) })
+            } else Modifier
+        )
     ) {
         Column(
             Modifier.padding(if (isMobile) 8.dp else 12.dp),
@@ -2335,11 +2512,9 @@ internal fun WebReceiptsTab(
     val monthTotal = remember(grouped) { grouped.sumOf { it.value.sumOf { r -> r.total } } }
     val monthCount = remember(grouped) { grouped.sumOf { it.value.size } }
 
-    // Newest day starts expanded
-    val expandedMap = remember(grouped) {
-        mutableStateMapOf<String, Boolean>().also { map ->
-            grouped.forEachIndexed { i, entry -> map[entry.key] = (i == 0) }
-        }
+    val expandedDays by receiptVm.expandedDays.collectAsState()
+    LaunchedEffect(grouped) {
+        receiptVm.initExpandedDays(grouped.map { it.key })
     }
 
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(0.dp)) {
@@ -2530,7 +2705,7 @@ internal fun WebReceiptsTab(
                 }
 
                 grouped.forEach { (dateKey, dayReceipts) ->
-                    val isOpen = expandedMap[dateKey] == true
+                    val isOpen = expandedDays[dateKey] == true
                     val dayTotal = dayReceipts.sumOf { it.total }
                     val cashTotal = dayReceipts.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
                     val transferTotal = dayReceipts.filter { it.paymentMethod == "تحويل" }.sumOf { it.total }
@@ -2547,7 +2722,7 @@ internal fun WebReceiptsTab(
                                 receiptVm.saveReconciliation(dateKey, actual, currentUsername)
                             },
                             isExpanded = isOpen,
-                            onClick = { expandedMap[dateKey] = !isOpen })
+                            onClick = { receiptVm.toggleDay(dateKey) })
                     }
 
                     item(key = "body_$dateKey") {

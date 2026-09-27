@@ -269,62 +269,65 @@ class ReceiptViewModel(
         _orderSaving.value = true
         val isPaid = paymentMethod != "آجل"
         viewModelScope.launch {
-            val tz       = TimeZone.currentSystemDefault()
-            val instant  = Clock.System.now()
-            val now      = instant.toLocalDateTime(tz)
-            val offset   = tz.offsetAt(instant)          // e.g. +02:00
-            val (year, month, day) = overrideDate ?: Triple(now.year, now.monthNumber, now.dayOfMonth)
-            val todayPrefix = dateString(year, month, day)
-            val localMax = _receipts.value
-                .filter { it.createdAt?.startsWith(todayPrefix) == true }
-                .maxOfOrNull { it.orderNumber } ?: 0
-            val remoteMax = runCatching { repository.fetchTodayMax(todayPrefix) }.getOrElse { 0 }
-            val nextNumber = maxOf(localMax, remoteMax) + 1
-            val nowIso = if (overrideDate != null)
-                "${todayPrefix}T12:00:00+00:00"
-            else
-                dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second) + offset
-            val receipt = Receipt(
-                id            = "${todayPrefix}-${nextNumber.toString().padStart(4, '0')}",
-                orderNumber   = nextNumber,
-                items         = items,
-                total         = total,
-                discount      = discount,
-                paymentMethod = paymentMethod,
-                isPaid        = isPaid,
-                createdAt     = nowIso,
-                customerPhone = customerPhone.takeIf { !it.isNullOrBlank() },
-                customerInfo  = customerInfo.takeIf  { !it.isNullOrBlank() },
-                username      = username.takeIf      { !it.isNullOrBlank() }
-            )
+            try {
+                val tz       = TimeZone.currentSystemDefault()
+                val instant  = Clock.System.now()
+                val now      = instant.toLocalDateTime(tz)
+                val offset   = tz.offsetAt(instant)          // e.g. +02:00
+                val (year, month, day) = overrideDate ?: Triple(now.year, now.monthNumber, now.dayOfMonth)
+                val todayPrefix = dateString(year, month, day)
+                val localMax = _receipts.value
+                    .filter { it.createdAt?.startsWith(todayPrefix) == true }
+                    .maxOfOrNull { it.orderNumber } ?: 0
+                val remoteMax = runCatching { repository.fetchTodayMax(todayPrefix) }.getOrElse { 0 }
+                val nextNumber = maxOf(localMax, remoteMax) + 1
+                val nowIso = if (overrideDate != null)
+                    "${todayPrefix}T12:00:00+00:00"
+                else
+                    dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second) + offset
+                val receipt = Receipt(
+                    id            = "${todayPrefix}-${nextNumber.toString().padStart(4, '0')}",
+                    orderNumber   = nextNumber,
+                    items         = items,
+                    total         = total,
+                    discount      = discount,
+                    paymentMethod = paymentMethod,
+                    isPaid        = isPaid,
+                    createdAt     = nowIso,
+                    customerPhone = customerPhone.takeIf { !it.isNullOrBlank() },
+                    customerInfo  = customerInfo.takeIf  { !it.isNullOrBlank() },
+                    username      = username.takeIf      { !it.isNullOrBlank() }
+                )
 
-            // Push to Supabase — 3 attempts, 2 s apart. Do NOT navigate until confirmed saved.
-            var insertResult = runCatching { repository.insert(receipt) }
-            if (!insertResult.isSuccess) { delay(2000); insertResult = runCatching { repository.insert(receipt) } }
-            if (!insertResult.isSuccess) { delay(2000); insertResult = runCatching { repository.insert(receipt) } }
+                // Push to Supabase — 3 attempts, 2 s apart. Do NOT navigate until confirmed saved.
+                var insertResult = runCatching { repository.insert(receipt) }
+                if (!insertResult.isSuccess) { delay(2000); insertResult = runCatching { repository.insert(receipt) } }
+                if (!insertResult.isSuccess) { delay(2000); insertResult = runCatching { repository.insert(receipt) } }
 
-            if (insertResult.isSuccess) {
-                val updated = _receipts.value + receipt
-                _receipts.value = updated
-                _currentReceipt.value = receipt
-                persistCache(updated)
-                items
-                    .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
-                    .forEach { cartItem ->
-                        runCatching {
-                            if (cartItem.variantId != null)
-                                variantRepository.decrementStock(cartItem.variantId, cartItem.quantity)
-                            else
-                                productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+                if (insertResult.isSuccess) {
+                    val updated = _receipts.value + receipt
+                    _receipts.value = updated
+                    _currentReceipt.value = receipt
+                    persistCache(updated)
+                    items
+                        .filter { it.product.categoryId.isNotBlank() && !it.product.id.startsWith("other_") }
+                        .forEach { cartItem ->
+                            runCatching {
+                                if (cartItem.variantId != null)
+                                    variantRepository.decrementStock(cartItem.variantId, cartItem.quantity)
+                                else
+                                    productRepository.decrementStock(cartItem.product.id, cartItem.quantity)
+                            }
                         }
-                    }
-                _stockVersion.value += 1
-                loadReceipts()
-                _orderSaved.value = true
-            } else {
-                _orderError.value = "فشل حفظ الفاتورة بعد 3 محاولات. تحقق من الاتصال بالإنترنت وحاول مرة أخرى."
+                    _stockVersion.value += 1
+                    loadReceipts()
+                    _orderSaved.value = true
+                } else {
+                    _orderError.value = "فشل حفظ الفاتورة بعد 3 محاولات. تحقق من الاتصال بالإنترنت وحاول مرة أخرى."
+                }
+            } finally {
+                _orderSaving.value = false
             }
-            _orderSaving.value = false
         }
     }
 
@@ -341,39 +344,42 @@ class ReceiptViewModel(
         if (_quotationSaving.value) return
         _quotationSaving.value = true
         viewModelScope.launch {
-            val tz      = TimeZone.currentSystemDefault()
-            val instant = Clock.System.now()
-            val now     = instant.toLocalDateTime(tz)
-            val offset  = tz.offsetAt(instant)
-            val todayPrefix = dateString(now.year, now.monthNumber, now.dayOfMonth)
-            val localMax = _receipts.value
-                .filter { it.createdAt?.startsWith(todayPrefix) == true }
-                .maxOfOrNull { it.orderNumber } ?: 0
-            val remoteMax = runCatching { repository.fetchTodayMax(todayPrefix) }.getOrElse { 0 }
-            val nextNumber = maxOf(localMax, remoteMax) + 1
-            val nowIso = dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second) + offset
-            val receipt = Receipt(
-                id            = "${todayPrefix}-${nextNumber.toString().padStart(4, '0')}",
-                orderNumber   = nextNumber,
-                items         = items,
-                total         = maxOf(0.0, items.sumOf { it.totalPrice } - discount),
-                discount      = discount,
-                paymentMethod = paymentMethod,
-                isPaid        = false,
-                createdAt     = nowIso,
-                customerPhone = customerPhone.takeIf { !it.isNullOrBlank() },
-                customerInfo  = customerInfo.takeIf  { !it.isNullOrBlank() },
-                username      = username.takeIf      { !it.isNullOrBlank() },
-                isQuotation   = true
-            )
-            val updated = _receipts.value + receipt
-            _receipts.value = updated
-            persistCache(updated)
-            runCatching { repository.insert(receipt) }
-                .onFailure { e -> _insertError.value = "فشل حفظ عرض السعر: ${e.message}" }
-            loadReceipts()
-            _quotationSaving.value = false
-            _quotationSaved.value = true
+            try {
+                val tz      = TimeZone.currentSystemDefault()
+                val instant = Clock.System.now()
+                val now     = instant.toLocalDateTime(tz)
+                val offset  = tz.offsetAt(instant)
+                val todayPrefix = dateString(now.year, now.monthNumber, now.dayOfMonth)
+                val localMax = _receipts.value
+                    .filter { it.createdAt?.startsWith(todayPrefix) == true }
+                    .maxOfOrNull { it.orderNumber } ?: 0
+                val remoteMax = runCatching { repository.fetchTodayMax(todayPrefix) }.getOrElse { 0 }
+                val nextNumber = maxOf(localMax, remoteMax) + 1
+                val nowIso = dateTimeString(now.year, now.monthNumber, now.dayOfMonth, now.hour, now.minute, now.second) + offset
+                val receipt = Receipt(
+                    id            = "${todayPrefix}-${nextNumber.toString().padStart(4, '0')}",
+                    orderNumber   = nextNumber,
+                    items         = items,
+                    total         = maxOf(0.0, items.sumOf { it.totalPrice } - discount),
+                    discount      = discount,
+                    paymentMethod = paymentMethod,
+                    isPaid        = false,
+                    createdAt     = nowIso,
+                    customerPhone = customerPhone.takeIf { !it.isNullOrBlank() },
+                    customerInfo  = customerInfo.takeIf  { !it.isNullOrBlank() },
+                    username      = username.takeIf      { !it.isNullOrBlank() },
+                    isQuotation   = true
+                )
+                val updated = _receipts.value + receipt
+                _receipts.value = updated
+                persistCache(updated)
+                runCatching { repository.insert(receipt) }
+                    .onFailure { e -> _insertError.value = "فشل حفظ عرض السعر: ${e.message}" }
+                loadReceipts()
+                _quotationSaved.value = true
+            } finally {
+                _quotationSaving.value = false
+            }
         }
     }
 
