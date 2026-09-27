@@ -58,16 +58,16 @@ private fun String.parseSupabaseDateTime(): kotlinx.datetime.LocalDateTime? = ru
     Instant.parse(normalized).toLocalDateTime(TimeZone.currentSystemDefault())
 }.getOrNull()
 
+// Use the UTC date portion of the ISO timestamp directly so monthKey/dateKey
+// always match what Supabase stores and what fetchByMonth queries by prefix.
 private fun Receipt.dateKey(): String {
-    val local = createdAt?.parseSupabaseDateTime()
-    return if (local != null)
-        dateString(local.year, local.monthNumber, local.dayOfMonth)
-    else "unknown"
+    val raw = createdAt?.replace(" ", "T") ?: return "unknown"
+    return raw.take(10).takeIf { it.length == 10 } ?: "unknown"  // "YYYY-MM-DD"
 }
 
 private fun Receipt.monthKey(): String {
-    val local = createdAt?.parseSupabaseDateTime() ?: return "unknown"
-    return "${local.year}-${twoDigit(local.monthNumber)}"
+    val raw = createdAt?.replace(" ", "T") ?: return "unknown"
+    return raw.take(7).takeIf { it.length == 7 } ?: "unknown"   // "YYYY-MM"
 }
 
 private fun String.toArabicMonth(): String {

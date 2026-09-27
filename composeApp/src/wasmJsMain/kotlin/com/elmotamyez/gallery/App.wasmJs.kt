@@ -207,12 +207,8 @@ private fun String.parseSupabaseDt() = runCatching {
 }.getOrNull()
 
 internal fun Receipt.dateKey(): String {
-    val local = createdAt?.parseSupabaseDt()
-    return if (local != null) dateString(
-        local.year,
-        local.monthNumber,
-        local.dayOfMonth
-    ) else "unknown"
+    val raw = createdAt?.replace(" ", "T") ?: return "unknown"
+    return raw.take(10).takeIf { it.length == 10 } ?: "unknown"  // "YYYY-MM-DD" UTC
 }
 
 private fun Receipt.timeLabel(): String {
@@ -2418,16 +2414,8 @@ private fun WebCartItemRow(
 // ── Receipts Tab — grouped by date, expand/collapse like mobile ───────────────
 
 private fun Receipt.webMonthKey(): String {
-    val local = createdAt?.let { raw ->
-        runCatching {
-            val normalized = raw.replace(" ", "T").replace(Regex("\\.\\d+"), "")
-                .replace(Regex("[+-]\\d{2}(:\\d{2})?$"), "Z")
-                .let { if (!it.endsWith("Z")) "${it}Z" else it }
-            Instant.parse(normalized)
-                .toLocalDateTime(TimeZone.currentSystemDefault())
-        }.getOrNull()
-    } ?: return "unknown"
-    return "${local.year}-${twoDigit(local.monthNumber)}"
+    val raw = createdAt?.replace(" ", "T") ?: return "unknown"
+    return raw.take(7).takeIf { it.length == 7 } ?: "unknown"  // "YYYY-MM" UTC
 }
 
 private fun String.webToArabicMonth(): String {
@@ -2488,8 +2476,7 @@ internal fun WebReceiptsTab(
 
     // Current month key e.g. "2026-07"
     val currentMonthKey = remember {
-        val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-        "${now.year}-${twoDigit(now.monthNumber)}"
+        Clock.System.now().toString().take(7)  // "YYYY-MM" in UTC, consistent with monthKey/RPC
     }
 
     // Month tabs: prefer availableMonths (fetched independently) so older months are shown
