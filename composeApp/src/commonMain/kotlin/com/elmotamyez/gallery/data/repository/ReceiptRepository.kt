@@ -13,6 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
@@ -98,6 +99,7 @@ class ReceiptRepository {
             .select(columns = Columns.list("created_at")) {
                 filter { filter("deleted_at", FilterOperator.IS, null) }
                 order("created_at", Order.DESCENDING)
+                limit(100_000)  // only fetches created_at, so this is still very lightweight
             }.data
         return runCatching {
             json.parseToJsonElement(raw).jsonArray
