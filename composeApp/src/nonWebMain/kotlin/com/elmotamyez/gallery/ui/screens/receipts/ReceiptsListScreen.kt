@@ -58,16 +58,21 @@ private fun String.parseSupabaseDateTime(): kotlinx.datetime.LocalDateTime? = ru
     Instant.parse(normalized).toLocalDateTime(TimeZone.currentSystemDefault())
 }.getOrNull()
 
+private fun String.startsWithYear() = length >= 4 && this[0].isDigit() && this[1].isDigit() && this[2].isDigit() && this[3].isDigit()
+
 // Key off the receipt ID which encodes local date.
 // New format: "YYYY-MM-DD-NNNN"  Old format: "YYYYMMDDNN" (no dashes)
+// Non-date IDs (e.g. "ORD-…") return "unknown" and are excluded from grouping.
 private fun Receipt.monthKey(): String = when {
-    id.length >= 7 && id.getOrNull(4) == '-' -> id.take(7)           // "2026-09"
-    id.length >= 6 -> "${id.take(4)}-${id.substring(4, 6)}"           // "202609…" → "2026-09"
+    !id.startsWithYear() -> "unknown"
+    id.length >= 7 && id.getOrNull(4) == '-' -> id.take(7)
+    id.length >= 6 -> "${id.take(4)}-${id.substring(4, 6)}"
     else -> "unknown"
 }
 private fun Receipt.dateKey(): String = when {
-    id.length >= 10 && id.getOrNull(4) == '-' -> id.take(10)          // "2026-09-01"
-    id.length >= 8 -> "${id.take(4)}-${id.substring(4,6)}-${id.substring(6,8)}" // "20260901…" → "2026-09-01"
+    !id.startsWithYear() -> "unknown"
+    id.length >= 10 && id.getOrNull(4) == '-' -> id.take(10)
+    id.length >= 8 -> "${id.take(4)}-${id.substring(4,6)}-${id.substring(6,8)}"
     else -> "unknown"
 }
 

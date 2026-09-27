@@ -24,9 +24,13 @@ data class Receipt(
     @SerialName("deleted_at") val deletedAt: String? = null
 )
 
+private fun String.startsWithYear() = length >= 4 && this[0].isDigit() && this[1].isDigit() && this[2].isDigit() && this[3].isDigit()
+
 /** Extracts "YYYY-MM" from the receipt ID regardless of format:
- *  new "YYYY-MM-DD-NNNN" or old "YYYYMMDDNN". */
+ *  new "YYYY-MM-DD-NNNN" or old "YYYYMMDDNN".
+ *  Returns "unknown" for non-date IDs (e.g. "ORD-…"). */
 fun Receipt.idMonthKey(): String = when {
+    !id.startsWithYear() -> "unknown"
     id.length >= 7 && id.getOrNull(4) == '-' -> id.take(7)
     id.length >= 6 -> "${id.take(4)}-${id.substring(4, 6)}"
     else -> "unknown"
