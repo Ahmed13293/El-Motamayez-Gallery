@@ -86,7 +86,7 @@ class ReceiptRepository {
         val raw = supabaseClient.from("receipts").select {
                 filter { filter("deleted_at", FilterOperator.IS, null) }
                 order("created_at", Order.DESCENDING)
-                limit(300)
+                limit(2000)
             }.data
 
         var firstError: String? = null
