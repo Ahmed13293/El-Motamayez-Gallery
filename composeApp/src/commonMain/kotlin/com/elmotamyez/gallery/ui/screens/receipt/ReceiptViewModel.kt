@@ -193,8 +193,11 @@ class ReceiptViewModel(
                 .onSuccess { result ->
                     if (reportError) _loadError.value = result.firstError
                     val fresh = result.receipts
-                    // Mark months already covered by this fetch so ensureMonthLoaded skips them
-                    fresh.mapNotNull { it.createdAt?.take(7) }.distinct().forEach { loadedMonths.add(it) }
+                    // Mark months fully covered by this fetch — exclude the oldest month because
+                    // fetchAll may have been cut off mid-month (boundary month is partially loaded).
+                    val monthsInFetch = fresh.mapNotNull { it.createdAt?.take(7) }.distinct().sortedDescending()
+                    val fullyLoaded = if (monthsInFetch.size > 1) monthsInFetch.dropLast(1) else emptyList()
+                    fullyLoaded.forEach { loadedMonths.add(it) }
                     runCatching {
                         val freshIds = fresh.map { it.id }.toSet()
                         // Oldest date covered by this fetch — receipts older than this are historical
