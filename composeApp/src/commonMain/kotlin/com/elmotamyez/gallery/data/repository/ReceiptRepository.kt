@@ -7,6 +7,7 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.query.filter.FilterOperator
+import io.github.jan.supabase.postgrest.rpc
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -93,20 +94,14 @@ class ReceiptRepository {
     }
 
     /** Returns distinct YYYY-MM keys for every month that has at least one receipt.
-     *  Fetches only the created_at column — very lightweight regardless of total receipt count. */
+     *  Calls the get_receipt_months() Postgres function so the result is one row per month —
+     *  completely bypasses PostgREST's per-query row limit regardless of total receipt count. */
     suspend fun fetchAllMonthKeys(): List<String> {
-        val raw = supabaseClient.from("receipts")
-            .select(columns = Columns.list("created_at")) {
-                filter { filter("deleted_at", FilterOperator.IS, null) }
-                order("created_at", Order.DESCENDING)
-                limit(100_000)  // only fetches created_at, so this is still very lightweight
-            }.data
+        val raw = supabaseClient.postgrest.rpc("get_receipt_months").data
         return runCatching {
             json.parseToJsonElement(raw).jsonArray
-                .mapNotNull { it.jsonObject["created_at"]?.jsonPrimitive?.contentOrNull }
-                .filter { it.length >= 7 }
-                .map { it.substring(0, 7) }
-                .distinct()
+                .mapNotNull { it.jsonObject["month"]?.jsonPrimitive?.contentOrNull }
+                .filter { it.length == 7 }
                 .sortedDescending()
         }.getOrElse { emptyList() }
     }
