@@ -2512,6 +2512,8 @@ internal fun WebReceiptsTab(
     val monthTotal = remember(grouped) { grouped.sumOf { it.value.sumOf { r -> r.total } } }
     val monthCount = remember(grouped) { grouped.sumOf { it.value.size } }
 
+    LaunchedEffect(selectedMonth) { receiptVm.ensureMonthLoaded(selectedMonth) }
+
     val expandedDays by receiptVm.expandedDays.collectAsState()
     LaunchedEffect(grouped) {
         receiptVm.initExpandedDays(grouped.map { it.key })

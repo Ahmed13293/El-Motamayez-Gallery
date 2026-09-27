@@ -218,6 +218,30 @@ class ReceiptViewModel(
         }
     }
 
+    // Tracks which months have been explicitly fetched so we don't re-fetch needlessly
+    private val loadedMonths = mutableSetOf<String>()
+
+    /** Ensures a specific month's receipts are fully loaded. Called when the user taps
+     *  a month tab — older months may not be covered by the initial fetchAll limit. */
+    fun ensureMonthLoaded(yearMonth: String) {
+        if (yearMonth in loadedMonths) return
+        loadedMonths.add(yearMonth)
+        viewModelScope.launch {
+            runCatching { repository.fetchByMonth(yearMonth) }
+                .onSuccess { result ->
+                    val fresh = result.receipts
+                    val existingIds = _receipts.value.map { it.id }.toSet()
+                    val newOnes = fresh.filter { it.id !in existingIds }
+                    if (newOnes.isNotEmpty()) {
+                        val merged = (_receipts.value + newOnes).sortedByDescending { it.createdAt ?: "" }
+                        _receipts.value = merged
+                        recomputeNewCount()
+                        persistCache(merged)
+                    }
+                }
+        }
+    }
+
     /** Tries to push any locally-pending receipts to Supabase and decrement their stock.
      *  Quotation receipts are synced (insert) but stock is NOT decremented until confirmed. */
     private suspend fun syncPendingReceipts() {

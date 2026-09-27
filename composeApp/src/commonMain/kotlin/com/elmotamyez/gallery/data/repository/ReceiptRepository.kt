@@ -88,7 +88,24 @@ class ReceiptRepository {
                 order("created_at", Order.DESCENDING)
                 limit(2000)
             }.data
+        return parseRows(raw)
+    }
 
+    /** Fetch all receipts for a specific month (e.g. "2026-09"). No row limit — returns
+     *  every receipt in that month so older months load completely on demand. */
+    suspend fun fetchByMonth(yearMonth: String): FetchResult {
+        val raw = supabaseClient.from("receipts").select {
+                filter {
+                    filter("deleted_at", FilterOperator.IS, null)
+                    like("created_at", "$yearMonth-%")
+                }
+                order("created_at", Order.DESCENDING)
+                limit(2000)
+            }.data
+        return parseRows(raw)
+    }
+
+    private fun parseRows(raw: String): FetchResult {
         var firstError: String? = null
         val receipts = runCatching { json.parseToJsonElement(raw).jsonArray }.getOrElse { e ->
                 firstError = "parse: ${e.message}"

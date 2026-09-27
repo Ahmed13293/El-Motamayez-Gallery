@@ -153,6 +153,9 @@ class ReceiptsListScreen : Screen {
         val monthTotal = remember(grouped) { grouped.sumOf { it.value.sumOf { r -> r.total } } }
         val monthCount = remember(grouped) { grouped.sumOf { it.value.size } }
 
+        // Ensure the selected month's receipts are fully loaded from Supabase
+        LaunchedEffect(selectedMonth) { vm.ensureMonthLoaded(selectedMonth) }
+
         // Expanded state lives in the VM so it survives back-navigation
         val expandedDays by vm.expandedDays.collectAsState()
         LaunchedEffect(receipts, selectedMonth) {
