@@ -206,7 +206,11 @@ private fun String.parseSupabaseDt() = runCatching {
     Instant.parse(normalized).toLocalDateTime(TimeZone.currentSystemDefault())
 }.getOrNull()
 
-internal fun Receipt.dateKey(): String = id.take(10).takeIf { it.length == 10 } ?: "unknown"
+internal fun Receipt.dateKey(): String = when {
+    id.length >= 10 && id.getOrNull(4) == '-' -> id.take(10)
+    id.length >= 8 -> "${id.take(4)}-${id.substring(4,6)}-${id.substring(6,8)}"
+    else -> "unknown"
+}
 
 private fun Receipt.timeLabel(): String {
     val local = createdAt?.parseSupabaseDt() ?: return ""
@@ -2410,10 +2414,13 @@ private fun WebCartItemRow(
 
 // ── Receipts Tab — grouped by date, expand/collapse like mobile ───────────────
 
-// Key off the receipt ID (format "YYYY-MM-DD-NNNN") which encodes local date.
-// created_at is stored as UTC in Supabase, so using it would shift early-morning
-// receipts into the previous UTC day/month, mismatching user expectations.
-private fun Receipt.webMonthKey(): String = id.take(7).takeIf { it.length == 7 } ?: "unknown"
+// Key off the receipt ID which encodes local date.
+// New format: "YYYY-MM-DD-NNNN"  Old format: "YYYYMMDDNN" (no dashes)
+private fun Receipt.webMonthKey(): String = when {
+    id.length >= 7 && id.getOrNull(4) == '-' -> id.take(7)
+    id.length >= 6 -> "${id.take(4)}-${id.substring(4, 6)}"
+    else -> "unknown"
+}
 
 private fun String.webToArabicMonth(): String {
     val parts = split("-")

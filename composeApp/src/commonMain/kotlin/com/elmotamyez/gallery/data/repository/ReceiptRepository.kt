@@ -107,15 +107,17 @@ class ReceiptRepository {
         }.getOrElse { emptyList() }
     }
 
-    /** Fetch all receipts for a specific month (e.g. "2026-09"). Filters by the receipt ID
-     *  prefix (format "YYYY-MM-DD-NNNN") which encodes the local date set by the app.
-     *  Filtering by created_at would break because Supabase normalises it to UTC, shifting
-     *  early-morning local receipts into the previous UTC month. */
+    /** Fetch all receipts for a specific month (e.g. "2026-09").
+     *  Covers both new IDs ("YYYY-MM-DD-NNNN") and old IDs ("YYYYMMDDNN"). */
     suspend fun fetchByMonth(yearMonth: String): FetchResult {
+        val oldPrefix = yearMonth.replace("-", "")   // "2026-09" → "202609"
         val raw = supabaseClient.from("receipts").select {
                 filter {
                     filter("deleted_at", FilterOperator.IS, null)
-                    like("id", "$yearMonth-%")
+                    or {
+                        like("id", "$yearMonth-%")   // new format
+                        like("id", "$oldPrefix%")    // old format
+                    }
                 }
                 order("created_at", Order.DESCENDING)
                 limit(2000)

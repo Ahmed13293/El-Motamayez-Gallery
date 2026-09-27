@@ -23,3 +23,11 @@ data class Receipt(
     // Set by Supabase when the receipt is soft-deleted. Null = active.
     @SerialName("deleted_at") val deletedAt: String? = null
 )
+
+/** Extracts "YYYY-MM" from the receipt ID regardless of format:
+ *  new "YYYY-MM-DD-NNNN" or old "YYYYMMDDNN". */
+fun Receipt.idMonthKey(): String = when {
+    id.length >= 7 && id.getOrNull(4) == '-' -> id.take(7)
+    id.length >= 6 -> "${id.take(4)}-${id.substring(4, 6)}"
+    else -> "unknown"
+}

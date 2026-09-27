@@ -58,11 +58,18 @@ private fun String.parseSupabaseDateTime(): kotlinx.datetime.LocalDateTime? = ru
     Instant.parse(normalized).toLocalDateTime(TimeZone.currentSystemDefault())
 }.getOrNull()
 
-// Key off the receipt ID (format "YYYY-MM-DD-NNNN") which encodes local date.
-// created_at is stored as UTC in Supabase, so using it would shift early-morning
-// receipts into the previous UTC day/month, mismatching user expectations.
-private fun Receipt.dateKey(): String = id.take(10).takeIf { it.length == 10 } ?: "unknown"
-private fun Receipt.monthKey(): String = id.take(7).takeIf { it.length == 7 } ?: "unknown"
+// Key off the receipt ID which encodes local date.
+// New format: "YYYY-MM-DD-NNNN"  Old format: "YYYYMMDDNN" (no dashes)
+private fun Receipt.monthKey(): String = when {
+    id.length >= 7 && id.getOrNull(4) == '-' -> id.take(7)           // "2026-09"
+    id.length >= 6 -> "${id.take(4)}-${id.substring(4, 6)}"           // "202609…" → "2026-09"
+    else -> "unknown"
+}
+private fun Receipt.dateKey(): String = when {
+    id.length >= 10 && id.getOrNull(4) == '-' -> id.take(10)          // "2026-09-01"
+    id.length >= 8 -> "${id.take(4)}-${id.substring(4,6)}-${id.substring(6,8)}" // "20260901…" → "2026-09-01"
+    else -> "unknown"
+}
 
 private fun String.toArabicMonth(): String {
     val parts = split("-")
