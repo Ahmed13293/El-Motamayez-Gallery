@@ -4,6 +4,7 @@ import com.elmotamyez.gallery.data.model.CartItem
 import com.elmotamyez.gallery.data.model.Receipt
 import com.elmotamyez.gallery.data.remote.supabaseClient
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.query.filter.FilterOperator
@@ -106,13 +107,15 @@ class ReceiptRepository {
         }.getOrElse { emptyList() }
     }
 
-    /** Fetch all receipts for a specific month (e.g. "2026-09"). No row limit — returns
-     *  every receipt in that month so older months load completely on demand. */
+    /** Fetch all receipts for a specific month (e.g. "2026-09"). Filters by the receipt ID
+     *  prefix (format "YYYY-MM-DD-NNNN") which encodes the local date set by the app.
+     *  Filtering by created_at would break because Supabase normalises it to UTC, shifting
+     *  early-morning local receipts into the previous UTC month. */
     suspend fun fetchByMonth(yearMonth: String): FetchResult {
         val raw = supabaseClient.from("receipts").select {
                 filter {
                     filter("deleted_at", FilterOperator.IS, null)
-                    like("created_at", "$yearMonth-%")
+                    like("id", "$yearMonth-%")
                 }
                 order("created_at", Order.DESCENDING)
                 limit(2000)

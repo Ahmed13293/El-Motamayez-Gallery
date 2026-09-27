@@ -196,7 +196,8 @@ class ReceiptViewModel(
                     val fresh = result.receipts
                     // Mark months fully covered by this fetch — exclude the oldest month because
                     // fetchAll may have been cut off mid-month (boundary month is partially loaded).
-                    val monthsInFetch = fresh.mapNotNull { it.createdAt?.take(7) }.distinct().sortedDescending()
+                    // Use receipt ID prefix (local date) not created_at (UTC) for consistency.
+                    val monthsInFetch = fresh.map { it.id.take(7) }.filter { it.length == 7 }.distinct().sortedDescending()
                     val fullyLoaded = if (monthsInFetch.size > 1) monthsInFetch.dropLast(1) else emptyList()
                     fullyLoaded.forEach { loadedMonths.add(it) }
                     runCatching {
