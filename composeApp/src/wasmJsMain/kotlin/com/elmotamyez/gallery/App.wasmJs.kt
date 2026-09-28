@@ -2466,12 +2466,14 @@ internal fun WebReceiptsTab(
     val isLoading by receiptVm.isLoading.collectAsState()
     val allProducts by receiptVm.allProducts.collectAsState()
     val isSaving by receiptVm.isSaving.collectAsState()
+    val loadError by receiptVm.loadError.collectAsState()
+    val insertError by receiptVm.insertError.collectAsState()
     val deleteError by receiptVm.deleteError.collectAsState()
     var editingReceipt  by remember { mutableStateOf<Receipt?>(null) }
     var deletingReceipt by remember { mutableStateOf<Receipt?>(null) }
 
     // Receipt type tab: 0 = confirmed, 1 = quotations
-    var receiptTypeTab by remember { mutableIntStateOf(0) }
+    var receiptTypeTab by androidx.compose.runtime.rememberSaveable { mutableIntStateOf(0) }
     val confirmedReceipts = remember(receipts) { receipts.filter { !it.isQuotation } }
     val quotationReceipts = remember(receipts) {
         receipts.filter { it.isQuotation }.sortedByDescending { it.orderNumber }
@@ -2480,12 +2482,11 @@ internal fun WebReceiptsTab(
     LaunchedEffect(receiptTypeTab) {
         if (receiptTypeTab == 0) receiptVm.markReceiptsSeen()
     }
-    // Mark seen immediately on first open (tab 0 is default)
-    LaunchedEffect(Unit) { receiptVm.markReceiptsSeen() }
 
-    // Current month key e.g. "2026-07"
+    // Current month key in LOCAL time — matches the local date encoded in receipt IDs
     val currentMonthKey = remember {
-        Clock.System.now().toString().take(7)  // "YYYY-MM" in UTC, consistent with monthKey/RPC
+        val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+        "${now.year}-${twoDigit(now.monthNumber)}"
     }
 
     // Month tabs: prefer availableMonths (fetched independently) so older months are shown
@@ -2544,6 +2545,22 @@ internal fun WebReceiptsTab(
                 else Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(if (isLoading) "جاري التحديث..." else "تحديث")
+            }
+        }
+
+        // ── Load/insert error banners ─────────────────────────────────────────
+        val hasPending = remember(receipts) { receipts.any { it.pendingSave } }
+        if (hasPending || loadError != null || insertError != null) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = if (isMobile) 12.dp else 16.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (hasPending) Text("⚠ بعض الفواتير لم تُحفظ على السيرفر بعد", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                    if (loadError != null) Text("خطأ في التحميل: $loadError", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                    if (insertError != null) Text("خطأ في الحفظ: $insertError", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                }
             }
         }
 
@@ -2618,8 +2635,10 @@ internal fun WebReceiptsTab(
                             },
                             onDelete = { deletingReceipt = receipt },
                             onReplicate = {
-                                cartVm?.replicateFromReceipt(receipt.items)
-                                onNavigateToCart()
+                                cartVm?.let {
+                                    it.replicateFromReceipt(receipt.items)
+                                    onNavigateToCart()
+                                }
                             }
                         )
                     }
@@ -2751,8 +2770,10 @@ internal fun WebReceiptsTab(
                                             },
                                             onDelete = { deletingReceipt = receipt },
                                             onReplicate = {
-                                                cartVm?.replicateFromReceipt(receipt.items)
-                                                onNavigateToCart()
+                                                cartVm?.let {
+                                                    it.replicateFromReceipt(receipt.items)
+                                                    onNavigateToCart()
+                                                }
                                             }
                                         )
                                     }
@@ -2875,6 +2896,7 @@ private fun ReceiptDayHeader(
                         onValueChange = { inputValue = it },
                         label = { Text("الكاش الفعلي") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth()
                     )
                     if (diff != null) {
@@ -3090,11 +3112,7 @@ internal fun WebReceiptCard(
                         }
                     }
                     val time = receipt.timeLabel()
-                    val refNo = receipt.createdAt?.take(10)?.let { d ->
-                        "${d.replace("-", "")}${receipt.orderNumber}"
-                    } ?: "${receipt.orderNumber}"
                     val metaParts = buildList {
-                        add(refNo)
                         add("${receipt.items.size} منتج")
                         if (time.isNotEmpty()) add(time)
                     }.joinToString(" • ")
