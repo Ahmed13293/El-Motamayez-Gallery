@@ -156,7 +156,7 @@ internal fun WebAdminTab(user: User, onLogout: () -> Unit) {
     val state by adminVm.state.collectAsState()
     var section by remember { mutableStateOf(AdminSection.HUB) }
 
-    state.toast?.let { msg -> LaunchedEffect(msg) { adminVm.clearToast() } }
+    state.toast?.let { msg -> LaunchedEffect(msg) { delay(2500); adminVm.clearToast() } }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val isMobile = maxWidth < 600.dp
@@ -221,9 +221,19 @@ internal fun WebProductsManagementTab(isMobile: Boolean = false) {
     val adminVm: AdminViewModel = koinViewModel()
     val state by adminVm.state.collectAsState()
 
-    state.toast?.let { msg -> LaunchedEffect(msg) { adminVm.clearToast() } }
+    state.toast?.let { msg -> LaunchedEffect(msg) { delay(2500); adminVm.clearToast() } }
 
     Column(Modifier.fillMaxSize()) {
+        state.error?.let { err ->
+            Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    err,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
         state.toast?.let { msg ->
             Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -537,7 +547,7 @@ private fun AdminBrandsSection(brands: List<Brand>, categories: List<Category>, 
             categories = categories,
             selectedCategoryId = selectedCategoryId,
             onCategorySelect = { selectedCategoryId = it },
-            onConfirm = { adminVm.editBrand(brand.id, nameField, selectedCategoryId, null); editTarget = null },
+            onConfirm = { adminVm.editBrand(brand.id, nameField, selectedCategoryId, brand.parentId); editTarget = null },
             onDismiss = { editTarget = null }
         )
     }
@@ -664,8 +674,8 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
                     AnimatedVisibility(visible = headerExpanded, enter = expandVertically(), exit = shrinkVertically()) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                item {
-                                    listOf("all" to "الكل", "0" to "نفد المخزون", "12" to "مخزون 1 و 2").forEach { (key, label) ->
+                                listOf("all" to "الكل", "0" to "نفد المخزون", "12" to "مخزون 1 و 2").forEach { (key, label) ->
+                                    item(key = key) {
                                         FilterChip(
                                             selected = stockFilter == key,
                                             onClick  = { stockFilter = key },
@@ -674,8 +684,7 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
                                                 selectedContainerColor = if (key == "0")
                                                     MaterialTheme.colorScheme.errorContainer
                                                 else MaterialTheme.colorScheme.primaryContainer
-                                            ),
-                                            modifier = Modifier.padding(end = 8.dp)
+                                            )
                                         )
                                     }
                                 }
@@ -765,8 +774,8 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
             initial = null,
             categories = categories,
             brands = brands,
-            onConfirm = { name, price, wholesale, stock, brandId, catId, imageUrls ->
-                adminVm.addProduct(name, price, wholesale, stock, brandId, catId, imageUrls)
+            onConfirm = { name, price, wholesale, stock, brandId, catId, imageUrls, barcode ->
+                adminVm.addProduct(name, price, wholesale, stock, brandId, catId, imageUrls, barcode)
                 showAdd = false
             },
             onDismiss = { showAdd = false }
@@ -779,8 +788,8 @@ private fun AdminProductsSection(products: List<Product>, categories: List<Categ
             initial = product,
             categories = categories,
             brands = brands,
-            onConfirm = { name, price, wholesale, stock, brandId, catId, imageUrls ->
-                adminVm.editProduct(product.id, name, price, wholesale, stock, brandId, catId, imageUrls)
+            onConfirm = { name, price, wholesale, stock, brandId, catId, imageUrls, barcode ->
+                adminVm.editProduct(product.id, name, price, wholesale, stock, brandId, catId, imageUrls, barcode)
                 editTarget = null
             },
             onDismiss = { editTarget = null }
@@ -1200,12 +1209,13 @@ private fun BrandDialog(title: String, nameValue: String, onNameChange: (String)
 
 @OptIn(ExperimentalEncodingApi::class)
 @Composable
-private fun ProductDialog(title: String, initial: Product?, categories: List<Category>, brands: List<Brand>, onConfirm: (String, Double, Double?, Int, String, String, List<String>) -> Unit, onDismiss: () -> Unit) {
+private fun ProductDialog(title: String, initial: Product?, categories: List<Category>, brands: List<Brand>, onConfirm: (String, Double, Double?, Int, String, String, List<String>, String?) -> Unit, onDismiss: () -> Unit) {
     fun tfv(s: String) = TextFieldValue(s, TextRange(s.length))
     var name         by remember { mutableStateOf(tfv(initial?.name ?: "")) }
     var price        by remember { mutableStateOf(tfv(initial?.price?.toString() ?: "")) }
     var wholesale    by remember { mutableStateOf(tfv(initial?.wholesalePrice?.toString() ?: "")) }
     var stock        by remember { mutableStateOf(tfv(initial?.stock?.toString() ?: "")) }
+    var barcode      by remember { mutableStateOf(initial?.barcode ?: "") }
     var imageUrls    by remember { mutableStateOf(initial?.displayImages ?: emptyList()) }
     var urlInput     by remember { mutableStateOf(TextFieldValue("")) }
     var isUploading  by remember { mutableStateOf(false) }
@@ -1249,6 +1259,10 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) { stock = stock.selectAll(); selectAllInFocusedInput() } })
+                OutlinedTextField(value = barcode, onValueChange = { barcode = it },
+                    label = { Text("الباركود") }, singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth())
                 // Images section
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (imageUrls.isNotEmpty()) {
@@ -1400,7 +1414,7 @@ private fun ProductDialog(title: String, initial: Product?, categories: List<Cat
                     val p = price.text.toDoubleOrNull() ?: return@Button
                     val w = wholesale.text.toDoubleOrNull()
                     val s = stock.text.toIntOrNull() ?: 0
-                    onConfirm(name.text, p, w, s, brandId, catId, imageUrls)
+                    onConfirm(name.text, p, w, s, brandId, catId, imageUrls, barcode.trim().ifBlank { null })
                 },
                 enabled = name.text.isNotBlank() && price.text.isNotBlank() && catId.isNotBlank() && brandId.isNotBlank()
             ) { Text("حفظ") }

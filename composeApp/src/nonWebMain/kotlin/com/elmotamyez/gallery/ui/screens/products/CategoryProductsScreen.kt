@@ -54,7 +54,7 @@ data class CategoryProductsScreen(
         val keyboard = LocalSoftwareKeyboardController.current
         var quickEditProduct by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Product?>(null) }
         var variantPickerProduct by remember { mutableStateOf<com.elmotamyez.gallery.data.model.Product?>(null) }
-        var searchHistory by remember { mutableStateOf(listOf<String>()) }
+        val searchHistory by vm.searchHistory.collectAsState()
         var isSearchFocused by remember { mutableStateOf(false) }
 
         // Select this category on first composition
@@ -68,7 +68,7 @@ data class CategoryProductsScreen(
             if (q.isNotBlank()) {
                 kotlinx.coroutines.delay(1200)
                 if (state.searchQuery.trim() == q) {
-                    searchHistory = (listOf(q) + searchHistory.filter { it != q }).take(6)
+                    vm.addToSearchHistory(q)
                 }
             }
         }
@@ -252,7 +252,7 @@ data class CategoryProductsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        if (state.searchQuery.isNotEmpty()) "No results for \"${state.searchQuery}\""
+                        if (state.searchQuery.isNotEmpty()) "لا توجد نتائج لـ \"${state.searchQuery}\""
                         else "لا توجد منتجات",
                         color = MaterialTheme.colorScheme.outline
                     )
