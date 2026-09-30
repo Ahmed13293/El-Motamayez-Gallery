@@ -99,6 +99,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.elmotamyez.gallery.data.repository.PushTokenRepository
 import kotlinx.coroutines.Dispatchers
@@ -2504,7 +2505,7 @@ internal fun WebReceiptsTab(
     var deletingReceipt by remember { mutableStateOf<Receipt?>(null) }
 
     // Receipt type tab: 0 = confirmed, 1 = quotations
-    var receiptTypeTab by androidx.compose.runtime.rememberSaveable { mutableIntStateOf(0) }
+    var receiptTypeTab by rememberSaveable { mutableIntStateOf(0) }
     val confirmedReceipts = remember(receipts) { receipts.filter { !it.isQuotation } }
     val quotationReceipts = remember(receipts) {
         receipts.filter { it.isQuotation }.sortedByDescending { it.orderNumber }
