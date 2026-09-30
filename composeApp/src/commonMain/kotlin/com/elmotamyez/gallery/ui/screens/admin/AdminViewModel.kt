@@ -21,7 +21,7 @@ data class AdminUiState(
     val categories:          List<Category> = emptyList(),
     val brands:              List<Brand>    = emptyList(),
     val products:            List<Product>  = emptyList(),
-    val hasMoreProducts:     Boolean        = true,
+    val hasMoreProducts:     Boolean        = false,
     val isLoading:           Boolean        = false,
     val isLoadingMore:       Boolean        = false,
     val isUploadingImage:    Boolean        = false,
@@ -39,9 +39,7 @@ class AdminViewModel(
     private val _state = MutableStateFlow(AdminUiState())
     val state: StateFlow<AdminUiState> = _state.asStateFlow()
 
-    private val pageSize = 60
-    private var currentPage = 0
-    // Non-blank when the user is in search mode; null means browse/paginate mode
+    // Non-blank when the user is in search mode; null means browse mode
     private var activeSearch: String? = null
 
     init { loadAll() }
@@ -49,7 +47,6 @@ class AdminViewModel(
     // ── Load ──────────────────────────────────────────────────────────────────
 
     fun loadAll() {
-        currentPage = 0
         activeSearch = null
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
@@ -58,13 +55,13 @@ class AdminViewModel(
                     .sortedBy { it.id.filter { c -> c.isDigit() }.toIntOrNull() ?: Int.MAX_VALUE }
                 val brands = repository.getBrands()
                     .sortedBy { it.id.filter { c -> c.isDigit() }.toIntOrNull() ?: Int.MAX_VALUE }
-                val prods  = repository.getProductsPage(0, pageSize)
+                val prods  = repository.getProducts().sortedBy { it.name }
                 _state.update {
                     it.copy(
                         categories      = cats,
                         brands          = brands,
                         products        = prods,
-                        hasMoreProducts = prods.size >= pageSize,
+                        hasMoreProducts = false,
                         isLoading       = false
                     )
                 }
@@ -74,35 +71,13 @@ class AdminViewModel(
         }
     }
 
-    /** Load the next page and append to the current list (browse mode only). */
-    fun loadNextPage() {
-        if (activeSearch != null) return
-        if (!_state.value.hasMoreProducts) return
-        if (_state.value.isLoadingMore) return
-        viewModelScope.launch {
-            _state.update { it.copy(isLoadingMore = true) }
-            try {
-                currentPage++
-                val more = repository.getProductsPage(currentPage, pageSize)
-                _state.update {
-                    it.copy(
-                        products        = it.products + more,
-                        hasMoreProducts = more.size >= pageSize,
-                        isLoadingMore   = false
-                    )
-                }
-            } catch (e: Exception) {
-                currentPage--
-                _state.update { it.copy(isLoadingMore = false, error = e.message) }
-            }
-        }
-    }
+    /** No-op kept for mobile screen compatibility — all products are now loaded upfront. */
+    fun loadNextPage() = Unit
 
-    /** Server-side name search. Empty/blank query returns to browse/paginate mode. */
+    /** Server-side name search. Empty/blank query returns to browse mode. */
     fun searchProducts(query: String) {
         val q = query.trim()
         if (q == activeSearch) return
-        // Blank query with no prior search → already in browse mode, nothing to do
         if (q.isBlank() && activeSearch == null) return
         activeSearch = q.ifBlank { null }
         if (q.isBlank()) { loadAll(); return }

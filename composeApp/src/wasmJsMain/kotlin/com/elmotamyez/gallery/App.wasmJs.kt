@@ -692,38 +692,36 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
         else -> if (isMobile) {
             // ── Mobile: categories as horizontal chips, products below ──────
             Column(Modifier.fillMaxSize()) {
-                // Search bar (hidden in subcategory view to keep it clean)
-                if (!showSubcategoryView) {
-                    OutlinedTextField(
-                        value = state.searchQuery,
-                        onValueChange = { productsVm.search(it) },
-                        placeholder = { Text("بحث عن منتج...") },
-                        leadingIcon = { Icon(Icons.Default.Search, null) },
-                        trailingIcon = {
-                            if (state.searchQuery.isNotEmpty()) IconButton(onClick = {
-                                productsVm.search("")
-                            }) { Icon(Icons.Default.Clear, null) }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
-                            .onFocusChanged { isSearchFocused = it.isFocused }
-                    )
-                    if (state.searchQuery.isBlank() && searchHistory.isNotEmpty()) {
-                        androidx.compose.foundation.lazy.LazyRow(
-                            contentPadding = PaddingValues(horizontal = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
-                        ) {
-                            items(searchHistory) { entry ->
-                                SuggestionChip(
-                                    onClick = { productsVm.search(entry); focusManager.clearFocus() },
-                                    label = { Text(entry) },
-                                    icon = { Icon(Icons.Default.History, null, Modifier.size(16.dp)) }
-                                )
-                            }
+                // Search bar
+                OutlinedTextField(
+                    value = state.searchQuery,
+                    onValueChange = { productsVm.search(it) },
+                    placeholder = { Text("بحث عن منتج...") },
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    trailingIcon = {
+                        if (state.searchQuery.isNotEmpty()) IconButton(onClick = {
+                            productsVm.search("")
+                        }) { Icon(Icons.Default.Clear, null) }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+                        .onFocusChanged { isSearchFocused = it.isFocused }
+                )
+                if (state.searchQuery.isBlank() && searchHistory.isNotEmpty()) {
+                    androidx.compose.foundation.lazy.LazyRow(
+                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                    ) {
+                        items(searchHistory) { entry ->
+                            SuggestionChip(
+                                onClick = { productsVm.search(entry); focusManager.clearFocus() },
+                                label = { Text(entry) },
+                                icon = { Icon(Icons.Default.History, null, Modifier.size(16.dp)) }
+                            )
                         }
                     }
                 }
@@ -772,7 +770,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                         }
                     }
                 } else {
-                    // Back breadcrumb when brand selected
+                    // Back breadcrumb + sub-brand chips when brand selected
                     if (state.selectedBrandId != null) {
                         val catName = state.categories.find { it.id == state.selectedCategoryId }?.name ?: ""
                         val brandName = state.brands.find { it.id == state.selectedBrandId }?.name ?: ""
@@ -783,6 +781,21 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("$catName ← $brandName", style = MaterialTheme.typography.labelMedium)
+                        }
+                        if (subBrandsForSelected.isNotEmpty()) {
+                            androidx.compose.foundation.lazy.LazyRow(
+                                contentPadding = PaddingValues(horizontal = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                            ) {
+                                items(subBrandsForSelected, key = { it.id }) { sub ->
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = { focusManager.clearFocus(); productsVm.selectBrand(sub.id) },
+                                        label = { Text(sub.name, maxLines = 1) }
+                                    )
+                                }
+                            }
                         }
                     }
                     // 50/50 row: Other product | Printing
@@ -825,7 +838,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                         ) {
-                            items(bestSellers) { product ->
+                            items(bestSellers, key = { it.id }) { product ->
                                 val qty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
                                 val variants = state.variantsMap[product.id] ?: emptyList()
                                 Box(Modifier.width(130.dp)) {
@@ -859,7 +872,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                         ) {
-                            items(state.products) { product ->
+                            items(state.products, key = { it.id }) { product ->
                                 val qty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
                                 val variants = state.variantsMap[product.id] ?: emptyList()
                                 WebProductCard(
@@ -965,7 +978,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                         Modifier.fillMaxSize().padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Back breadcrumb when brand selected
+                        // Back breadcrumb + sub-brand chips when brand selected
                         if (state.selectedBrandId != null) {
                             val catName = state.categories.find { it.id == state.selectedCategoryId }?.name ?: ""
                             TextButton(
@@ -975,6 +988,20 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
                                 Text(catName, style = MaterialTheme.typography.labelMedium)
+                            }
+                            if (subBrandsForSelected.isNotEmpty()) {
+                                androidx.compose.foundation.lazy.LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(subBrandsForSelected, key = { it.id }) { sub ->
+                                        FilterChip(
+                                            selected = false,
+                                            onClick = { productsVm.selectBrand(sub.id) },
+                                            label = { Text(sub.name, maxLines = 1) }
+                                        )
+                                    }
+                                }
                             }
                         }
                         OutlinedTextField(
@@ -1045,7 +1072,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 contentPadding = PaddingValues(bottom = 4.dp)
                             ) {
-                                items(bestSellers) { product ->
+                                items(bestSellers, key = { it.id }) { product ->
                                     val qty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
                                     val variants = state.variantsMap[product.id] ?: emptyList()
                                     Box(Modifier.width(170.dp)) {
@@ -1080,7 +1107,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 contentPadding = PaddingValues(bottom = 16.dp)
                             ) {
-                                items(state.products) { product ->
+                                items(state.products, key = { it.id }) { product ->
                                     val qty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
                                     val variants = state.variantsMap[product.id] ?: emptyList()
                                     WebProductCard(
@@ -1115,7 +1142,7 @@ private fun WebQuickEditDialog(
     var price by remember { mutableStateOf(product.price.fmt2f()) }
     var wholesale by remember { mutableStateOf(product.wholesalePrice?.fmt2f() ?: "") }
     var stock by remember { mutableStateOf(product.stock.toString()) }
-    val variantStocks = remember {
+    val variantStocks = remember(variants) {
         mutableStateMapOf<String, String>().also { map ->
             variants.forEach { v -> map[v.id] = v.stock.toString() }
         }
