@@ -653,6 +653,9 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
         subcategoriesForCategory.isNotEmpty() &&
         state.selectedBrandId == null &&
         state.searchQuery.isBlank()
+    val subBrandsForSelected = if (state.selectedBrandId != null)
+        state.brands.filter { it.parentId == state.selectedBrandId }
+    else emptyList()
 
     if (showOtherDialog) {
         OtherProductDialog(
@@ -1723,6 +1726,7 @@ private fun WebCartTab(
             showConfirmDialog = false
             customerPhone = ""
             customerInfo  = ""
+            onOrderConfirmed()
         }
     }
     val overrideDateLabel = overrideDate?.let { (y, m, d) ->
@@ -1889,7 +1893,7 @@ private fun WebCartTab(
                             fontWeight = FontWeight.SemiBold
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("كاش", "تحويل").forEach { method ->
+                            listOf("كاش", "تحويل", "شبكة", "آجل").forEach { method ->
                                 FilterChip(
                                     selected = paymentMethod == method,
                                     onClick = { paymentMethod = method },
@@ -2043,7 +2047,7 @@ private fun WebCartTab(
                         fontWeight = FontWeight.SemiBold
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("كاش", "تحويل").forEach { method ->
+                        listOf("كاش", "تحويل", "شبكة", "آجل").forEach { method ->
                             FilterChip(
                                 selected = paymentMethod == method,
                                 onClick = { paymentMethod = method },
@@ -2245,7 +2249,7 @@ private fun WebCartTab(
                     val millis = datePickerState.selectedDateMillis
                     if (millis != null) {
                         val local = Instant.fromEpochMilliseconds(millis)
-                            .toLocalDateTime(TimeZone.UTC)
+                            .toLocalDateTime(TimeZone.currentSystemDefault())
                         overrideDate = Triple(local.year, local.monthNumber, local.dayOfMonth)
                     }
                     showDatePicker = false
@@ -2541,7 +2545,7 @@ internal fun WebReceiptsTab(
     LaunchedEffect(selectedMonth) { receiptVm.ensureMonthLoaded(selectedMonth) }
 
     val expandedDays by receiptVm.expandedDays.collectAsState()
-    LaunchedEffect(grouped) {
+    LaunchedEffect(selectedMonth, grouped.map { it.key }) {
         receiptVm.initExpandedDays(grouped.map { it.key })
     }
 
@@ -2753,8 +2757,10 @@ internal fun WebReceiptsTab(
                 grouped.forEach { (dateKey, dayReceipts) ->
                     val isOpen = expandedDays[dateKey] == true
                     val dayTotal = dayReceipts.sumOf { it.total }
-                    val cashTotal = dayReceipts.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
+                    val cashTotal     = dayReceipts.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
                     val transferTotal = dayReceipts.filter { it.paymentMethod == "تحويل" }.sumOf { it.total }
+                    val networkTotal  = dayReceipts.filter { it.paymentMethod == "شبكة" }.sumOf { it.total }
+                    val deferTotal    = dayReceipts.filter { it.paymentMethod == "آجل" }.sumOf { it.total }
 
                     item(key = "header_$dateKey") {
                         ReceiptDayHeader(
@@ -2763,6 +2769,8 @@ internal fun WebReceiptsTab(
                             dayTotal = dayTotal,
                             cashTotal = cashTotal,
                             transferTotal = transferTotal,
+                            networkTotal = networkTotal,
+                            deferTotal = deferTotal,
                             reconciliation = reconciliations[dateKey],
                             onSaveReconciliation = { actual ->
                                 receiptVm.saveReconciliation(dateKey, actual, currentUsername)
@@ -2871,6 +2879,8 @@ private fun ReceiptDayHeader(
     dayTotal: Double,
     cashTotal: Double,
     transferTotal: Double,
+    networkTotal: Double = 0.0,
+    deferTotal: Double = 0.0,
     reconciliation: DailyReconciliation?,
     onSaveReconciliation: (Double) -> Unit,
     isExpanded: Boolean,
@@ -2987,7 +2997,7 @@ private fun ReceiptDayHeader(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
-                if (cashTotal > 0.0 || transferTotal > 0.0) {
+                if (cashTotal > 0.0 || transferTotal > 0.0 || networkTotal > 0.0 || deferTotal > 0.0) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (cashTotal > 0.0)
                             Text(
@@ -3000,6 +3010,18 @@ private fun ReceiptDayHeader(
                                 "تحويل: ${transferTotal.formatPrice()} ج",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.tertiary
+                            )
+                        if (networkTotal > 0.0)
+                            Text(
+                                "شبكة: ${networkTotal.formatPrice()} ج",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        if (deferTotal > 0.0)
+                            Text(
+                                "آجل: ${deferTotal.formatPrice()} ج",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error
                             )
                     }
                 }
@@ -3502,7 +3524,7 @@ private fun WebEditReceiptDialog(
                 // ── Payment method ────────────────────────────────────────────
                 Text("طريقة الدفع", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("كاش", "تحويل").forEach { method ->
+                    listOf("كاش", "تحويل", "شبكة", "آجل").forEach { method ->
                         FilterChip(
                             selected = paymentMethod == method,
                             onClick = { paymentMethod = method },

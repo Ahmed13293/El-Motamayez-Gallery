@@ -162,6 +162,18 @@ internal fun WebAdminTab(user: User, onLogout: () -> Unit) {
         val isMobile = maxWidth < 600.dp
 
         Column(Modifier.fillMaxSize()) {
+            state.error?.let { err ->
+                Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(err, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { adminVm.clearError() }) { Text("إغلاق", color = MaterialTheme.colorScheme.onErrorContainer) }
+                    }
+                }
+            }
             state.toast?.let { msg ->
                 Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -822,15 +834,17 @@ private fun AdminReportSection(isMobile: Boolean = false) {
     val receipts by receiptVm.receipts.collectAsState()
     val expenses by expenseVm.expenses.collectAsState()
 
-    val grouped = receipts
+    val salesReceipts = receipts.filter { !it.isQuotation }
+
+    val grouped = salesReceipts
         .sortedByDescending { it.orderNumber }
         .groupBy { it.dateKey() }
         .entries.sortedByDescending { it.key }
 
-    val grandRevenue  = receipts.sumOf { it.total }
+    val grandRevenue  = salesReceipts.sumOf { it.total }
     val grandExpenses = expenses.sumOf { it.amount }
     val grandProfit   = grandRevenue - grandExpenses
-    val grandCount    = receipts.size
+    val grandCount    = salesReceipts.size
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -890,11 +904,12 @@ private fun AdminReportSection(isMobile: Boolean = false) {
 
         grouped.forEach { (dateKey, dayReceipts) ->
             val dayRevenue   = dayReceipts.sumOf { it.total }
-            val cashTotal    = dayReceipts.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
-            val networkTotal = dayReceipts.filter { it.paymentMethod == "شبكة" }.sumOf { it.total }
-            val deferTotal   = dayReceipts.filter { it.paymentMethod == "آجل" }.sumOf { it.total }
-            val dayExpenses  = expenses.filter { it.createdAt?.take(10) == dateKey }.sumOf { it.amount }
-            val dayProfit    = dayRevenue - dayExpenses
+            val cashTotal     = dayReceipts.filter { it.paymentMethod == "كاش" }.sumOf { it.total }
+            val transferTotal = dayReceipts.filter { it.paymentMethod == "تحويل" }.sumOf { it.total }
+            val networkTotal  = dayReceipts.filter { it.paymentMethod == "شبكة" }.sumOf { it.total }
+            val deferTotal    = dayReceipts.filter { it.paymentMethod == "آجل" }.sumOf { it.total }
+            val dayExpenses   = expenses.filter { it.createdAt?.take(10) == dateKey }.sumOf { it.amount }
+            val dayProfit     = dayRevenue - dayExpenses
 
             item(key = "rep_$dateKey") {
                 Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp)) {
@@ -906,9 +921,10 @@ private fun AdminReportSection(isMobile: Boolean = false) {
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("${dayReceipts.size} فاتورة", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            if (cashTotal    > 0) Text("كاش: ${cashTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                            if (networkTotal > 0) Text("شبكة: ${networkTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
-                            if (deferTotal   > 0) Text("آجل: ${deferTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            if (cashTotal     > 0) Text("كاش: ${cashTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            if (transferTotal > 0) Text("تحويل: ${transferTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            if (networkTotal  > 0) Text("شبكة: ${networkTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                            if (deferTotal    > 0) Text("آجل: ${deferTotal.formatPrice()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                         }
                         if (dayExpenses > 0) {
                             HorizontalDivider(thickness = 0.5.dp)
