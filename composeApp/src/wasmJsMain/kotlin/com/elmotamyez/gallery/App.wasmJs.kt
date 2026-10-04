@@ -657,6 +657,13 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
         state.brands.filter { it.parentId == state.selectedBrandId }
     else emptyList()
 
+    val showCategoryHub = state.selectedCategoryId == null && state.searchQuery.isBlank()
+
+    // product count per category for the hub cards
+    val productCountByCategory = remember(state.allProducts) {
+        state.allProducts.groupBy { it.categoryId }.mapValues { it.value.size }
+    }
+
     if (showOtherDialog) {
         OtherProductDialog(
             onDismiss = { showOtherDialog = false },
@@ -976,6 +983,106 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             }
                         }
                     }
+                } else if (showCategoryHub) {
+                    // ── Desktop category hub (الكل selected, no search) ─────────
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        // Action buttons row
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFFFFEEDD))
+                                        .clickable { showOtherDialog = true }
+                                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, null, tint = Color(0xFF08396C), modifier = Modifier.size(22.dp))
+                                        Text("منتج اخر", color = Color(0xFF08396C), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    }
+                                }
+                                PrintingButton(
+                                    onAddToCart = { product -> cartVm.addToCart(product) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                        // Best sellers strip
+                        if (bestSellers.isNotEmpty()) {
+                            item {
+                                Text(
+                                    "الأكثر مبيعاً",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            item {
+                                androidx.compose.foundation.lazy.LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    contentPadding = PaddingValues(bottom = 4.dp)
+                                ) {
+                                    items(bestSellers, key = { it.id }) { product ->
+                                        val qty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
+                                        val variants = state.variantsMap[product.id] ?: emptyList()
+                                        Box(Modifier.width(170.dp)) {
+                                            WebProductCard(
+                                                product = product,
+                                                quantity = qty,
+                                                variants = variants,
+                                                isMobile = false,
+                                                onAdd = { cartVm.addToCart(product) },
+                                                onAddVariant = { variantId, variantName, variantQty ->
+                                                    cartVm.addWithQuantity(product, variantQty, variantId, variantName)
+                                                },
+                                                onIncrease = { cartVm.increaseQuantity(product.id) },
+                                                onDecrease = { cartVm.decreaseQuantity(product.id) },
+                                                onLongPress = { quickEditProduct = it })
+                                        }
+                                    }
+                                }
+                            }
+                            item { HorizontalDivider() }
+                        }
+                        // Category hub title
+                        item {
+                            Text(
+                                "تصفح الأقسام",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        // Category grid (adaptive columns)
+                        item {
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(minSize = 160.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 2000.dp)
+                            ) {
+                                items(state.categories, key = { it.id }) { cat ->
+                                    WebCategoryHubCard(
+                                        name = cat.name,
+                                        productCount = productCountByCategory[cat.id] ?: 0,
+                                        onClick = { productsVm.selectCategory(cat.id) }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 } else {
                     Column(
                         Modifier.fillMaxSize().padding(16.dp),
@@ -1212,6 +1319,66 @@ private fun WebQuickEditDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
     )
+}
+
+@Composable
+@Composable
+private fun WebCategoryHubCard(
+    name: String,
+    productCount: Int,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val colors = listOf(
+        Color(0xFFDCEEFA), Color(0xFFDCF0E8), Color(0xFFFFF3E0),
+        Color(0xFFFCE4EC), Color(0xFFEDE7F6), Color(0xFFE8F5E9),
+        Color(0xFFFFF8E1), Color(0xFFE3F2FD)
+    )
+    val colorIndex = (name.firstOrNull()?.code ?: 0) % colors.size
+    val bgColor = colors[colorIndex]
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(bgColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    name.firstOrNull()?.toString() ?: "",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF08396C)
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "$productCount منتج",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }
 
 @Composable
