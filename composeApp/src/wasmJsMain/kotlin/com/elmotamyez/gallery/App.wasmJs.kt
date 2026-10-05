@@ -779,6 +779,105 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             )
                         }
                     }
+                } else if (showCategoryHub) {
+                    // ── Category hub (الكل selected, no search) — mobile ────────
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = 16.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFFFFEEDD))
+                                        .clickable { focusManager.clearFocus(); showOtherDialog = true }
+                                        .padding(horizontal = 12.dp, vertical = 14.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, null, tint = Color(0xFF08396C), modifier = Modifier.size(20.dp))
+                                        Text("منتج اخر", color = Color(0xFF08396C), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    }
+                                }
+                                PrintingButton(
+                                    onAddToCart = { product -> cartVm.addToCart(product) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                        if (bestSellers.isNotEmpty()) {
+                            item {
+                                Text(
+                                    "الأكثر مبيعاً",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp)
+                                )
+                            }
+                            item {
+                                androidx.compose.foundation.lazy.LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                ) {
+                                    items(bestSellers, key = { it.id }) { product ->
+                                        val qty = cartItems.filter { it.product.id == product.id }.sumOf { it.quantity }
+                                        val variants = state.variantsMap[product.id] ?: emptyList()
+                                        Box(Modifier.width(130.dp)) {
+                                            WebProductCard(
+                                                product = product,
+                                                quantity = qty,
+                                                variants = variants,
+                                                isMobile = true,
+                                                onAdd = { focusManager.clearFocus(); cartVm.addToCart(product) },
+                                                onAddVariant = { variantId, variantName, variantQty ->
+                                                    focusManager.clearFocus()
+                                                    cartVm.addWithQuantity(product, variantQty, variantId, variantName)
+                                                },
+                                                onIncrease = { focusManager.clearFocus(); cartVm.increaseQuantity(product.id) },
+                                                onDecrease = { focusManager.clearFocus(); cartVm.decreaseQuantity(product.id) },
+                                                onLongPress = { quickEditProduct = it })
+                                        }
+                                    }
+                                }
+                            }
+                            item { HorizontalDivider(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) }
+                        }
+                        item {
+                            Text(
+                                "تصفح الأقسام",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 8.dp)
+                            )
+                        }
+                        val rows = state.categories.chunked(2)
+                        items(rows, key = { it.first().id }) { pair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                pair.forEach { cat ->
+                                    WebCategoryHubCard(
+                                        name = cat.name,
+                                        productCount = productCountByCategory[cat.id] ?: 0,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { focusManager.clearFocus(); productsVm.selectCategory(cat.id) }
+                                    )
+                                }
+                                if (pair.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
                 } else {
                     // Back breadcrumb + sub-brand chips when brand selected
                     if (state.selectedBrandId != null) {
