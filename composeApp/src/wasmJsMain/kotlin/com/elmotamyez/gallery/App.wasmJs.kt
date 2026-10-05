@@ -1322,7 +1322,6 @@ private fun WebQuickEditDialog(
 }
 
 @Composable
-@Composable
 private fun WebCategoryHubCard(
     name: String,
     productCount: Int,
