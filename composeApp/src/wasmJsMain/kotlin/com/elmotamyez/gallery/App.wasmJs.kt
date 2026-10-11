@@ -808,7 +808,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                     }
                                 }
                                 PrintingButton(
-                                    onAddToCart = { product -> cartVm.addToCart(product) },
+                                    onAddToCart = { product, qty -> cartVm.addWithQuantity(product, qty) },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -930,7 +930,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                             }
                         }
                         PrintingButton(
-                            onAddToCart = { product -> cartVm.addToCart(product) },
+                            onAddToCart = { product, qty -> cartVm.addWithQuantity(product, qty) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -1113,7 +1113,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                     }
                                 }
                                 PrintingButton(
-                                    onAddToCart = { product -> cartVm.addToCart(product) },
+                                    onAddToCart = { product, qty -> cartVm.addWithQuantity(product, qty) },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -1265,7 +1265,7 @@ private fun WebHomeTab(cartVm: CartViewModel, isMobile: Boolean) {
                                 }
                             }
                             PrintingButton(
-                                onAddToCart = { product -> cartVm.addToCart(product) },
+                                onAddToCart = { product, qty -> cartVm.addWithQuantity(product, qty) },
                                 modifier = Modifier.weight(1f)
                             )
                         }

@@ -667,7 +667,7 @@ class CategoriesHomeScreen : Screen {
                             title = "الأقسام",
                             trailing = {
                                 PrintingButton(
-                                    onAddToCart = { cartVm.addToCart(it) },
+                                    onAddToCart = { product, qty -> cartVm.addWithQuantity(product, qty) },
                                     squareMode = true
                                 )
                             }

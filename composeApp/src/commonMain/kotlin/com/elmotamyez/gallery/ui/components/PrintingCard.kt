@@ -56,7 +56,7 @@ private enum class ServiceType(val label: String) { PRINT("طباعة"), PHOTO("
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrintingButton(
-    onAddToCart: (Product) -> Unit,
+    onAddToCart: (Product, Int) -> Unit,
     modifier: Modifier = Modifier,
     squareMode: Boolean = false
 ) {
@@ -120,8 +120,8 @@ fun PrintingButton(
                 }
             }
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-            PrintingSheetContent(onAddToCart = { product ->
-                onAddToCart(product)
+            PrintingSheetContent(onAddToCart = { product, qty ->
+                onAddToCart(product, qty)
                 showSheet = false
             })
         }
@@ -131,7 +131,7 @@ fun PrintingButton(
 // ── Bottom sheet content ──────────────────────────────────────────────────────
 
 @Composable
-private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
+private fun PrintingSheetContent(onAddToCart: (Product, Int) -> Unit) {
     var serviceType    by remember { mutableStateOf(ServiceType.PRINT) }
     var paperCountText by remember { mutableStateOf("1") }
     var doubleSided    by remember { mutableStateOf(false) }
@@ -358,13 +358,13 @@ private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
                     if (!isColor && doubleSided) append(" (وش وضهر)")
                 }
                 onAddToCart(Product(
-                    id         = "${serviceType.name.lowercase()}_${paperCount}_${if (isColor) "color" else if (doubleSided) "dbl" else "sgl"}",
+                    id         = "${serviceType.name.lowercase()}_${if (isColor) "color" else if (doubleSided) "dbl" else "sgl"}",
                     name       = label,
-                    price      = totalPrice,
+                    price      = pricePerPage,
                     stock      = 999,
                     brandId    = "printing",
                     categoryId = "printing"
-                ))
+                ), paperCount)
             },
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(14.dp)
