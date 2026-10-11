@@ -39,10 +39,17 @@ private const val PRICE_A3_SINGLE    = 3.00
 private const val PRICE_PRINT_DOUBLE = 3.50
 private const val PRICE_PHOTO_DOUBLE = 2.50
 private const val PRICE_A3_DOUBLE    = 4.00
+// Color tiered pricing (single-sided only, no A3)
+private fun colorPricePerPage(count: Int): Double = when {
+    count <= 10  -> 5.00
+    count <= 50  -> 4.00
+    count <= 100 -> 3.75
+    else         -> 3.50
+}
 
 private val NavyGradient = listOf(Color(0xFF08396C), Color(0xFF1565C0))
 
-private enum class ServiceType(val label: String) { PRINT("طباعة"), PHOTO("تصوير"), A3("طباعة A3") }
+private enum class ServiceType(val label: String) { PRINT("طباعة"), PHOTO("تصوير"), A3("طباعة A3"), COLOR("ألوان") }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -130,8 +137,13 @@ private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
     var doubleSided    by remember { mutableStateOf(false) }
 
     val paperCount = paperCountText.toIntOrNull()?.coerceAtLeast(1) ?: 1
+    val isColor = serviceType == ServiceType.COLOR
+
+    // reset double-sided when switching to color
+    LaunchedEffect(isColor) { if (isColor) doubleSided = false }
 
     val pricePerPage = when {
+        isColor                                          -> colorPricePerPage(paperCount)
         serviceType == ServiceType.A3    && doubleSided  -> PRICE_A3_DOUBLE
         serviceType == ServiceType.A3    && !doubleSided -> PRICE_A3_SINGLE
         serviceType == ServiceType.PRINT && doubleSided  -> PRICE_PRINT_DOUBLE
@@ -172,45 +184,70 @@ private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
 
         HorizontalDivider()
 
-        // ── Service type toggle ───────────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            ServiceType.entries.forEach { type ->
-                val selected = serviceType == type
-                val singlePrice = when (type) {
-                    ServiceType.PRINT -> PRICE_PRINT_SINGLE
-                    ServiceType.PHOTO -> PRICE_PHOTO_SINGLE
-                    ServiceType.A3    -> PRICE_A3_SINGLE
-                }
-                val doublePrice = when (type) {
-                    ServiceType.PRINT -> PRICE_PRINT_DOUBLE
-                    ServiceType.PHOTO -> PRICE_PHOTO_DOUBLE
-                    ServiceType.A3    -> PRICE_A3_DOUBLE
-                }
-                Surface(
-                    onClick = { serviceType = type },
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.weight(1f).height(56.dp)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+        // ── Service type toggle (2×2 grid) ───────────────────────────────────
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Row 1: طباعة + تصوير
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(ServiceType.PRINT, ServiceType.PHOTO).forEach { type ->
+                    val selected = serviceType == type
+                    val singlePrice = if (type == ServiceType.PRINT) PRICE_PRINT_SINGLE else PRICE_PHOTO_SINGLE
+                    val doublePrice = if (type == ServiceType.PRINT) PRICE_PRINT_DOUBLE else PRICE_PHOTO_DOUBLE
+                    Surface(
+                        onClick = { serviceType = type },
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.weight(1f).height(56.dp)
                     ) {
-                        Text(
-                            type.label,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "وجه: ${singlePrice.fmt2f()}  |  وجهين: ${doublePrice.fmt2f()}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (selected) Color.White.copy(alpha = 0.8f)
-                                    else MaterialTheme.colorScheme.outline
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                            Text(type.label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium,
+                                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("وجه: ${singlePrice.fmt2f()}  |  وجهين: ${doublePrice.fmt2f()}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (selected) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.outline)
+                        }
+                    }
+                }
+            }
+            // Row 2: طباعة A3 + ألوان
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(ServiceType.A3, ServiceType.COLOR).forEach { type ->
+                    val selected = serviceType == type
+                    Surface(
+                        onClick = { serviceType = type },
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.weight(1f).height(56.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                            Text(type.label, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium,
+                                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (type == ServiceType.A3) {
+                                Text("وجه: ${PRICE_A3_SINGLE.fmt2f()}  |  وجهين: ${PRICE_A3_DOUBLE.fmt2f()}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (selected) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.outline)
+                            } else {
+                                Text("3.50 ← 5.00 ج / ورقة",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (selected) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Color tier info
+        AnimatedVisibility(visible = isColor) {
+            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.tertiaryContainer) {
+                Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("أسعار الطباعة الملونة", fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                    listOf("حتى 10 ورقات" to "5.00 ج", "11 → 50 ورقة" to "4.00 ج",
+                           "51 → 100 ورقة" to "3.75 ج", "أكثر من 100" to "3.50 ج").forEach { (range, price) ->
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(range, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                            Text(price, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        }
                     }
                 }
             }
@@ -259,30 +296,32 @@ private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
             }
         }
 
-        // ── Double-sided toggle ───────────────────────────────────────────────
-        Surface(shape = RoundedCornerShape(14.dp),
-            color = if (doubleSided) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.fillMaxWidth()) {
-            Row(modifier = Modifier.fillMaxWidth().clickable { doubleSided = !doubleSided }
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("وش وضهر", fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (doubleSided) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface)
-                    Text(
-                        "سعر الورقة: ${pricePerPage.fmt2f()} جنيه",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline)
+        // ── Double-sided toggle (hidden for color) ────────────────────────────
+        AnimatedVisibility(visible = !isColor) {
+            Surface(shape = RoundedCornerShape(14.dp),
+                color = if (doubleSided) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth().clickable { doubleSided = !doubleSided }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("وش وضهر", fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (doubleSided) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            "سعر الورقة: ${pricePerPage.fmt2f()} جنيه",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline)
+                    }
+                    Icon(if (doubleSided) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                        null,
+                        tint = if (doubleSided) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(28.dp))
                 }
-                Icon(if (doubleSided) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-                    null,
-                    tint = if (doubleSided) MaterialTheme.colorScheme.primary
-                           else MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(28.dp))
             }
         }
 
@@ -316,10 +355,10 @@ private fun PrintingSheetContent(onAddToCart: (Product) -> Unit) {
             onClick = {
                 val label = buildString {
                     append("${serviceType.label} $paperCount ورقة")
-                    if (doubleSided) append(" (وش وضهر)")
+                    if (!isColor && doubleSided) append(" (وش وضهر)")
                 }
                 onAddToCart(Product(
-                    id         = "${serviceType.name.lowercase()}_${paperCount}_${if (doubleSided) "dbl" else "sgl"}",
+                    id         = "${serviceType.name.lowercase()}_${paperCount}_${if (isColor) "color" else if (doubleSided) "dbl" else "sgl"}",
                     name       = label,
                     price      = totalPrice,
                     stock      = 999,
