@@ -2787,9 +2787,14 @@ internal fun WebReceiptsTab(
 
     // Month tabs: prefer availableMonths (fetched independently) so older months are shown
     // even if their receipts haven't been lazy-loaded yet.
+    // Always include currentMonthKey so the current month tab is visible even before the first
+    // receipt of the month is saved (avoids new receipts being hidden behind an old month tab).
     val availableMonths by receiptVm.availableMonths.collectAsState()
-    val months = availableMonths.ifEmpty {
-        confirmedReceipts.map { it.webMonthKey() }.filter { it != "unknown" }.distinct().sortedDescending()
+    val months = run {
+        val base = availableMonths.ifEmpty {
+            confirmedReceipts.map { it.webMonthKey() }.filter { it != "unknown" }.distinct()
+        }
+        (base + currentMonthKey).distinct().sortedDescending()
     }
 
     var selectedMonthIndex by remember(months) {

@@ -372,6 +372,7 @@ class ReceiptViewModel(
                         }
                     _stockVersion.value += 1
                     loadReceipts()
+                    loadAvailableMonths()
                     _orderSaved.value = true
                 } else {
                     _orderError.value = "فشل حفظ الفاتورة بعد 3 محاولات. تحقق من الاتصال بالإنترنت وحاول مرة أخرى."
