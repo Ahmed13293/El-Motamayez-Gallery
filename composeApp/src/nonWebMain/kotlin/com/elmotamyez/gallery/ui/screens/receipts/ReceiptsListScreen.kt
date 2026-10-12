@@ -136,9 +136,13 @@ class ReceiptsListScreen : Screen {
 
         // Month tabs: prefer availableMonths (fetched independently) so older months are shown
         // even if their receipts haven't been lazy-loaded yet.
+        // Always include currentMonthKey so the tab is visible before the first receipt of the month.
         val availableMonths by vm.availableMonths.collectAsState()
-        val months = availableMonths.ifEmpty {
-            confirmedReceipts.map { it.monthKey() }.filter { it != "unknown" }.distinct().sortedDescending()
+        val months = run {
+            val base = availableMonths.ifEmpty {
+                confirmedReceipts.map { it.monthKey() }.filter { it != "unknown" }.distinct()
+            }
+            (base + currentMonthKey).distinct().sortedDescending()
         }
 
         // Selected month tab index — default to current month, fallback to newest
