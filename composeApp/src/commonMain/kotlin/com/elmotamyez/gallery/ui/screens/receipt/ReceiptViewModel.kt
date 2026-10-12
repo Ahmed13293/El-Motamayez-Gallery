@@ -86,15 +86,19 @@ class ReceiptViewModel(
     var listScrollIndex: Int = 0
     var listScrollOffset: Int = 0
 
-    /** Called once when the grouped list is first built to seed default state (newest day open). */
+    /** Called when the grouped list changes — seeds or merges expanded state.
+     *  dateKeys must be sorted descending (most recent first). */
     fun initExpandedDays(dateKeys: List<String>) {
         if (_expandedDays.value.isEmpty()) {
-            // Only expand the first (most recent) day on initial load
+            // Fresh start — expand only the first (most recent) day
             _expandedDays.value = dateKeys.mapIndexed { i, key -> key to (i == 0) }.toMap()
         } else {
-            // Merge: keep existing state; new keys default to collapsed
+            // Merge: keep existing user state; for new keys (e.g. switching to a new month)
+            // expand the first (most recent) one so receipts are immediately visible.
             val current = _expandedDays.value.toMutableMap()
-            dateKeys.forEach { key -> if (!current.containsKey(key)) current[key] = false }
+            dateKeys.forEachIndexed { i, key ->
+                if (!current.containsKey(key)) current[key] = (i == 0)
+            }
             _expandedDays.value = current
         }
     }
